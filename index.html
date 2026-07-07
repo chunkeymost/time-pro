@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lini Waktu Proyek</title>
+<title>Proyek Management | as System Analyst</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -379,12 +379,14 @@
   .cat-pengujian{ background:var(--status-done); }
   .cat-peluncuran{ background:var(--status-risk); }
   .cat-lainnya{ background:var(--status-planned); }
+  .cat-research{ background:var(--gold); }
 
   .legend-dot.cat-desain, .tag-dot.cat-desain{ clip-path:polygon(50% 0%,0% 100%,100% 100%); }
   .legend-dot.cat-pengembangan, .tag-dot.cat-pengembangan{ clip-path:circle(50%); }
   .legend-dot.cat-pengujian, .tag-dot.cat-pengujian{ clip-path:polygon(50% 0%,100% 38%,82% 100%,18% 100%,0% 38%); }
   .legend-dot.cat-peluncuran, .tag-dot.cat-peluncuran{ clip-path:none; }
   .legend-dot.cat-lainnya, .tag-dot.cat-lainnya{ clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%); }
+  .legend-dot.cat-research, .tag-dot.cat-research{ clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%); }
   .cat-today{ background:var(--cut-line); }
   .legend-dot.cat-today{ clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%); }
 
@@ -666,7 +668,7 @@
 
   <header class="app-header">
     <div class="title-block">
-      <span class="eyebrow">Lini Waktu Proyek</span>
+      <span class="eyebrow">Proyek Management</span>
       <span id="project-title">Timeframe as a System Analyst</span>
       <span class="project-sub" id="project-range">—</span>
     </div>
@@ -733,6 +735,7 @@
           <option value="pengembangan">Pengembangan</option>
           <option value="pengujian">Pengujian</option>
           <option value="peluncuran">Peluncuran</option>
+          <option value="research">RnD (Research & Development)</option>
           <option value="lainnya">Lainnya</option>
         </select>
       </div>
@@ -799,6 +802,7 @@
     pengujian:     { label:"Pengujian",     cls:"cat-pengujian" },
     peluncuran:    { label:"Peluncuran",    cls:"cat-peluncuran" },
     lainnya:       { label:"Lainnya",       cls:"cat-lainnya" },
+    research:      { label:"RnD (Research & Development)", cls:"cat-research" },
   };
 
   function today(){
