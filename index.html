@@ -490,13 +490,16 @@
     gap:10px;
   }
   .link-danger{
-    background:none; border:none;
+    background:rgba(181,72,47,0.1);
+    border:1px solid var(--status-risk);
     color:var(--status-risk);
     font-size:12.5px;
     font-family:'IBM Plex Mono', monospace;
     cursor:pointer;
-    padding:6px 0;
+    padding:10px 16px;
+    border-radius:8px;
   }
+  .link-danger:hover{ background:rgba(181,72,47,0.2); }
   .modal-actions-right{ display:flex; gap:8px; }
 
   /* ---------- Empty state ---------- */
@@ -619,7 +622,7 @@
     </div>
 
     <div class="modal-actions">
-      <button class="link-danger" id="delete-btn" style="visibility:hidden;">Hapus tugas</button>
+      <button class="link-danger" id="delete-btn" style="visibility:hidden;">Hapus Tugas</button>
       <div class="modal-actions-right">
         <button class="btn btn-ghost" id="cancel-btn">Batal</button>
         <button class="btn btn-primary" id="save-btn">Simpan</button>
