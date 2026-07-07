@@ -27,9 +27,9 @@ Jangan gunakan skill ini jika pengguna secara eksplisit meminta file `.xlsx` (pa
    - Kategori/tim yang relevan (default: Desain, Pengembangan, Pengujian, Peluncuran, Lainnya) — ganti label & warna kelas `cat-*` di CSS bila pengguna menyebut tim/kategori berbeda (misalnya Marketing, Riset, Produksi).
 3. **Edit seperlunya di `<script>`**, bagian `let tasks = [...]` — ini satu-satunya tempat yang biasanya perlu diubah untuk mengganti data proyek. Setiap task punya bentuk:
    ```js
-   { id:1, name:"Nama Tugas", start:addDays(T,-4), end:addDays(T,4), cat:"desain", assignee:"Nama", progress:60 }
+   { id:1, name:"Nama Tugas", start:addDays(T,-4), end:addDays(T,4), cat:"desain", assignee:"Nama", progress:60, todos:[] }
    ```
-   `T` adalah variabel hari ini (`today()`), gunakan `addDays(T, n)` untuk tanggal relatif, atau `new Date(2026,6,15)` (bulan berbasis 0) untuk tanggal absolut.
+    `T` adalah variabel hari ini (`today()`), gunakan `addDays(T, n)` untuk tanggal relatif, atau `new Date(2026,6,15)` (bulan berbasis 0) untuk tanggal absolut. Field `todos` adalah array `{ id, text, done, due }` — progress otomatis terhitung dari checklist ini jika ada isinya.
 4. **Judul proyek**: ubah `value` pada `<input id="project-title">` di HTML sesuai nama proyek pengguna.
 5. **Jangan tambahkan localStorage/sessionStorage** — file ini dirender sebagai artifact HTML di Claude.ai, dan browser storage API tidak didukung di sana. Semua data tetap di variabel JS in-memory (`tasks` array), sesuai desain template.
 6. Simpan hasil akhir ke `/mnt/user-data/outputs/<nama-proyek>-timeline.html`, lalu presentasikan dengan `present_files`.
@@ -38,9 +38,14 @@ Jangan gunakan skill ini jika pengguna secara eksplisit meminta file `.xlsx` (pa
 
 - Ruler tanggal dengan mode tampilan **Minggu** (40px/hari) dan **Bulan** (14px/hari).
 - Garis merah **"HARI INI"** otomatis mengikuti tanggal sistem (`new Date()`).
-- **Drag** batang tugas untuk memindahkan jadwal, **tarik ujung kiri/kanan** untuk mengubah durasi — logika ada di fungsi `attachBarDrag`.
-- Modal tambah/ubah/hapus tugas (nama, tanggal, kategori, penanggung jawab, progres %).
+- **Drag** batang tugas untuk memindahkan jadwal, **tarik ujung kiri/kanan** untuk mengubah durasi — tanggal otomatis disnap ke hari kerja (Sen-Jum).
+- **Weekend skip** — bar timeline otomatis terpotong di Sabtu-Minggu, hanya muncul di hari kerja.
+- **Side panel kanan** — modal tambah/ubah/hapus tugas (nama, tanggal, kategori, penanggung jawab, progres %, todo list) tampil sebagai panel slide dari kanan, bukan popup tengah.
+- **To Do List** — setiap task bisa memiliki subtask checklist. Tiap todo punya due date (date picker) yang mengacu pada rentang start-end task utama. Progress task otomatis dihitung dari persentase todo yang selesai (slider progres disabled saat ada todos). Klik teks todo untuk mengedit. 
+- **Tag shapes unik** — tiap kategori punya bentuk berbeda di legend (segitiga, lingkaran, segi lima, kotak, belah ketupat, bintang).
 - Sidebar daftar tugas yang selalu sinkron dengan lini waktu.
+- Konfirmasi hapus — tombol hapus memunculkan dialog konfirmasi sebelum task dihapus.
+- Input tanggal native — field start/end date menggunakan `<input type="date">` (date picker browser).
 - Palet warna gaya "blueprint drafting" (kertas gambar teknis, tinta navy, aksen emas, garis potong merah) — token warna ada di `:root` CSS. Jika pengguna minta gaya visual berbeda, ubah token warna & font di `:root`, jangan tulis ulang struktur HTML/JS.
 
 ## Poin kustomisasi umum
@@ -51,11 +56,15 @@ Jangan gunakan skill ini jika pengguna secara eksplisit meminta file `.xlsx` (pa
 | Ganti kategori/tim | Objek `CATS` + kelas `.cat-*` di CSS |
 | Ganti skema warna | Variabel CSS di `:root` (`--paper`, `--ink`, `--gold`, dst.) |
 | Ganti bahasa ke Inggris | Semua teks berbahasa Indonesia (label, placeholder, `MONTHS_ID`, `DOW_ID`, teks tombol) |
-| Tambah kolom baru (mis. anggaran) | Tambah field di modal (`<div class="field">`) + properti baru di object task + tampilkan di `renderSidebar`/bar label sesuai kebutuhan |
+| Tambah kolom baru (mis. anggaran) | Tambah field di side panel (`<div class="field">`) + properti baru di object task + tampilkan di `renderSidebar`/bar label sesuai kebutuhan |
 | Export/import data (persist) | Tambahkan tombol export JSON (unduh file) / import (upload file) — **hindari** localStorage karena tidak didukung di artifact Claude.ai |
+| Ubah bentuk tag di legend | Edit `clip-path` di selector `.legend-dot.cat-*` dan `.tag-dot.cat-*` |
 
 ## Catatan teknis
 
 - Font dimuat dari Google Fonts CDN (`fonts.googleapis.com`) — ini dimuat oleh browser pengguna saat file dibuka, bukan oleh sandbox Claude, jadi tidak terpengaruh pembatasan jaringan di sisi Claude.
 - Semua tanggal dibandingkan sebagai objek `Date` dengan `setHours(0,0,0,0)` agar perbandingan hari akurat tanpa masalah zona waktu jam.
+- Progress task otomatis berasal dari todo checklist jika `task.todos.length > 0`; jika kosong, progress manual via slider.
+- Setiap todo memiliki field `due: Date` — date picker di sisi kiri input teks, range dibatasi oleh start-end task utama.
+- Helpers weekend: `isWeekend(d)`, `nextWeekday(d)`, `countWeekdays(a,b)` untuk menangani hari kerja.
 - File ini harus tetap **satu file tunggal** (CSS & JS inline) kecuali pengguna eksplisit minta dipecah menjadi beberapa file.
