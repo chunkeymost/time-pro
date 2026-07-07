@@ -68,6 +68,29 @@ app.delete('/api/tasks/:id', (req, res) => {
   }
 });
 
+/* ---------- Backup ---------- */
+
+app.post('/api/backup', (req, res) => {
+  const fs = require('fs');
+  const path = require('path');
+  const dataDir = path.dirname(config.dataPath);
+  const now = new Date();
+  const y = now.getFullYear();
+  const M = String(now.getMonth()+1).padStart(2,'0');
+  const d = String(now.getDate()).padStart(2,'0');
+  const h = String(now.getHours()).padStart(2,'0');
+  const m = String(now.getMinutes()).padStart(2,'0');
+  const s = String(now.getSeconds()).padStart(2,'0');
+  const filename = `task-${y}${M}${d}-${h}${m}${s}.json`;
+  const dest = path.join(dataDir, filename);
+  try {
+    fs.copyFileSync(config.dataPath, dest);
+    res.json({ success: true, file: filename });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ---------- Todos ---------- */
 
 app.post('/api/tasks/:id/todos', (req, res) => {

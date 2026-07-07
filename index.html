@@ -145,6 +145,8 @@
     color:var(--ink);
   }
   .btn-ghost:hover{ border-color:var(--ink-soft); }
+  #backup-btn{ background:#E67E22; border-color:#E67E22; color:#fff; }
+  #backup-btn:hover{ background:#D35400; border-color:#D35400; }
 
   /* ---------- Legend ---------- */
   .legend{
@@ -159,6 +161,26 @@
   .legend-label{font-weight:600; color:var(--ink); margin-right:4px;}
   .legend-item{display:flex; align-items:center; gap:7px;}
   .legend-dot{width:9px; height:9px; display:inline-block;}
+
+  /* ---------- Toast ---------- */
+  .toast-container{
+    position:fixed; bottom:24px; right:24px;
+    display:flex; flex-direction:column-reverse; gap:8px;
+    z-index:999;
+  }
+  .toast{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:13px; font-weight:500;
+    padding:12px 20px; border-radius:8px;
+    color:#fff; box-shadow:var(--shadow);
+    animation:toast-in .25s ease;
+  }
+  .toast.success{ background:var(--status-done); }
+  .toast.error{ background:var(--status-risk); }
+  @keyframes toast-in{
+    from{ opacity:0; transform:translateY(12px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
 
   /* ---------- Board layout ---------- */
   .board{
@@ -677,7 +699,8 @@
         <button data-view="week" class="active">MINGGU</button>
         <button data-view="month">BULAN</button>
       </div>
-      <button class="btn btn-ghost" id="today-btn">KE HARI INI</button>
+       <button class="btn btn-ghost" id="today-btn">KE HARI INI</button>
+      <button class="btn btn-ghost" id="backup-btn">KEPT ON IT</button>
       <button class="btn btn-primary" id="add-task-btn">+ TUGAS BARU</button>
     </div>
   </header>
@@ -700,6 +723,7 @@
     </div>
   </div>
 
+  <div class="toast-container" id="toast-container"></div>
 </div>
 
 <!-- Modal -->
@@ -835,6 +859,7 @@
   let tasks = [];
   let nextId = 1;
   let nextTodoId = 1;
+  let lastUpdated = null;
   let editingTodoId = null;
   let selectedId = null;
   let view = "week"; // "week" | "month"
@@ -906,6 +931,7 @@
       }));
       nextId = data.nextId;
       nextTodoId = data.nextTodoId;
+      lastUpdated = data.metadata?.updatedAt || null;
     } catch(e){
       console.error('Gagal memuat data:', e);
       alert('Gagal memuat data. Pastikan server API berjalan (node server.js).');
@@ -1162,12 +1188,19 @@
     return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
 
+  function fmtDateTime(isoStr){
+    if(!isoStr) return '';
+    const d = new Date(isoStr);
+    return `${String(d.getDate()).padStart(2,'0')} ${MONTHS_ID[d.getMonth()]} ${d.getFullYear()}, ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  }
+
   /* ---------------- Project range label ---------------- */
   function renderProjectRange(){
     if(tasks.length===0){ els.range.textContent='Belum ada tugas'; return; }
     let min=tasks[0].start, max=tasks[0].end;
     tasks.forEach(t=>{ if(t.start<min) min=t.start; if(t.end>max) max=t.end; });
-    els.range.textContent = `${fmt(min)} — ${fmt(max)} · ${tasks.length} tugas`;
+    const updated = lastUpdated ? ` · Last updated ${fmtDateTime(lastUpdated)}` : '';
+    els.range.textContent = `${fmt(min)} — ${fmt(max)} · ${tasks.length} tugas${updated}`;
   }
 
   /* ---------------- Master render ---------------- */
@@ -1198,6 +1231,33 @@
 
   document.getElementById('today-btn').addEventListener('click', ()=>{
     renderAll(true);
+  });
+
+  /* ---------------- Toast ---------------- */
+  function showToast(msg, type='success'){
+    const el = document.createElement('div');
+    el.className = 'toast '+type;
+    el.textContent = msg;
+    document.getElementById('toast-container').appendChild(el);
+    setTimeout(()=>{ el.remove(); }, 3000);
+  }
+
+  /* ---------------- Backup ---------------- */
+  document.getElementById('backup-btn').addEventListener('click', async ()=>{
+    const btn = document.getElementById('backup-btn');
+    btn.textContent = 'MENYIMPAN...';
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/backup', { method:'POST' });
+      const data = await res.json();
+      if(data.success) showToast('Backup berhasil: '+data.file);
+      else showToast('Backup gagal', 'error');
+    } catch(e){
+      showToast('Backup gagal: '+e.message, 'error');
+    } finally {
+      btn.textContent = 'KEPT ON IT';
+      btn.disabled = false;
+    }
   });
 
   /* ---------------- Modal logic ---------------- */
