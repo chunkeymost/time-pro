@@ -417,6 +417,7 @@
     overflow-y:auto;
     transform:translateX(100%);
     transition:transform .25s ease;
+    position:relative;
   }
   .overlay.open .modal{
     transform:translateX(0);
@@ -504,13 +505,14 @@
 
   /* ---------- Confirm dialog ---------- */
   .confirm-overlay{
-    position:fixed; inset:0;
+    position:absolute; inset:0;
     background:rgba(27,51,80,0.45);
-    z-index:60;
+    z-index:10;
     display:none;
     align-items:center;
     justify-content:center;
     padding:20px;
+    pointer-events:auto;
   }
   .confirm-overlay.open{ display:flex; }
   .confirm-box{
@@ -772,16 +774,16 @@
       </div>
     </div>
   </div>
-</div>
 
-<!-- Confirm dialog -->
-<div class="confirm-overlay" id="confirm-overlay">
-  <div class="confirm-box">
-    <div class="confirm-icon">!</div>
-    <div class="confirm-msg" id="confirm-msg">Yakin ingin menghapus tugas ini?</div>
-    <div class="confirm-actions">
-      <button class="btn btn-ghost" id="confirm-cancel">Batal</button>
-      <button class="btn confirm-yes" id="confirm-yes">Ya, Hapus</button>
+  <!-- Confirm dialog (inside modal) -->
+  <div class="confirm-overlay" id="confirm-overlay">
+    <div class="confirm-box">
+      <div class="confirm-icon">!</div>
+      <div class="confirm-msg" id="confirm-msg">Yakin ingin menghapus tugas ini?</div>
+      <div class="confirm-actions">
+        <button class="btn btn-ghost" id="confirm-cancel">Batal</button>
+        <button class="btn confirm-yes" id="confirm-yes">Ya, Hapus</button>
+      </div>
     </div>
   </div>
 </div>
@@ -826,20 +828,8 @@
 
   const T = today();
 
-  let tasks = [
-    { id:1, name:"Riset & Perencanaan",      start:addDays(T,-10), end:addDays(T,-3), cat:"lainnya",      assignee:"Dewi",  progress:100, todos:[] },
-    { id:2, name:"Desain Wireframe",          start:addDays(T,-4),  end:addDays(T,4),  cat:"desain",       assignee:"Rangga",progress:60,  todos:[] },
-    { id:3, name:"Desain Visual UI",          start:addDays(T,2),   end:addDays(T,9),  cat:"desain",       assignee:"Sari",  progress:20,  todos:[
-    { id:1, text:"Buat wireframe halaman utama", done:true, due:addDays(T,-2) },
-    { id:2, text:"Buat mockup dashboard", done:false, due:addDays(T,3) },
-    { id:3, text:"Revisi color palette", done:false, due:addDays(T,6) },
-    ] },
-    { id:4, name:"Pengembangan Backend",      start:addDays(T,3),   end:addDays(T,18), cat:"pengembangan", assignee:"Bima",  progress:10,  todos:[] },
-    { id:5, name:"Pengembangan Frontend",     start:addDays(T,6),   end:addDays(T,20), cat:"pengembangan", assignee:"Putri", progress:0,   todos:[] },
-    { id:6, name:"Pengujian QA",              start:addDays(T,18),  end:addDays(T,25), cat:"pengujian",    assignee:"Fajar", progress:0,   todos:[] },
-    { id:7, name:"Peluncuran ke Publik",      start:addDays(T,26),  end:addDays(T,28), cat:"peluncuran",   assignee:"Tim",   progress:0,   todos:[] },
-  ];
-  let nextId = 8;
+  let tasks = [];
+  let nextId = 1;
   let nextTodoId = 1;
   let editingTodoId = null;
   let selectedId = null;
@@ -877,22 +867,71 @@
     todoSection: document.getElementById('todo-section'),
   };
 
-  let confirmCallback = null;
+  /* ---------------- API helper ---------------- */
+  const api = {
+    async get(path) {
+      const r = await fetch(path);
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    },
+    async post(path, body) {
+      const r = await fetch(path, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    },
+    async put(path, body) {
+      const r = await fetch(path, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    },
+    async del(path) {
+      const r = await fetch(path, { method:'DELETE' });
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    },
+  };
 
-  function showConfirm(msg, cb){
-    els.confirmMsg.innerHTML = msg;
-    confirmCallback = cb;
-    els.confirmOverlay.classList.add('open');
+  async function loadTasks(){
+    try {
+      const data = await api.get('/api/tasks');
+      tasks = data.tasks.map(t => ({
+        ...t,
+        start: parseDate(t.start),
+        end: parseDate(t.end),
+        todos: (t.todos||[]).map(td => ({ ...td, due: td.due ? parseDate(td.due) : null })),
+      }));
+      nextId = data.nextId;
+      nextTodoId = data.nextTodoId;
+    } catch(e){
+      console.error('Gagal memuat data:', e);
+      alert('Gagal memuat data. Pastikan server API berjalan (node server.js).');
+    }
+    renderLegend();
+    renderAll(true);
+  }
+
+  let _confirmResolve = null;
+
+  function showConfirm(msg){
+    return new Promise(resolve => {
+      els.confirmMsg.innerHTML = msg;
+      _confirmResolve = resolve;
+      els.confirmOverlay.classList.add('open');
+    });
   }
   function closeConfirm(){
     els.confirmOverlay.classList.remove('open');
-    confirmCallback = null;
+    _confirmResolve = null;
   }
-  document.getElementById('confirm-cancel').addEventListener('click', closeConfirm);
+  document.getElementById('confirm-cancel').addEventListener('click', ()=>{
+    els.confirmOverlay.classList.remove('open');
+    _confirmResolve = null;
+  });
   els.confirmYes.addEventListener('click', ()=>{
-    const cb = confirmCallback;
-    closeConfirm();
-    if(cb) cb();
+    const resolve = _confirmResolve;
+    els.confirmOverlay.classList.remove('open');
+    _confirmResolve = null;
+    if(resolve) resolve();
   });
 
   /* ---------------- Legend ---------------- */
@@ -1083,6 +1122,12 @@
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
       mode = null;
+      if(task && bar._dragged){
+        api.put('/api/tasks/'+task.id, {
+          name: task.name, start: fmt(task.start), end: fmt(task.end),
+          cat: task.cat, assignee: task.assignee, progress: task.progress,
+        }).catch(e => console.error('Save drag failed:', e));
+      }
     }
 
     bar.addEventListener('mousedown', (e)=> onDown(e,'move'));
@@ -1182,7 +1227,8 @@
     els.fName.focus();
   }
 
-  function closeModal(){
+  function closeModal(force){
+    if(!force && els.confirmOverlay.classList.contains('open')) return;
     els.overlay.classList.remove('open');
     els.todoSection.style.display = '';
     cancelTodoEdit();
@@ -1213,10 +1259,12 @@
       `;
       tr.querySelector('.todo-cb').addEventListener('change', function(){
         todo.done = this.checked;
+        api.put('/api/tasks/'+task.id+'/todos/'+todo.id, { done: todo.done }).catch(e => console.error('Save todo cb failed:', e));
         updateProgressFromTodos(task);
         renderTodos(task);
       });
       tr.querySelector('.todo-del-btn').addEventListener('click', function(){
+        api.del('/api/tasks/'+task.id+'/todos/'+todo.id).catch(e => console.error('Delete todo failed:', e));
         task.todos = task.todos.filter(t=>t.id!==todo.id);
         updateProgressFromTodos(task);
         renderTodos(task);
@@ -1262,19 +1310,23 @@
     els.todoCancelBtn.style.display = 'none';
   }
 
-  els.todoAddBtn.addEventListener('click', ()=>{
+  els.todoAddBtn.addEventListener('click', async ()=>{
     const t = tasks.find(x=>x.id===editingId);
     if(!t) return;
     const text = els.todoInput.value.trim();
     if(!text) return;
-    const due = els.todoDate.value ? parseDate(els.todoDate.value) : null;
+    const dueStr = els.todoDate.value || null;
     t.todos = t.todos || [];
     if(editingTodoId){
       const todo = t.todos.find(x=>x.id===editingTodoId);
-      if(todo){ todo.text = text; todo.due = due; }
+      if(todo){ todo.text = text; todo.due = dueStr ? parseDate(dueStr) : null; }
+      api.put('/api/tasks/'+t.id+'/todos/'+editingTodoId, { text, due: dueStr }).catch(e => console.error('Save todo failed:', e));
       cancelTodoEdit();
     } else {
-      t.todos.push({ id:nextTodoId++, text, done:false, due });
+      try {
+        const result = await api.post('/api/tasks/'+t.id+'/todos', { text, due: dueStr });
+        t.todos.push({ id: result.todo.id, text: result.todo.text, done: false, due: result.todo.due ? parseDate(result.todo.due) : null });
+      } catch(e){ console.error('Failed to add todo:', e); return; }
       els.todoInput.value = '';
       els.todoDate.value = '';
     }
@@ -1296,7 +1348,7 @@
   els.overlay.addEventListener('click', (e)=>{ if(e.target===els.overlay) closeModal(); });
   els.confirmOverlay.addEventListener('click', (e)=>{ if(e.target===els.confirmOverlay) closeConfirm(); });
 
-  document.getElementById('save-btn').addEventListener('click', ()=>{
+  document.getElementById('save-btn').addEventListener('click', async ()=>{
     const name = els.fName.value.trim();
     const start = parseDate(els.fStart.value);
     const end = parseDate(els.fEnd.value);
@@ -1304,31 +1356,39 @@
     if(!start || !end){ alert('Format tanggal harus YYYY-MM-DD.'); return; }
     if(end < start){ alert('Tanggal selesai harus setelah tanggal mulai.'); return; }
 
+    const cat = els.fCat.value;
+    const assignee = els.fAssignee.value.trim();
+    const progress = Number(els.fProgress.value);
+
     if(editingId){
       const t = tasks.find(x=>x.id===editingId);
+      if(!t) return;
       t.name = name; t.start = start; t.end = end;
-      t.cat = els.fCat.value; t.assignee = els.fAssignee.value.trim();
-      t.progress = Number(els.fProgress.value);
+      t.cat = cat; t.assignee = assignee; t.progress = progress;
+      api.put('/api/tasks/'+editingId, { name, start:fmt(start), end:fmt(end), cat, assignee, progress }).catch(e => console.error('Save task failed:', e));
     } else {
-      tasks.push({
-        id: nextId++, name, start, end,
-        cat: els.fCat.value,
-        assignee: els.fAssignee.value.trim(),
-        progress: Number(els.fProgress.value),
-        todos: []
-      });
+      try {
+        const result = await api.post('/api/tasks', { name, start:fmt(start), end:fmt(end), cat, assignee, progress });
+        tasks.push({
+          ...result.task,
+          start: parseDate(result.task.start),
+          end: parseDate(result.task.end),
+          todos: (result.task.todos||[]).map(td => ({ ...td, due: td.due ? parseDate(td.due) : null })),
+        });
+      } catch(e){ console.error('Failed to create task:', e); return; }
     }
     closeModal();
     renderAll(false);
   });
 
-  document.getElementById('delete-btn').addEventListener('click', ()=>{
+  document.getElementById('delete-btn').addEventListener('click', async ()=>{
     if(!editingId) return;
-    showConfirm('Yakin ingin menghapus tugas <strong>'+escapeHtml(tasks.find(t=>t.id===editingId)?.name||'')+'</strong>?', ()=>{
-      tasks = tasks.filter(t=>t.id!==editingId);
-      closeModal();
-      renderAll(false);
-    });
+    const name = tasks.find(t=>t.id===editingId)?.name||'';
+    await showConfirm('Yakin ingin menghapus tugas <strong>'+escapeHtml(name)+'</strong>?');
+    api.del('/api/tasks/'+editingId).catch(e => console.error('Delete task failed:', e));
+    tasks = tasks.filter(t=>t.id!==editingId);
+    closeModal(true);
+    renderAll(false);
   });
 
   document.getElementById('add-task-btn').addEventListener('click', ()=> openModal(null));
@@ -1340,8 +1400,7 @@
   });
 
   /* ---------------- Init ---------------- */
-  renderLegend();
-  renderAll(true);
+  loadTasks();
 
 })();
 </script>

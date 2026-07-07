@@ -1,6 +1,21 @@
 # Time Pro — Lini Waktu Proyek
 
-Project management timeline / Gantt chart interaktif dalam satu file HTML mandiri tanpa framework atau build step.
+Project management timeline / Gantt chart interaktif dengan backend Node.js + JSON storage.
+
+## Cara Menjalankan
+
+```bash
+# Install dependencies
+npm install
+
+# Jalankan server
+npm start
+
+# Atau dengan auto-reload (development)
+npm run dev
+```
+
+Buka `http://localhost:3000` di browser.
 
 ## Target Purpose
 
@@ -14,24 +29,56 @@ Aplikasi web ringan untuk memvisualisasikan, melacak, dan mengelola jadwal tugas
 - **Sidebar Daftar Tugas** — Selalu sinkron dengan timeline
 - **Kategori & Warna** — 5 kategori tugas (Desain, Pengembangan, Pengujian, Peluncuran, Lainnya) dengan kode warna berbeda
 - **Progress Bar** — Visualisasi persentase progres per tugas
+- **To Do List** — Subtask checklist dengan due date; progress otomatis terhitung dari todo yang selesai
 - **Garis "Hari Ini"** — Penanda tanggal sekarang secara otomatis
-- **Legend** — Label kategori dan keterangan visual
+- **Persistent Storage** — Data tersimpan di `data/tasks.json` (tidak hilang saat refresh)
 
-## Solusi
+## Arsitektur
 
-- **Tanpa dependensi** — Satu file `.html` bisa langsung dibuka di browser
-- **Data in-memory** — Semua perubahan tersimpan selama sesi, cukup reload untuk data awal
-- **Drag & resize** — Penyesuaian jadwal secara visual tanpa input manual tanggal
-- **Ringan & cepat** — Zero build step, zero framework, cocok untuk artifact sharing
+```
+Browser (index.html)
+      ↕ REST API (fetch / JSON)
+Node.js + Express (server.js)
+      ↕
+data/tasks.json        ← Phase 1 (JSON Storage)
+MySQL Database         ← Phase 2 (coming soon)
+      ↕ Sync
+POST /api/sync/commit  ← Phase 3 (coming soon)
+```
 
-## Update — Peningkatan dari v1.0
+Lihat `ARCHITECTURE.md` untuk detail arsitektur.
 
-- **Side Panel** — Modal form berubah dari popup tengah menjadi side panel kanan (45% lebar) dengan animasi slide
-- **To Do List** — Setiap tugas bisa memiliki subtask checklist dengan due date; progress otomatis terhitung dari todo yang selesai
-- **Weekend Skip** — Bar timeline otomatis terpotong di akhir pekan, hanya muncul di hari kerja
-- **Snap ke Hari Kerja** — Drag & resize otomatis menyesuaikan ke hari Senin–Jumat
-- **Tag Shapes Unik** — Setiap kategori punya bentuk clip-path berbeda (segitiga, lingkaran, segi lima, kotak, belah ketupat, bintang)
-- **Date Picker Native** — Input start/end date menggunakan date picker browser
-- **Konfirmasi Hapus** — Dialog konfirmasi sebelum tugas dihapus
-- **Layout Full-width** — App menggunakan lebar penuh dengan padding responsif
-- **Grid Opacity** — Opasitas background grid dikurangi menjadi 35%
+## API
+
+| Method | Endpoint | Deskripsi |
+|--------|----------|-----------|
+| `GET` | `/api/tasks` | Ambil semua data |
+| `POST` | `/api/tasks` | Buat task baru |
+| `PUT` | `/api/tasks/:id` | Update task |
+| `DELETE` | `/api/tasks/:id` | Hapus task + todos |
+| `POST` | `/api/tasks/:id/todos` | Tambah todo |
+| `PUT` | `/api/tasks/:id/todos/:todoId` | Update todo |
+| `DELETE` | `/api/tasks/:id/todos/:todoId` | Hapus todo |
+| `POST` | `/api/sync/commit` | (Phase 3) Sync JSON → MySQL |
+
+## Rencana Pengembangan
+
+| Phase | Status | Deskripsi |
+|-------|--------|-----------|
+| **Phase 1** | ✅ Selesai | JSON file storage via Node.js backend |
+| **Phase 2** | 📋 Rencana | MySQL storage engine |
+| **Phase 3** | 📋 Rencana | Sync mechanism (JSON ↔ MySQL) |
+
+Lihat `PLAN.md` untuk detail rencana implementasi.
+
+## Tech Stack
+
+- **Frontend:** Vanilla HTML5, CSS3, JavaScript (ES6+) — single file
+- **Backend:** Node.js 20+, Express 4
+- **Dependencies:** express, cors, mysql2
+
+## Catatan
+
+- Data tersimpan secara persistent di `data/tasks.json` — tidak hilang saat browser di-refresh
+- Seed data (7 contoh task) dibuat otomatis saat pertama kali server dijalankan
+- File `index.html` tetap single-file; backend terpisah di `server.js` + `src/`

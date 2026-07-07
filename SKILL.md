@@ -60,6 +60,43 @@ Jangan gunakan skill ini jika pengguna secara eksplisit meminta file `.xlsx` (pa
 | Export/import data (persist) | Tambahkan tombol export JSON (unduh file) / import (upload file) — **hindari** localStorage karena tidak didukung di artifact Claude.ai |
 | Ubah bentuk tag di legend | Edit `clip-path` di selector `.legend-dot.cat-*` dan `.tag-dot.cat-*` |
 
+## Cara menjalankan (dengan Node.js backend)
+
+1. Pastikan Node.js 20+ terinstall
+2. `npm install`
+3. `node server.js` (atau `npm run dev` untuk auto-reload)
+4. Buka `http://localhost:3000` di browser
+
+## API Backend (Express + JSON Storage)
+
+Aplikasi sekarang memiliki backend Node.js yang menyediakan REST API:
+
+- **Storage:** JSON file (`data/tasks.json`) — auto-seed dengan 7 contoh task
+- **Frontend:** `index.html` berkomunikasi dengan backend via `fetch()`
+- **Semua CRUD** dilakukan melalui API, bukan in-memory
+
+### Endpoints
+
+| Method | Endpoint | Deskripsi |
+|--------|----------|-----------|
+| `GET` | `/api/tasks` | Ambil semua data |
+| `POST` | `/api/tasks` | Buat task baru |
+| `PUT` | `/api/tasks/:id` | Update task |
+| `DELETE` | `/api/tasks/:id` | Hapus task + todos |
+| `POST` | `/api/tasks/:id/todos` | Tambah todo |
+| `PUT` | `/api/tasks/:id/todos/:todoId` | Update todo |
+| `DELETE` | `/api/tasks/:id/todos/:todoId` | Hapus todo |
+| `POST` | `/api/sync/commit` | (Phase 3) Sync ke MySQL |
+
+### Struktur data
+
+Lihat `ARCHITECTURE.md` untuk detail data model Task dan Todo.
+
+### Pengembangan
+
+- `npm start` — Jalankan production server
+- `npm run dev` — Jalankan dengan `--watch` (auto-restart pada perubahan)
+
 ## Catatan teknis
 
 - Font dimuat dari Google Fonts CDN (`fonts.googleapis.com`) — ini dimuat oleh browser pengguna saat file dibuka, bukan oleh sandbox Claude, jadi tidak terpengaruh pembatasan jaringan di sisi Claude.
@@ -67,4 +104,5 @@ Jangan gunakan skill ini jika pengguna secara eksplisit meminta file `.xlsx` (pa
 - Progress task otomatis berasal dari todo checklist jika `task.todos.length > 0`; jika kosong, progress manual via slider.
 - Setiap todo memiliki field `due: Date` — date picker di sisi kiri input teks, range dibatasi oleh start-end task utama.
 - Helpers weekend: `isWeekend(d)`, `nextWeekday(d)`, `countWeekdays(a,b)` untuk menangani hari kerja.
-- File ini harus tetap **satu file tunggal** (CSS & JS inline) kecuali pengguna eksplisit minta dipecah menjadi beberapa file.
+- File `index.html` harus tetap **satu file tunggal** (CSS & JS inline) — backend terpisah di `server.js` dan `src/`.
+- Lihat `ARCHITECTURE.md` untuk arsitektur dan `PLAN.md` untuk rencana implementasi.
