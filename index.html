@@ -156,6 +156,7 @@
     font-size:11.5px;
     color:var(--ink-soft);
   }
+  .legend-label{font-weight:600; color:var(--ink); margin-right:4px;}
   .legend-item{display:flex; align-items:center; gap:7px;}
   .legend-dot{width:9px; height:9px; border-radius:2px; display:inline-block;}
 
@@ -492,8 +493,8 @@
         <button data-view="week" class="active">MINGGU</button>
         <button data-view="month">BULAN</button>
       </div>
-      <button class="btn btn-ghost" id="today-btn">Ke Hari Ini</button>
-      <button class="btn btn-primary" id="add-task-btn">+ Tugas Baru</button>
+      <button class="btn btn-ghost" id="today-btn">KE HARI INI</button>
+      <button class="btn btn-primary" id="add-task-btn">+ TUGAS BARU</button>
     </div>
   </header>
 
@@ -652,9 +653,11 @@
 
   /* ---------------- Legend ---------------- */
   function renderLegend(){
-    els.legend.innerHTML = Object.values(CATS).map(c =>
-      `<span class="legend-item"><span class="legend-dot ${c.cls}"></span>${c.label}</span>`
-    ).join('') + `<span class="legend-item"><span class="legend-dot" style="background:var(--cut-line)"></span>Hari ini</span>`;
+    els.legend.innerHTML =
+      `<span class="legend-label">Tags : </span>` +
+      Object.values(CATS).map(c =>
+        `<span class="legend-item"><span class="legend-dot ${c.cls}"></span>${c.label}</span>`
+      ).join('') + `<span class="legend-item"><span class="legend-dot" style="background:var(--cut-line)"></span>Hari ini</span>`;
   }
 
   /* ---------------- Range calc ---------------- */
