@@ -569,7 +569,6 @@
     margin-bottom:8px;
   }
   .todo-add input{
-    flex:1;
     padding:7px 10px;
     border:1px solid var(--paper-line-strong);
     border-radius:7px;
@@ -579,6 +578,7 @@
     background:var(--paper);
     outline:none;
   }
+  .todo-date-input{ width:140px; }
   .todo-add input:focus{ outline:2px solid var(--gold); outline-offset:1px; }
   .todo-add .btn{ font-size:12px; padding:7px 12px; white-space:nowrap; }
   .todo-table{
@@ -603,6 +603,7 @@
     vertical-align:middle;
   }
   .todo-num{ width:32px; }
+  .todo-due{ width:90px; }
   .todo-status{ width:40px; text-align:center !important; }
   .todo-del{ width:28px; }
   .todo-table tbody tr:hover{ background:var(--paper); }
@@ -750,13 +751,14 @@
     <div class="todo-section" id="todo-section">
       <label class="todo-label">To Do List</label>
       <div class="todo-add">
-        <input type="text" id="todo-input" placeholder="Tambah aktivitas...">
+        <input type="date" id="todo-date" class="todo-date-input">
+        <input type="text" id="todo-input" placeholder="Tambah aktivitas..." style="flex:1;">
         <button class="btn btn-ghost" id="todo-cancel-btn" style="display:none;">Batal</button>
         <button class="btn btn-ghost" id="todo-add-btn">Tambah</button>
       </div>
       <table class="todo-table" id="todo-table">
         <thead>
-          <tr><th class="todo-num">No.</th><th>To Do List</th><th class="todo-status">Status</th><th class="todo-del"></th></tr>
+          <tr><th class="todo-num">No.</th><th>To Do List</th><th class="todo-due">Tanggal</th><th class="todo-status">Status</th><th class="todo-del"></th></tr>
         </thead>
         <tbody id="todo-body"></tbody>
       </table>
@@ -828,9 +830,9 @@
     { id:1, name:"Riset & Perencanaan",      start:addDays(T,-10), end:addDays(T,-3), cat:"lainnya",      assignee:"Dewi",  progress:100, todos:[] },
     { id:2, name:"Desain Wireframe",          start:addDays(T,-4),  end:addDays(T,4),  cat:"desain",       assignee:"Rangga",progress:60,  todos:[] },
     { id:3, name:"Desain Visual UI",          start:addDays(T,2),   end:addDays(T,9),  cat:"desain",       assignee:"Sari",  progress:20,  todos:[
-      { id:1, text:"Buat wireframe halaman utama", done:true },
-      { id:2, text:"Buat mockup dashboard", done:false },
-      { id:3, text:"Revisi color palette", done:false },
+    { id:1, text:"Buat wireframe halaman utama", done:true, due:addDays(T,-2) },
+    { id:2, text:"Buat mockup dashboard", done:false, due:addDays(T,3) },
+    { id:3, text:"Revisi color palette", done:false, due:addDays(T,6) },
     ] },
     { id:4, name:"Pengembangan Backend",      start:addDays(T,3),   end:addDays(T,18), cat:"pengembangan", assignee:"Bima",  progress:10,  todos:[] },
     { id:5, name:"Pengembangan Frontend",     start:addDays(T,6),   end:addDays(T,20), cat:"pengembangan", assignee:"Putri", progress:0,   todos:[] },
@@ -864,6 +866,7 @@
     fProgress: document.getElementById('f-progress'),
     fProgressVal: document.getElementById('f-progress-val'),
     todoInput: document.getElementById('todo-input'),
+    todoDate: document.getElementById('todo-date'),
     todoAddBtn: document.getElementById('todo-add-btn'),
     todoCancelBtn: document.getElementById('todo-cancel-btn'),
     todoBody: document.getElementById('todo-body'),
@@ -1166,6 +1169,13 @@
     selectedId = task ? task.id : null;
     renderSidebar();
     els.todoSection.style.display = task ? '' : 'none';
+    if(task){
+      els.todoDate.min = fmt(task.start);
+      els.todoDate.max = fmt(task.end);
+    } else {
+      els.todoDate.min = '';
+      els.todoDate.max = '';
+    }
     renderTodos(task);
     updateProgressSlider(task);
     els.overlay.classList.add('open');
@@ -1189,7 +1199,7 @@
   function renderTodos(task){
     els.todoBody.innerHTML = '';
     if(!task || !task.todos || task.todos.length===0){
-      els.todoBody.innerHTML = '<tr><td colspan="4" style="padding:16px 4px;color:var(--ink-faint);font-size:12px;">Belum ada aktivitas.</td></tr>';
+      els.todoBody.innerHTML = '<tr><td colspan="5" style="padding:16px 4px;color:var(--ink-faint);font-size:12px;">Belum ada aktivitas.</td></tr>';
       return;
     }
     task.todos.forEach((todo, i)=>{
@@ -1197,6 +1207,7 @@
       tr.innerHTML = `
         <td class="todo-num">${i+1}</td>
         <td><span class="todo-text${todo.done?' done':''}">${escapeHtml(todo.text)}</span></td>
+        <td class="todo-due" style="font-size:11px;font-family:'IBM Plex Mono',monospace;">${todo.due ? fmt(todo.due) : '—'}</td>
         <td class="todo-status"><input type="checkbox" class="todo-cb" data-todo-id="${todo.id}"${todo.done?' checked':''}></td>
         <td class="todo-del"><button class="todo-del-btn" data-todo-id="${todo.id}">&times;</button></td>
       `;
@@ -1214,6 +1225,7 @@
       tr.querySelector('.todo-text').addEventListener('click', function(){
         editingTodoId = todo.id;
         els.todoInput.value = todo.text;
+        els.todoDate.value = todo.due ? fmt(todo.due) : '';
         els.todoAddBtn.textContent = 'Ubah';
         els.todoCancelBtn.style.display = '';
         els.todoInput.focus();
@@ -1245,6 +1257,7 @@
   function cancelTodoEdit(){
     editingTodoId = null;
     els.todoInput.value = '';
+    els.todoDate.value = '';
     els.todoAddBtn.textContent = 'Tambah';
     els.todoCancelBtn.style.display = 'none';
   }
@@ -1254,14 +1267,16 @@
     if(!t) return;
     const text = els.todoInput.value.trim();
     if(!text) return;
+    const due = els.todoDate.value ? parseDate(els.todoDate.value) : null;
     t.todos = t.todos || [];
     if(editingTodoId){
       const todo = t.todos.find(x=>x.id===editingTodoId);
-      if(todo) todo.text = text;
+      if(todo){ todo.text = text; todo.due = due; }
       cancelTodoEdit();
     } else {
-      t.todos.push({ id:nextTodoId++, text, done:false });
+      t.todos.push({ id:nextTodoId++, text, done:false, due });
       els.todoInput.value = '';
+      els.todoDate.value = '';
     }
     els.todoInput.focus();
     renderTodos(t);
@@ -1269,6 +1284,9 @@
     updateProgressSlider(t);
   });
   els.todoInput.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter') els.todoAddBtn.click();
+  });
+  els.todoDate.addEventListener('keydown', (e)=>{
     if(e.key==='Enter') els.todoAddBtn.click();
   });
   els.todoCancelBtn.addEventListener('click', cancelTodoEdit);
