@@ -45,9 +45,9 @@
 
   /* ---------- App shell ---------- */
   .app{
-    max-width:1400px;
+    max-width:100%;
     margin:0 auto;
-    padding:28px 28px 60px;
+    padding:clamp(12px,3.5vw,28px) clamp(12px,3.5vw,28px) 60px;
   }
 
   /* ---------- Header ---------- */
@@ -469,9 +469,21 @@
     color:var(--ink-soft);
   }
 
-  @media (max-width: 760px){
+  @media (max-width: 820px){
     .board{ grid-template-columns:200px 1fr; }
     #project-title{ font-size:22px; }
+    .app-header{ gap:12px; }
+    .header-actions{ width:100%; }
+    .view-toggle{ flex:1; }
+    .view-toggle button{ flex:1; text-align:center; }
+  }
+
+  @media (max-width: 480px){
+    .board{ grid-template-columns:1fr; border-radius:6px; }
+    .sidebar{ border-right:none; border-bottom:1px solid var(--paper-line-strong); }
+    #project-title{ font-size:18px; }
+    .legend{ gap:8px; font-size:10.5px; }
+    .title-block{ min-width:0; }
   }
 
   @media (prefers-reduced-motion: reduce){
