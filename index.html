@@ -502,7 +502,132 @@
   .link-danger:hover{ background:rgba(181,72,47,0.2); }
   .modal-actions-right{ display:flex; gap:8px; }
 
-  /* ---------- Empty state ---------- */
+  /* ---------- Confirm dialog ---------- */
+  .confirm-overlay{
+    position:fixed; inset:0;
+    background:rgba(27,51,80,0.45);
+    z-index:60;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+  }
+  .confirm-overlay.open{ display:flex; }
+  .confirm-box{
+    background:var(--surface);
+    border-radius:12px;
+    box-shadow:0 20px 50px rgba(15,30,50,.25);
+    padding:28px 24px 20px;
+    text-align:center;
+    width:340px;
+    max-width:100%;
+    font-family:'Inter', sans-serif;
+  }
+  .confirm-icon{
+    width:44px; height:44px;
+    border-radius:50%;
+    background:rgba(181,72,47,0.12);
+    color:var(--status-risk);
+    font-size:22px;
+    font-weight:700;
+    line-height:44px;
+    text-align:center;
+    margin:0 auto 14px;
+  }
+  .confirm-msg{
+    font-size:14px;
+    color:var(--ink);
+    margin-bottom:20px;
+    line-height:1.4;
+  }
+  .confirm-actions{
+    display:flex;
+    gap:10px;
+    justify-content:center;
+  }
+  .confirm-yes{
+    background:var(--status-risk);
+    color:#fff;
+    border:1px solid var(--status-risk);
+  }
+  .confirm-yes:hover{ background:#9e3d28; }
+
+  /* ---------- To Do List ---------- */
+  .todo-section{ margin-bottom:14px; }
+  .todo-label{
+    display:block;
+    font-size:11.5px;
+    font-weight:600;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin-bottom:8px;
+  }
+  .todo-add{
+    display:flex;
+    gap:6px;
+    margin-bottom:8px;
+  }
+  .todo-add input{
+    flex:1;
+    padding:7px 10px;
+    border:1px solid var(--paper-line-strong);
+    border-radius:7px;
+    font-size:13px;
+    font-family:'Inter', sans-serif;
+    color:var(--ink);
+    background:var(--paper);
+    outline:none;
+  }
+  .todo-add input:focus{ outline:2px solid var(--gold); outline-offset:1px; }
+  .todo-add .btn{ font-size:12px; padding:7px 12px; white-space:nowrap; }
+  .todo-table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:12.5px;
+    table-layout:fixed;
+  }
+  .todo-table thead th{
+    text-align:left;
+    font-size:10px;
+    font-weight:600;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    padding:4px 4px 6px;
+    border-bottom:1px solid var(--paper-line);
+  }
+  .todo-table tbody td{
+    padding:6px 4px;
+    border-bottom:1px solid var(--paper-line);
+    vertical-align:middle;
+  }
+  .todo-num{ width:32px; }
+  .todo-status{ width:40px; text-align:center !important; }
+  .todo-del{ width:28px; }
+  .todo-table tbody tr:hover{ background:var(--paper); }
+  .todo-text{
+    color:var(--ink);
+    word-wrap:break-word;
+    overflow-wrap:break-word;
+  }
+  .todo-text.done{ text-decoration:line-through; color:var(--ink-faint); }
+  .todo-cb{
+    width:16px; height:16px;
+    accent-color:var(--status-done);
+    cursor:pointer;
+  }
+  .todo-del-btn{
+    background:none; border:none;
+    color:var(--ink-faint);
+    cursor:pointer;
+    font-size:16px;
+    line-height:1;
+    padding:2px;
+    opacity:0;
+  }
+  .todo-table tbody tr:hover .todo-del-btn{ opacity:1; }
+  .todo-del-btn:hover{ color:var(--status-risk); }
   .empty-board{
     padding:60px 20px;
     text-align:center;
@@ -621,12 +746,38 @@
       </div>
     </div>
 
+    <div class="todo-section" id="todo-section">
+      <label class="todo-label">To Do List</label>
+      <div class="todo-add">
+        <input type="text" id="todo-input" placeholder="Tambah aktivitas...">
+        <button class="btn btn-ghost" id="todo-add-btn">Tambah</button>
+      </div>
+      <table class="todo-table" id="todo-table">
+        <thead>
+          <tr><th class="todo-num">No.</th><th>To Do List</th><th class="todo-status">Status</th><th class="todo-del"></th></tr>
+        </thead>
+        <tbody id="todo-body"></tbody>
+      </table>
+    </div>
+
     <div class="modal-actions">
       <button class="link-danger" id="delete-btn" style="visibility:hidden;">Hapus Tugas</button>
       <div class="modal-actions-right">
         <button class="btn btn-ghost" id="cancel-btn">Batal</button>
         <button class="btn btn-primary" id="save-btn">Simpan</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm dialog -->
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-box">
+    <div class="confirm-icon">!</div>
+    <div class="confirm-msg" id="confirm-msg">Yakin ingin menghapus tugas ini?</div>
+    <div class="confirm-actions">
+      <button class="btn btn-ghost" id="confirm-cancel">Batal</button>
+      <button class="btn confirm-yes" id="confirm-yes">Ya, Hapus</button>
     </div>
   </div>
 </div>
@@ -672,15 +823,20 @@
   const T = today();
 
   let tasks = [
-    { id:1, name:"Riset & Perencanaan",      start:addDays(T,-10), end:addDays(T,-3), cat:"lainnya",      assignee:"Dewi",  progress:100 },
-    { id:2, name:"Desain Wireframe",          start:addDays(T,-4),  end:addDays(T,4),  cat:"desain",       assignee:"Rangga",progress:60  },
-    { id:3, name:"Desain Visual UI",          start:addDays(T,2),   end:addDays(T,9),  cat:"desain",       assignee:"Sari",  progress:20  },
-    { id:4, name:"Pengembangan Backend",      start:addDays(T,3),   end:addDays(T,18), cat:"pengembangan", assignee:"Bima",  progress:10  },
-    { id:5, name:"Pengembangan Frontend",     start:addDays(T,6),   end:addDays(T,20), cat:"pengembangan", assignee:"Putri", progress:0   },
-    { id:6, name:"Pengujian QA",              start:addDays(T,18),  end:addDays(T,25), cat:"pengujian",    assignee:"Fajar", progress:0   },
-    { id:7, name:"Peluncuran ke Publik",      start:addDays(T,26),  end:addDays(T,28), cat:"peluncuran",   assignee:"Tim",   progress:0   },
+    { id:1, name:"Riset & Perencanaan",      start:addDays(T,-10), end:addDays(T,-3), cat:"lainnya",      assignee:"Dewi",  progress:100, todos:[] },
+    { id:2, name:"Desain Wireframe",          start:addDays(T,-4),  end:addDays(T,4),  cat:"desain",       assignee:"Rangga",progress:60,  todos:[] },
+    { id:3, name:"Desain Visual UI",          start:addDays(T,2),   end:addDays(T,9),  cat:"desain",       assignee:"Sari",  progress:20,  todos:[
+      { id:1, text:"Buat wireframe halaman utama", done:true },
+      { id:2, text:"Buat mockup dashboard", done:false },
+      { id:3, text:"Revisi color palette", done:false },
+    ] },
+    { id:4, name:"Pengembangan Backend",      start:addDays(T,3),   end:addDays(T,18), cat:"pengembangan", assignee:"Bima",  progress:10,  todos:[] },
+    { id:5, name:"Pengembangan Frontend",     start:addDays(T,6),   end:addDays(T,20), cat:"pengembangan", assignee:"Putri", progress:0,   todos:[] },
+    { id:6, name:"Pengujian QA",              start:addDays(T,18),  end:addDays(T,25), cat:"pengujian",    assignee:"Fajar", progress:0,   todos:[] },
+    { id:7, name:"Peluncuran ke Publik",      start:addDays(T,26),  end:addDays(T,28), cat:"peluncuran",   assignee:"Tim",   progress:0,   todos:[] },
   ];
   let nextId = 8;
+  let nextTodoId = 1;
   let selectedId = null;
   let view = "week"; // "week" | "month"
   let dayWidth = 40;
@@ -704,8 +860,33 @@
     fAssignee: document.getElementById('f-assignee'),
     fProgress: document.getElementById('f-progress'),
     fProgressVal: document.getElementById('f-progress-val'),
+    todoInput: document.getElementById('todo-input'),
+    todoAddBtn: document.getElementById('todo-add-btn'),
+    todoBody: document.getElementById('todo-body'),
     deleteBtn: document.getElementById('delete-btn'),
+    confirmOverlay: document.getElementById('confirm-overlay'),
+    confirmMsg: document.getElementById('confirm-msg'),
+    confirmYes: document.getElementById('confirm-yes'),
+    todoSection: document.getElementById('todo-section'),
   };
+
+  let confirmCallback = null;
+
+  function showConfirm(msg, cb){
+    els.confirmMsg.innerHTML = msg;
+    confirmCallback = cb;
+    els.confirmOverlay.classList.add('open');
+  }
+  function closeConfirm(){
+    els.confirmOverlay.classList.remove('open');
+    confirmCallback = null;
+  }
+  document.getElementById('confirm-cancel').addEventListener('click', closeConfirm);
+  els.confirmYes.addEventListener('click', ()=>{
+    const cb = confirmCallback;
+    closeConfirm();
+    if(cb) cb();
+  });
 
   /* ---------------- Legend ---------------- */
   function renderLegend(){
@@ -980,12 +1161,16 @@
     els.deleteBtn.style.visibility = task ? 'visible' : 'hidden';
     selectedId = task ? task.id : null;
     renderSidebar();
+    els.todoSection.style.display = task ? '' : 'none';
+    renderTodos(task);
+    updateProgressSlider(task);
     els.overlay.classList.add('open');
     els.fName.focus();
   }
 
   function closeModal(){
     els.overlay.classList.remove('open');
+    els.todoSection.style.display = '';
     editingId = null;
     selectedId = null;
     renderSidebar();
@@ -995,9 +1180,77 @@
     els.fProgressVal.textContent = els.fProgress.value+'%';
   });
 
+  /* ---------------- To Do List ---------------- */
+  function renderTodos(task){
+    els.todoBody.innerHTML = '';
+    if(!task || !task.todos || task.todos.length===0){
+      els.todoBody.innerHTML = '<tr><td colspan="4" style="padding:16px 4px;color:var(--ink-faint);font-size:12px;">Belum ada aktivitas.</td></tr>';
+      return;
+    }
+    task.todos.forEach((todo, i)=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="todo-num">${i+1}</td>
+        <td><span class="todo-text${todo.done?' done':''}">${escapeHtml(todo.text)}</span></td>
+        <td class="todo-status"><input type="checkbox" class="todo-cb" data-todo-id="${todo.id}"${todo.done?' checked':''}></td>
+        <td class="todo-del"><button class="todo-del-btn" data-todo-id="${todo.id}">&times;</button></td>
+      `;
+      tr.querySelector('.todo-cb').addEventListener('change', function(){
+        todo.done = this.checked;
+        updateProgressFromTodos(task);
+        renderTodos(task);
+      });
+      tr.querySelector('.todo-del-btn').addEventListener('click', function(){
+        task.todos = task.todos.filter(t=>t.id!==todo.id);
+        updateProgressFromTodos(task);
+        renderTodos(task);
+        updateProgressSlider(task);
+      });
+      els.todoBody.appendChild(tr);
+    });
+  }
+
+  function updateProgressFromTodos(task){
+    if(!task.todos || task.todos.length===0) return;
+    const done = task.todos.filter(t=>t.done).length;
+    task.progress = Math.round((done / task.todos.length) * 100);
+    els.fProgress.value = task.progress;
+    els.fProgressVal.textContent = task.progress+'%';
+  }
+
+  function updateProgressSlider(task){
+    if(!task || !task.todos || task.todos.length===0){
+      els.fProgress.disabled = false;
+      els.fProgress.style.opacity = '';
+      els.fProgress.style.cursor = '';
+    } else {
+      els.fProgress.disabled = true;
+      els.fProgress.style.opacity = '0.5';
+      els.fProgress.style.cursor = 'not-allowed';
+    }
+  }
+
+  els.todoAddBtn.addEventListener('click', ()=>{
+    const t = tasks.find(x=>x.id===editingId);
+    if(!t) return;
+    const text = els.todoInput.value.trim();
+    if(!text) return;
+    t.todos = t.todos || [];
+    t.todos.push({ id:nextTodoId++, text, done:false });
+    els.todoInput.value = '';
+    els.todoInput.focus();
+    renderTodos(t);
+    updateProgressFromTodos(t);
+    updateProgressSlider(t);
+  });
+  els.todoInput.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter') els.todoAddBtn.click();
+  });
+
   document.getElementById('cancel-btn').addEventListener('click', closeModal);
   document.getElementById('close-btn').addEventListener('click', closeModal);
   els.overlay.addEventListener('click', (e)=>{ if(e.target===els.overlay) closeModal(); });
+  els.confirmOverlay.addEventListener('click', (e)=>{ if(e.target===els.confirmOverlay) closeConfirm(); });
 
   document.getElementById('save-btn').addEventListener('click', ()=>{
     const name = els.fName.value.trim();
@@ -1017,7 +1270,8 @@
         id: nextId++, name, start, end,
         cat: els.fCat.value,
         assignee: els.fAssignee.value.trim(),
-        progress: Number(els.fProgress.value)
+        progress: Number(els.fProgress.value),
+        todos: []
       });
     }
     closeModal();
@@ -1026,15 +1280,18 @@
 
   document.getElementById('delete-btn').addEventListener('click', ()=>{
     if(!editingId) return;
-    tasks = tasks.filter(t=>t.id!==editingId);
-    closeModal();
-    renderAll(false);
+    showConfirm('Yakin ingin menghapus tugas <strong>'+escapeHtml(tasks.find(t=>t.id===editingId)?.name||'')+'</strong>?', ()=>{
+      tasks = tasks.filter(t=>t.id!==editingId);
+      closeModal();
+      renderAll(false);
+    });
   });
 
   document.getElementById('add-task-btn').addEventListener('click', ()=> openModal(null));
   document.getElementById('add-task-btn-2').addEventListener('click', ()=> openModal(null));
 
   document.addEventListener('keydown', (e)=>{
+    if(e.key==='Escape' && els.confirmOverlay.classList.contains('open')){ closeConfirm(); return; }
     if(e.key==='Escape' && els.overlay.classList.contains('open')) closeModal();
   });
 
