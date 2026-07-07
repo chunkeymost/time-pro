@@ -1,6 +1,6 @@
 # Time Pro — Lini Waktu Proyek
 
-Project management timeline / Gantt chart interaktif dengan backend Node.js + JSON storage.
+Project management timeline / Gantt chart interaktif dengan backend Node.js + dual storage (JSON default, MySQL opsional).
 
 ## Cara Menjalankan
 
@@ -8,10 +8,15 @@ Project management timeline / Gantt chart interaktif dengan backend Node.js + JS
 # Install dependencies
 npm install
 
-# Jalankan server
+# Mode JSON (default, tanpa MySQL)
 npm start
 
-# Atau dengan auto-reload (development)
+# Mode MySQL
+npm run db:migrate              # Buat tabel + seed kategori
+npm run db:seed                 # Import data JSON → MySQL
+STORAGE=mysql npm start
+
+# Auto-reload (development)
 npm run dev
 ```
 
@@ -27,11 +32,14 @@ Aplikasi web ringan untuk memvisualisasikan, melacak, dan mengelola jadwal tugas
 - **Dua Mode Tampilan** — Minggu (40px/hari) dan Bulan (14px/hari)
 - **Manajemen Tugas CRUD** — Tambah, ubah, dan hapus tugas lewat modal form
 - **Sidebar Daftar Tugas** — Selalu sinkron dengan timeline
-- **Kategori & Warna** — 5 kategori tugas (Desain, Pengembangan, Pengujian, Peluncuran, Lainnya) dengan kode warna berbeda
+- **Kategori & Warna** — 6 kategori tugas (Desain, Pengembangan, Pengujian, Peluncuran, Research, Lainnya) dengan kode warna berbeda
 - **Progress Bar** — Visualisasi persentase progres per tugas
 - **To Do List** — Subtask checklist dengan due date; progress otomatis terhitung dari todo yang selesai
 - **Garis "Hari Ini"** — Penanda tanggal sekarang secara otomatis
-- **Persistent Storage** — Data tersimpan di `data/tasks.json` (tidak hilang saat refresh)
+- **Dual Storage** — JSON file (default) atau MySQL (opsional via `STORAGE=mysql`)
+- **Migration System** — Perubahan schema database terversioning dan repeatable
+- **Soft Delete** — Task/todo tidak hilang permanen, bisa di-restore (MySQL mode)
+- **Seed Data** — Import data dari JSON ke MySQL dengan guard double-import
 
 ## Arsitektur
 
@@ -40,10 +48,11 @@ Browser (index.html)
       ↕ REST API (fetch / JSON)
 Node.js + Express (server.js)
       ↕
-data/tasks.json        ← Phase 1 (JSON Storage)
-MySQL Database         ← Phase 2 (coming soon)
-      ↕ Sync
-POST /api/sync/commit  ← Phase 3 (coming soon)
+data/tasks.json        ← Mode default (JSON)
+MySQL Database         ← Mode STORAGE=mysql
+      ↕
+npm run db:migrate     ← Migration runner
+npm run db:seed        ← Import JSON → MySQL
 ```
 
 Lihat `ARCHITECTURE.md` untuk detail arsitektur.
@@ -59,14 +68,14 @@ Lihat `ARCHITECTURE.md` untuk detail arsitektur.
 | `POST` | `/api/tasks/:id/todos` | Tambah todo |
 | `PUT` | `/api/tasks/:id/todos/:todoId` | Update todo |
 | `DELETE` | `/api/tasks/:id/todos/:todoId` | Hapus todo |
-| `POST` | `/api/sync/commit` | (Phase 3) Sync JSON → MySQL |
+| `POST` | `/api/backup` | Backup tasks.json ke file timestamp |
 
 ## Rencana Pengembangan
 
 | Phase | Status | Deskripsi |
 |-------|--------|-----------|
 | **Phase 1** | ✅ Selesai | JSON file storage via Node.js backend |
-| **Phase 2** | 📋 Rencana | MySQL storage engine |
+| **Phase 2** | ✅ Selesai | MySQL storage engine + migration runner + seed |
 | **Phase 3** | 📋 Rencana | Sync mechanism (JSON ↔ MySQL) |
 
 Lihat `PLAN.md` untuk detail rencana implementasi.
@@ -75,10 +84,12 @@ Lihat `PLAN.md` untuk detail rencana implementasi.
 
 - **Frontend:** Vanilla HTML5, CSS3, JavaScript (ES6+) — single file
 - **Backend:** Node.js 20+, Express 4
-- **Dependencies:** express, cors, mysql2
+- **Database:** MySQL 8+ via `mysql2` (opsional)
+- **Migration:** Custom runner (file-based SQL versioning)
 
 ## Catatan
 
 - Data tersimpan secara persistent di `data/tasks.json` — tidak hilang saat browser di-refresh
-- Seed data (7 contoh task) dibuat otomatis saat pertama kali server dijalankan
 - File `index.html` tetap single-file; backend terpisah di `server.js` + `src/`
+- MySQL membutuhkan: `npm run db:migrate` (buat tabel) lalu `npm run db:seed` (import data) sebelum `STORAGE=mysql npm start`
+- Lihat `PLAN.md` untuk migration path lengkap

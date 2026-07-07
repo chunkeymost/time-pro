@@ -67,13 +67,20 @@ Jangan gunakan skill ini jika pengguna secara eksplisit meminta file `.xlsx` (pa
 3. `node server.js` (atau `npm run dev` untuk auto-reload)
 4. Buka `http://localhost:3000` di browser
 
-## API Backend (Express + JSON Storage)
+## API Backend (Express + Dual Storage)
 
-Aplikasi sekarang memiliki backend Node.js yang menyediakan REST API:
+Aplikasi memiliki backend Node.js dengan dua mode storage:
 
-- **Storage:** JSON file (`data/tasks.json`) — auto-seed dengan 7 contoh task
-- **Frontend:** `index.html` berkomunikasi dengan backend via `fetch()`
-- **Semua CRUD** dilakukan melalui API, bukan in-memory
+- **Default:** JSON file (`data/tasks.json`)
+- **Opsional:** MySQL 8+ (set `STORAGE=mysql` environment variable)
+
+### Setup MySQL (jika menggunakan MySQL)
+
+```bash
+npm run db:migrate              # Buat tabel + seed kategori
+npm run db:seed                 # Import data JSON → MySQL
+STORAGE=mysql npm start         # Jalankan dengan MySQL
+```
 
 ### Endpoints
 
@@ -86,16 +93,21 @@ Aplikasi sekarang memiliki backend Node.js yang menyediakan REST API:
 | `POST` | `/api/tasks/:id/todos` | Tambah todo |
 | `PUT` | `/api/tasks/:id/todos/:todoId` | Update todo |
 | `DELETE` | `/api/tasks/:id/todos/:todoId` | Hapus todo |
-| `POST` | `/api/sync/commit` | (Phase 3) Sync ke MySQL |
+| `POST` | `/api/backup` | Backup data ke file (JSON mode) |
 
 ### Struktur data
 
-Lihat `ARCHITECTURE.md` untuk detail data model Task dan Todo.
+Lihat `ARCHITECTURE.md` untuk detail data model Task, Todo, dan schema MySQL.
 
-### Pengembangan
+### Scripts
 
-- `npm start` — Jalankan production server
-- `npm run dev` — Jalankan dengan `--watch` (auto-restart pada perubahan)
+| Command | Fungsi |
+|---------|--------|
+| `npm start` | Jalankan server (JSON mode) |
+| `npm run dev` | Jalankan dengan auto-restart |
+| `npm run db:migrate` | Jalankan migration database |
+| `npm run db:seed` | Import data JSON ke MySQL |
+| `STORAGE=mysql npm start` | Jalankan server dengan MySQL |
 
 ## Catatan teknis
 
@@ -105,4 +117,6 @@ Lihat `ARCHITECTURE.md` untuk detail data model Task dan Todo.
 - Setiap todo memiliki field `due: Date` — date picker di sisi kiri input teks, range dibatasi oleh start-end task utama.
 - Helpers weekend: `isWeekend(d)`, `nextWeekday(d)`, `countWeekdays(a,b)` untuk menangani hari kerja.
 - File `index.html` harus tetap **satu file tunggal** (CSS & JS inline) — backend terpisah di `server.js` dan `src/`.
+- MySQL mode menggunakan **soft delete** — task/todo tidak dihapus permanen, hanya di-set `deleted_at`.
+- Migration runner otomatis mendeteksi file SQL baru — cukup tambah file `V3__*.sql` di `src/schema/migrations/`.
 - Lihat `ARCHITECTURE.md` untuk arsitektur dan `PLAN.md` untuk rencana implementasi.
