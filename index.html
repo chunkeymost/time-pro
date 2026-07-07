@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lini Waktu Proyek</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F6F8FB;
+    --paper-line:#DCE4EE;
+    --paper-line-strong:#C4D0E0;
+    --ink:#1B3350;
+    --ink-soft:#5B7290;
+    --ink-faint:#8B9CB3;
+    --surface:#FFFFFF;
+    --gold:#C99A3B;
+    --gold-soft:#F1E4C6;
+    --status-done:#3F8F63;
+    --status-progress:#2F6BA3;
+    --status-planned:#8996A8;
+    --status-risk:#B5482F;
+    --cut-line:#C0392B;
+    --shadow:0 1px 2px rgba(27,51,80,.06), 0 6px 16px rgba(27,51,80,.07);
+    --radius:10px;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:
+      linear-gradient(var(--paper-line) 1px, transparent 1px) 0 0/100% 28px,
+      linear-gradient(90deg, var(--paper-line) 1px, transparent 1px) 0 0/28px 100%,
+      var(--paper);
+    background-color:var(--paper);
+    color:var(--ink);
+    font-family:'Inter', sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  ::selection{background:var(--gold-soft);}
+
+  /* ---------- App shell ---------- */
+  .app{
+    max-width:1400px;
+    margin:0 auto;
+    padding:28px 28px 60px;
+  }
+
+  /* ---------- Header ---------- */
+  .app-header{
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:24px;
+    flex-wrap:wrap;
+    padding-bottom:20px;
+    margin-bottom:22px;
+    border-bottom:2px solid var(--ink);
+    position:relative;
+  }
+  .app-header::after{
+    content:'';
+    position:absolute;
+    left:0; bottom:-6px;
+    width:100%; height:1px;
+    background:var(--paper-line-strong);
+  }
+  .title-block{display:flex; flex-direction:column; gap:6px; min-width:280px;}
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--gold);
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .eyebrow::before{
+    content:'';
+    width:18px; height:1px;
+    background:var(--gold);
+    display:inline-block;
+  }
+  #project-title{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:30px;
+    font-weight:700;
+    color:var(--ink);
+    border:none;
+    background:transparent;
+    padding:2px 4px;
+    margin:0;
+    width:min(560px, 60vw);
+    border-radius:6px;
+  }
+  #project-title:hover, #project-title:focus{
+    background:var(--surface);
+    outline:1px dashed var(--paper-line-strong);
+  }
+  .project-sub{
+    font-size:13px;
+    color:var(--ink-soft);
+    font-family:'IBM Plex Mono', monospace;
+  }
+
+  .header-actions{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+
+  .view-toggle{
+    display:flex;
+    border:1px solid var(--ink);
+    border-radius:8px;
+    overflow:hidden;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+  }
+  .view-toggle button{
+    padding:9px 14px;
+    background:var(--surface);
+    border:none;
+    color:var(--ink-soft);
+    cursor:pointer;
+    letter-spacing:.03em;
+  }
+  .view-toggle button + button{ border-left:1px solid var(--ink); }
+  .view-toggle button.active{
+    background:var(--ink);
+    color:var(--paper);
+  }
+
+  .btn{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:600;
+    font-size:13.5px;
+    border-radius:8px;
+    padding:10px 16px;
+    cursor:pointer;
+    border:1px solid transparent;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .btn:active{ transform:translateY(1px); }
+  .btn-primary{
+    background:var(--ink);
+    color:var(--paper);
+    box-shadow:var(--shadow);
+  }
+  .btn-primary:hover{ background:#142842; }
+  .btn-ghost{
+    background:var(--surface);
+    border:1px solid var(--paper-line-strong);
+    color:var(--ink);
+  }
+  .btn-ghost:hover{ border-color:var(--ink-soft); }
+
+  /* ---------- Legend ---------- */
+  .legend{
+    display:flex;
+    gap:18px;
+    flex-wrap:wrap;
+    margin-bottom:18px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11.5px;
+    color:var(--ink-soft);
+  }
+  .legend-item{display:flex; align-items:center; gap:7px;}
+  .legend-dot{width:9px; height:9px; border-radius:2px; display:inline-block;}
+
+  /* ---------- Board layout ---------- */
+  .board{
+    display:grid;
+    grid-template-columns:280px 1fr;
+    border:1px solid var(--paper-line-strong);
+    border-radius:var(--radius);
+    background:var(--surface);
+    box-shadow:var(--shadow);
+    overflow:hidden;
+  }
+
+  /* Sidebar */
+  .sidebar{
+    border-right:1px solid var(--paper-line-strong);
+    display:flex;
+    flex-direction:column;
+  }
+  .sidebar-head{
+    height:56px;
+    display:flex;
+    align-items:center;
+    padding:0 16px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    border-bottom:1px solid var(--paper-line-strong);
+    background:var(--paper);
+  }
+  .sidebar-list{ flex:1; overflow:hidden; }
+  .sidebar-row{
+    height:52px;
+    padding:0 16px;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    gap:2px;
+    border-bottom:1px solid var(--paper-line);
+    cursor:pointer;
+  }
+  .sidebar-row:hover{ background:var(--paper); }
+  .sidebar-row.selected{ background:var(--gold-soft); }
+  .sidebar-row .name{
+    font-size:13.5px;
+    font-weight:600;
+    color:var(--ink);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .sidebar-row .meta{
+    font-size:11px;
+    color:var(--ink-soft);
+    font-family:'IBM Plex Mono', monospace;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .meta .tag-dot{ width:7px; height:7px; border-radius:2px; display:inline-block; }
+  .sidebar-empty{
+    padding:26px 16px;
+    font-size:12.5px;
+    color:var(--ink-faint);
+    line-height:1.5;
+  }
+  .sidebar-add{
+    border-top:1px solid var(--paper-line-strong);
+    padding:12px 14px;
+  }
+  .sidebar-add button{
+    width:100%;
+    justify-content:center;
+  }
+
+  /* Timeline */
+  .timeline-wrap{
+    overflow-x:auto;
+    position:relative;
+  }
+  .timeline-inner{ position:relative; }
+
+  .ruler{
+    height:56px;
+    position:relative;
+    border-bottom:1px solid var(--paper-line-strong);
+    background:
+      repeating-linear-gradient(90deg, transparent 0, transparent calc(var(--day-w) - 1px), var(--paper-line) calc(var(--day-w) - 1px), var(--paper-line) var(--day-w));
+  }
+  .ruler-month{
+    position:absolute;
+    top:8px;
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:600;
+    font-size:12.5px;
+    color:var(--ink);
+    padding-left:4px;
+    border-left:1px solid var(--ink-soft);
+    white-space:nowrap;
+  }
+  .ruler-day{
+    position:absolute;
+    bottom:6px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:9.5px;
+    color:var(--ink-faint);
+    width:var(--day-w);
+    text-align:center;
+  }
+  .ruler-day.weekend{ color:var(--gold); }
+  .ruler-tick{
+    position:absolute;
+    bottom:0;
+    width:1px;
+    height:6px;
+    background:var(--paper-line-strong);
+  }
+
+  .rows{ position:relative; }
+  .row-bg{
+    height:52px;
+    border-bottom:1px solid var(--paper-line);
+    position:relative;
+  }
+  .row-bg.weekend-shade::before{
+    content:'';
+  }
+  .weekend-col{
+    position:absolute;
+    top:0; bottom:0;
+    width:var(--day-w);
+    background:rgba(139,156,179,0.06);
+    pointer-events:none;
+  }
+
+  .today-line{
+    position:absolute;
+    top:0; bottom:0;
+    width:2px;
+    background:var(--cut-line);
+    z-index:5;
+    pointer-events:none;
+  }
+  .today-line::before{
+    content:'HARI INI';
+    position:absolute;
+    top:-2px;
+    left:5px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:9px;
+    letter-spacing:.08em;
+    color:var(--cut-line);
+    white-space:nowrap;
+  }
+  .today-line::after{
+    content:'';
+    position:absolute;
+    top:0; left:-3px;
+    width:0; height:0;
+    border-left:4px solid transparent;
+    border-right:4px solid transparent;
+    border-top:6px solid var(--cut-line);
+  }
+
+  .bar{
+    position:absolute;
+    top:10px;
+    height:32px;
+    border-radius:7px;
+    box-shadow:0 1px 2px rgba(27,51,80,.18);
+    cursor:grab;
+    display:flex;
+    align-items:center;
+    z-index:2;
+    border:1px solid rgba(0,0,0,.08);
+  }
+  .bar:active{ cursor:grabbing; }
+  .bar .fill{
+    position:absolute;
+    left:0; top:0; bottom:0;
+    border-radius:7px 0 0 7px;
+    background:rgba(255,255,255,.32);
+  }
+  .bar .label{
+    position:relative;
+    padding:0 10px;
+    font-size:12px;
+    font-weight:600;
+    color:#fff;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    pointer-events:none;
+  }
+  .bar .pct{
+    position:relative;
+    margin-left:auto;
+    padding-right:10px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    color:rgba(255,255,255,.85);
+    pointer-events:none;
+  }
+  .handle{
+    position:absolute;
+    top:0; bottom:0;
+    width:8px;
+    cursor:ew-resize;
+    z-index:3;
+  }
+  .handle.left{ left:0; }
+  .handle.right{ right:0; }
+
+  .cat-desain{ background:var(--status-progress); }
+  .cat-pengembangan{ background:var(--ink); }
+  .cat-pengujian{ background:var(--status-done); }
+  .cat-peluncuran{ background:var(--status-risk); }
+  .cat-lainnya{ background:var(--status-planned); }
+
+  /* ---------- Modal ---------- */
+  .overlay{
+    position:fixed; inset:0;
+    background:rgba(27,51,80,.35);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:50;
+    padding:20px;
+  }
+  .overlay.open{ display:flex; }
+  .modal{
+    background:var(--surface);
+    width:100%;
+    max-width:440px;
+    border-radius:12px;
+    box-shadow:0 20px 50px rgba(15,30,50,.25);
+    padding:24px;
+    font-family:'Inter', sans-serif;
+  }
+  .modal h2{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:19px;
+    margin:0 0 4px;
+    color:var(--ink);
+  }
+  .modal .modal-sub{
+    font-size:12px;
+    color:var(--ink-soft);
+    font-family:'IBM Plex Mono', monospace;
+    margin-bottom:18px;
+  }
+  .field{ margin-bottom:14px; }
+  .field label{
+    display:block;
+    font-size:11.5px;
+    font-weight:600;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin-bottom:6px;
+  }
+  .field input[type=text], .field select{
+    width:100%;
+    padding:9px 10px;
+    border:1px solid var(--paper-line-strong);
+    border-radius:7px;
+    font-size:13.5px;
+    font-family:'Inter', sans-serif;
+    color:var(--ink);
+    background:var(--paper);
+  }
+  .field input:focus, .field select:focus{
+    outline:2px solid var(--gold);
+    outline-offset:1px;
+  }
+  .row-2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .range-row{ display:flex; align-items:center; gap:10px; }
+  .range-row input[type=range]{ flex:1; accent-color:var(--ink); }
+  .range-val{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    color:var(--ink);
+    width:36px;
+    text-align:right;
+  }
+  .modal-actions{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:20px;
+    gap:10px;
+  }
+  .link-danger{
+    background:none; border:none;
+    color:var(--status-risk);
+    font-size:12.5px;
+    font-family:'IBM Plex Mono', monospace;
+    cursor:pointer;
+    padding:6px 0;
+  }
+  .modal-actions-right{ display:flex; gap:8px; }
+
+  /* ---------- Empty state ---------- */
+  .empty-board{
+    padding:60px 20px;
+    text-align:center;
+    color:var(--ink-soft);
+  }
+
+  @media (max-width: 760px){
+    .board{ grid-template-columns:200px 1fr; }
+    #project-title{ font-size:22px; width:80vw; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .btn{ transition:none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="app-header">
+    <div class="title-block">
+      <span class="eyebrow">Lini Waktu Proyek</span>
+      <input id="project-title" type="text" value="Peluncuran Produk Q3" />
+      <span class="project-sub" id="project-range">—</span>
+    </div>
+    <div class="header-actions">
+      <div class="view-toggle" id="view-toggle">
+        <button data-view="week" class="active">MINGGU</button>
+        <button data-view="month">BULAN</button>
+      </div>
+      <button class="btn btn-ghost" id="today-btn">Ke Hari Ini</button>
+      <button class="btn btn-primary" id="add-task-btn">+ Tugas Baru</button>
+    </div>
+  </header>
+
+  <div class="legend" id="legend"></div>
+
+  <div class="board" id="board">
+    <aside class="sidebar">
+      <div class="sidebar-head">Daftar Tugas</div>
+      <div class="sidebar-list" id="sidebar-list"></div>
+      <div class="sidebar-add">
+        <button class="btn btn-ghost" id="add-task-btn-2">+ Tambah Tugas</button>
+      </div>
+    </aside>
+    <div class="timeline-wrap" id="timeline-wrap">
+      <div class="timeline-inner" id="timeline-inner">
+        <div class="ruler" id="ruler"></div>
+        <div class="rows" id="rows"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2 id="modal-title">Tugas Baru</h2>
+    <div class="modal-sub" id="modal-sub">Isi detail tugas di bawah ini.</div>
+
+    <div class="field">
+      <label for="f-name">Nama Tugas</label>
+      <input type="text" id="f-name" placeholder="cth. Desain wireframe">
+    </div>
+
+    <div class="row-2">
+      <div class="field">
+        <label for="f-start">Mulai</label>
+        <input type="text" id="f-start" placeholder="YYYY-MM-DD">
+      </div>
+      <div class="field">
+        <label for="f-end">Selesai</label>
+        <input type="text" id="f-end" placeholder="YYYY-MM-DD">
+      </div>
+    </div>
+
+    <div class="row-2">
+      <div class="field">
+        <label for="f-cat">Kategori</label>
+        <select id="f-cat">
+          <option value="desain">Desain</option>
+          <option value="pengembangan">Pengembangan</option>
+          <option value="pengujian">Pengujian</option>
+          <option value="peluncuran">Peluncuran</option>
+          <option value="lainnya">Lainnya</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-assignee">Penanggung Jawab</label>
+        <input type="text" id="f-assignee" placeholder="cth. Sari">
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="f-progress">Progres</label>
+      <div class="range-row">
+        <input type="range" id="f-progress" min="0" max="100" value="0">
+        <span class="range-val" id="f-progress-val">0%</span>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="link-danger" id="delete-btn" style="visibility:hidden;">Hapus tugas</button>
+      <div class="modal-actions-right">
+        <button class="btn btn-ghost" id="cancel-btn">Batal</button>
+        <button class="btn btn-primary" id="save-btn">Simpan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------- State ---------------- */
+  const CATS = {
+    desain:        { label:"Desain",        cls:"cat-desain" },
+    pengembangan:  { label:"Pengembangan",  cls:"cat-pengembangan" },
+    pengujian:     { label:"Pengujian",     cls:"cat-pengujian" },
+    peluncuran:    { label:"Peluncuran",    cls:"cat-peluncuran" },
+    lainnya:       { label:"Lainnya",       cls:"cat-lainnya" },
+  };
+
+  function today(){
+    const d = new Date();
+    d.setHours(0,0,0,0);
+    return d;
+  }
+  function addDays(date, n){
+    const d = new Date(date);
+    d.setDate(d.getDate()+n);
+    return d;
+  }
+  function fmt(d){
+    const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  }
+  function parseDate(str){
+    const parts = str.split('-').map(Number);
+    if(parts.length!==3 || parts.some(isNaN)) return null;
+    const d = new Date(parts[0], parts[1]-1, parts[2]);
+    d.setHours(0,0,0,0);
+    return d;
+  }
+  function dayDiff(a,b){ return Math.round((b-a)/86400000); }
+  const MONTHS_ID = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+  const DOW_ID = ["Min","Sen","Sel","Rab","Kam","Jum","Sab"];
+
+  const T = today();
+
+  let tasks = [
+    { id:1, name:"Riset & Perencanaan",      start:addDays(T,-10), end:addDays(T,-3), cat:"lainnya",      assignee:"Dewi",  progress:100 },
+    { id:2, name:"Desain Wireframe",          start:addDays(T,-4),  end:addDays(T,4),  cat:"desain",       assignee:"Rangga",progress:60  },
+    { id:3, name:"Desain Visual UI",          start:addDays(T,2),   end:addDays(T,9),  cat:"desain",       assignee:"Sari",  progress:20  },
+    { id:4, name:"Pengembangan Backend",      start:addDays(T,3),   end:addDays(T,18), cat:"pengembangan", assignee:"Bima",  progress:10  },
+    { id:5, name:"Pengembangan Frontend",     start:addDays(T,6),   end:addDays(T,20), cat:"pengembangan", assignee:"Putri", progress:0   },
+    { id:6, name:"Pengujian QA",              start:addDays(T,18),  end:addDays(T,25), cat:"pengujian",    assignee:"Fajar", progress:0   },
+    { id:7, name:"Peluncuran ke Publik",      start:addDays(T,26),  end:addDays(T,28), cat:"peluncuran",   assignee:"Tim",   progress:0   },
+  ];
+  let nextId = 8;
+  let selectedId = null;
+  let view = "week"; // "week" | "month"
+  let dayWidth = 40;
+
+  const els = {
+    title: document.getElementById('project-title'),
+    range: document.getElementById('project-range'),
+    legend: document.getElementById('legend'),
+    sidebarList: document.getElementById('sidebar-list'),
+    ruler: document.getElementById('ruler'),
+    rows: document.getElementById('rows'),
+    timelineInner: document.getElementById('timeline-inner'),
+    timelineWrap: document.getElementById('timeline-wrap'),
+    overlay: document.getElementById('overlay'),
+    modalTitle: document.getElementById('modal-title'),
+    modalSub: document.getElementById('modal-sub'),
+    fName: document.getElementById('f-name'),
+    fStart: document.getElementById('f-start'),
+    fEnd: document.getElementById('f-end'),
+    fCat: document.getElementById('f-cat'),
+    fAssignee: document.getElementById('f-assignee'),
+    fProgress: document.getElementById('f-progress'),
+    fProgressVal: document.getElementById('f-progress-val'),
+    deleteBtn: document.getElementById('delete-btn'),
+  };
+
+  /* ---------------- Legend ---------------- */
+  function renderLegend(){
+    els.legend.innerHTML = Object.values(CATS).map(c =>
+      `<span class="legend-item"><span class="legend-dot ${c.cls}"></span>${c.label}</span>`
+    ).join('') + `<span class="legend-item"><span class="legend-dot" style="background:var(--cut-line)"></span>Hari ini</span>`;
+  }
+
+  /* ---------------- Range calc ---------------- */
+  function computeRange(){
+    if(tasks.length===0){
+      return { start: addDays(T,-5), end: addDays(T,20) };
+    }
+    let min = tasks[0].start, max = tasks[0].end;
+    tasks.forEach(t=>{
+      if(t.start < min) min = t.start;
+      if(t.end > max) max = t.end;
+    });
+    min = addDays(min, -4);
+    max = addDays(max, 6);
+    // ensure today is visible
+    if(T < min) min = addDays(T,-3);
+    if(T > max) max = addDays(T,3);
+    return { start:min, end:max };
+  }
+
+  /* ---------------- Render ruler ---------------- */
+  function renderRuler(range){
+    const totalDays = dayDiff(range.start, range.end)+1;
+    els.timelineInner.style.setProperty('--day-w', dayWidth+'px');
+    els.timelineInner.style.width = (totalDays*dayWidth)+'px';
+    els.ruler.innerHTML = '';
+    els.ruler.style.width = (totalDays*dayWidth)+'px';
+
+    let lastMonth = null;
+    for(let i=0;i<totalDays;i++){
+      const d = addDays(range.start, i);
+      const x = i*dayWidth;
+
+      if(d.getDate()===1 || i===0){
+        const label = document.createElement('div');
+        label.className='ruler-month';
+        label.style.left = x+'px';
+        label.textContent = `${MONTHS_ID[d.getMonth()]} ${d.getFullYear()}`;
+        els.ruler.appendChild(label);
+      }
+
+      if(view==='week' && dayWidth>=28){
+        const dayLbl = document.createElement('div');
+        const isWeekend = d.getDay()===0 || d.getDay()===6;
+        dayLbl.className = 'ruler-day' + (isWeekend?' weekend':'');
+        dayLbl.style.left = x+'px';
+        dayLbl.textContent = d.getDate();
+        els.ruler.appendChild(dayLbl);
+      } else if(d.getDay()===1) {
+        const dayLbl = document.createElement('div');
+        dayLbl.className = 'ruler-day';
+        dayLbl.style.left = x+'px';
+        dayLbl.textContent = d.getDate()+' '+MONTHS_ID[d.getMonth()];
+        els.ruler.appendChild(dayLbl);
+      }
+
+      const tick = document.createElement('div');
+      tick.className='ruler-tick';
+      tick.style.left = x+'px';
+      els.ruler.appendChild(tick);
+    }
+  }
+
+  /* ---------------- Render rows / bars ---------------- */
+  function renderRows(range){
+    const totalDays = dayDiff(range.start, range.end)+1;
+    els.rows.innerHTML = '';
+    els.rows.style.width = (totalDays*dayWidth)+'px';
+
+    // weekend shading
+    for(let i=0;i<totalDays;i++){
+      const d = addDays(range.start,i);
+      if(d.getDay()===0 || d.getDay()===6){
+        const col = document.createElement('div');
+        col.className='weekend-col';
+        col.style.left = (i*dayWidth)+'px';
+        col.style.height = (tasks.length*52)+'px';
+        els.rows.appendChild(col);
+      }
+    }
+
+    tasks.forEach((t, idx) => {
+      const rowBg = document.createElement('div');
+      rowBg.className='row-bg';
+      rowBg.style.width = (totalDays*dayWidth)+'px';
+      els.rows.appendChild(rowBg);
+    });
+
+    // today line
+    const todayOffset = dayDiff(range.start, T);
+    if(todayOffset>=0 && todayOffset<=totalDays){
+      const line = document.createElement('div');
+      line.className='today-line';
+      line.style.left = (todayOffset*dayWidth)+'px';
+      line.style.height = Math.max(tasks.length*52, 52)+'px';
+      els.rows.appendChild(line);
+    }
+
+    tasks.forEach((t, idx) => {
+      const bar = document.createElement('div');
+      bar.className = 'bar ' + CATS[t.cat].cls;
+      bar.dataset.id = t.id;
+      const left = dayDiff(range.start, t.start)*dayWidth;
+      const width = (dayDiff(t.start,t.end)+1)*dayWidth - 4;
+      bar.style.left = (left+2)+'px';
+      bar.style.width = Math.max(width, 18)+'px';
+      bar.style.top = (idx*52 + 10)+'px';
+
+      const fill = document.createElement('div');
+      fill.className='fill';
+      fill.style.width = t.progress+'%';
+      bar.appendChild(fill);
+
+      const label = document.createElement('span');
+      label.className='label';
+      label.textContent = t.name;
+      bar.appendChild(label);
+
+      const pct = document.createElement('span');
+      pct.className='pct';
+      pct.textContent = t.progress+'%';
+      bar.appendChild(pct);
+
+      const hLeft = document.createElement('div');
+      hLeft.className='handle left';
+      const hRight = document.createElement('div');
+      hRight.className='handle right';
+      bar.appendChild(hLeft);
+      bar.appendChild(hRight);
+
+      attachBarDrag(bar, t, hLeft, hRight);
+      bar.addEventListener('click', (e)=>{
+        if(bar._dragged) { bar._dragged=false; return; }
+        openModal(t);
+      });
+
+      els.rows.appendChild(bar);
+    });
+
+    els.rows.style.height = Math.max(tasks.length*52, 52)+'px';
+  }
+
+  /* ---------------- Drag & resize ---------------- */
+  function attachBarDrag(bar, task, hLeft, hRight){
+    let mode = null; // 'move' | 'left' | 'right'
+    let startX = 0;
+    let origStart = null, origEnd = null;
+
+    function onDown(e, m){
+      mode = m;
+      startX = e.clientX;
+      origStart = task.start;
+      origEnd = task.end;
+      bar._dragged = false;
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+      e.stopPropagation();
+      e.preventDefault();
+    }
+
+    function onMove(e){
+      const dx = e.clientX - startX;
+      if(Math.abs(dx) > 3) bar._dragged = true;
+      const deltaDays = Math.round(dx/dayWidth);
+      if(mode==='move'){
+        task.start = addDays(origStart, deltaDays);
+        task.end = addDays(origEnd, deltaDays);
+      } else if(mode==='left'){
+        const newStart = addDays(origStart, deltaDays);
+        if(newStart <= task.end) task.start = newStart;
+      } else if(mode==='right'){
+        const newEnd = addDays(origEnd, deltaDays);
+        if(newEnd >= task.start) task.end = newEnd;
+      }
+      renderAll(false);
+    }
+
+    function onUp(){
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      mode = null;
+    }
+
+    bar.addEventListener('mousedown', (e)=> onDown(e,'move'));
+    hLeft.addEventListener('mousedown', (e)=> onDown(e,'left'));
+    hRight.addEventListener('mousedown', (e)=> onDown(e,'right'));
+  }
+
+  /* ---------------- Sidebar ---------------- */
+  function renderSidebar(){
+    if(tasks.length===0){
+      els.sidebarList.innerHTML = `<div class="sidebar-empty">Belum ada tugas. Tambahkan tugas pertama untuk mulai membangun lini waktu.</div>`;
+      return;
+    }
+    els.sidebarList.innerHTML = '';
+    tasks.forEach(t=>{
+      const row = document.createElement('div');
+      row.className = 'sidebar-row' + (t.id===selectedId ? ' selected':'');
+      row.innerHTML = `
+        <span class="name">${escapeHtml(t.name)}</span>
+        <span class="meta"><span class="tag-dot ${CATS[t.cat].cls}"></span>${CATS[t.cat].label} · ${t.progress}%</span>
+      `;
+      row.addEventListener('click', ()=> openModal(t));
+      els.sidebarList.appendChild(row);
+    });
+  }
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  /* ---------------- Project range label ---------------- */
+  function renderProjectRange(){
+    if(tasks.length===0){ els.range.textContent='Belum ada tugas'; return; }
+    let min=tasks[0].start, max=tasks[0].end;
+    tasks.forEach(t=>{ if(t.start<min) min=t.start; if(t.end>max) max=t.end; });
+    els.range.textContent = `${fmt(min)} — ${fmt(max)} · ${tasks.length} tugas`;
+  }
+
+  /* ---------------- Master render ---------------- */
+  function renderAll(scrollToToday){
+    const range = computeRange();
+    renderRuler(range);
+    renderRows(range);
+    renderSidebar();
+    renderProjectRange();
+    if(scrollToToday) scrollToTodayLine(range);
+  }
+
+  function scrollToTodayLine(range){
+    const offset = dayDiff(range.start, T)*dayWidth;
+    els.timelineWrap.scrollLeft = Math.max(offset - 200, 0);
+  }
+
+  /* ---------------- View toggle ---------------- */
+  document.getElementById('view-toggle').addEventListener('click', (e)=>{
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    document.querySelectorAll('#view-toggle button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    view = btn.dataset.view;
+    dayWidth = view==='week' ? 40 : 14;
+    renderAll(true);
+  });
+
+  document.getElementById('today-btn').addEventListener('click', ()=>{
+    renderAll(true);
+  });
+
+  /* ---------------- Modal logic ---------------- */
+  let editingId = null;
+
+  function openModal(task){
+    editingId = task ? task.id : null;
+    els.modalTitle.textContent = task ? 'Ubah Tugas' : 'Tugas Baru';
+    els.modalSub.textContent = task ? 'Perbarui detail atau geser jadwal tugas ini.' : 'Isi detail tugas di bawah ini.';
+    els.fName.value = task ? task.name : '';
+    els.fStart.value = task ? fmt(task.start) : fmt(T);
+    els.fEnd.value = task ? fmt(task.end) : fmt(addDays(T,3));
+    els.fCat.value = task ? task.cat : 'pengembangan';
+    els.fAssignee.value = task ? task.assignee : '';
+    els.fProgress.value = task ? task.progress : 0;
+    els.fProgressVal.textContent = (task ? task.progress : 0)+'%';
+    els.deleteBtn.style.visibility = task ? 'visible' : 'hidden';
+    selectedId = task ? task.id : null;
+    renderSidebar();
+    els.overlay.classList.add('open');
+    els.fName.focus();
+  }
+
+  function closeModal(){
+    els.overlay.classList.remove('open');
+    editingId = null;
+    selectedId = null;
+    renderSidebar();
+  }
+
+  els.fProgress.addEventListener('input', ()=>{
+    els.fProgressVal.textContent = els.fProgress.value+'%';
+  });
+
+  document.getElementById('cancel-btn').addEventListener('click', closeModal);
+  els.overlay.addEventListener('click', (e)=>{ if(e.target===els.overlay) closeModal(); });
+
+  document.getElementById('save-btn').addEventListener('click', ()=>{
+    const name = els.fName.value.trim();
+    const start = parseDate(els.fStart.value);
+    const end = parseDate(els.fEnd.value);
+    if(!name){ alert('Nama tugas tidak boleh kosong.'); return; }
+    if(!start || !end){ alert('Format tanggal harus YYYY-MM-DD.'); return; }
+    if(end < start){ alert('Tanggal selesai harus setelah tanggal mulai.'); return; }
+
+    if(editingId){
+      const t = tasks.find(x=>x.id===editingId);
+      t.name = name; t.start = start; t.end = end;
+      t.cat = els.fCat.value; t.assignee = els.fAssignee.value.trim();
+      t.progress = Number(els.fProgress.value);
+    } else {
+      tasks.push({
+        id: nextId++, name, start, end,
+        cat: els.fCat.value,
+        assignee: els.fAssignee.value.trim(),
+        progress: Number(els.fProgress.value)
+      });
+    }
+    closeModal();
+    renderAll(false);
+  });
+
+  document.getElementById('delete-btn').addEventListener('click', ()=>{
+    if(!editingId) return;
+    tasks = tasks.filter(t=>t.id!==editingId);
+    closeModal();
+    renderAll(false);
+  });
+
+  document.getElementById('add-task-btn').addEventListener('click', ()=> openModal(null));
+  document.getElementById('add-task-btn-2').addEventListener('click', ()=> openModal(null));
+
+  document.addEventListener('keydown', (e)=>{
+    if(e.key==='Escape' && els.overlay.classList.contains('open')) closeModal();
+  });
+
+  /* ---------------- Init ---------------- */
+  renderLegend();
+  renderAll(true);
+
+})();
+</script>
+</body>
+</html>
