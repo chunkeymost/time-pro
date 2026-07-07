@@ -529,9 +529,9 @@
 
   /* ---------- Confirm dialog ---------- */
   .confirm-overlay{
-    position:absolute; inset:0;
+    position:fixed; inset:0;
     background:rgba(27,51,80,0.45);
-    z-index:10;
+    z-index:60;
     display:none;
     align-items:center;
     justify-content:center;
@@ -802,15 +802,16 @@
     </div>
   </div>
 
-  <!-- Confirm dialog (inside modal) -->
-  <div class="confirm-overlay" id="confirm-overlay">
-    <div class="confirm-box">
-      <div class="confirm-icon">!</div>
-      <div class="confirm-msg" id="confirm-msg">Yakin ingin menghapus tugas ini?</div>
-      <div class="confirm-actions">
-        <button class="btn btn-ghost" id="confirm-cancel">Batal</button>
-        <button class="btn confirm-yes" id="confirm-yes">Ya, Hapus</button>
-      </div>
+</div>
+
+<!-- Confirm dialog -->
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-box">
+    <div class="confirm-icon">!</div>
+    <div class="confirm-msg" id="confirm-msg">Yakin ingin menghapus tugas ini?</div>
+    <div class="confirm-actions">
+      <button class="btn btn-ghost" id="confirm-cancel">Batal</button>
+      <button class="btn confirm-yes" id="confirm-yes">Ya, Hapus</button>
     </div>
   </div>
 </div>
@@ -942,9 +943,13 @@
 
   let _confirmResolve = null;
 
-  function showConfirm(msg){
+  function showConfirm(msg, confirmLabel = 'Ya, Hapus', cancelLabel = 'Batal', confirmClass = 'confirm-yes'){
     return new Promise(resolve => {
       els.confirmMsg.innerHTML = msg;
+      document.getElementById('confirm-cancel').textContent = cancelLabel;
+      const confirmBtn = document.getElementById('confirm-yes');
+      confirmBtn.textContent = confirmLabel;
+      confirmBtn.className = 'btn ' + confirmClass;
       _confirmResolve = resolve;
       els.confirmOverlay.classList.add('open');
     });
@@ -1244,6 +1249,7 @@
 
   /* ---------------- Backup ---------------- */
   document.getElementById('backup-btn').addEventListener('click', async ()=>{
+    await showConfirm('Yakin ingin melakukan backup data?', 'Ya, Backup', 'Batal', 'btn-primary');
     const btn = document.getElementById('backup-btn');
     btn.textContent = 'MENYIMPAN...';
     btn.disabled = true;
@@ -1448,7 +1454,7 @@
   document.getElementById('delete-btn').addEventListener('click', async ()=>{
     if(!editingId) return;
     const name = tasks.find(t=>t.id===editingId)?.name||'';
-    await showConfirm('Yakin ingin menghapus tugas <strong>'+escapeHtml(name)+'</strong>?');
+    await showConfirm('Yakin ingin menghapus tugas <strong>'+escapeHtml(name)+'</strong>?', 'Ya, Hapus', 'Batal', 'confirm-yes');
     api.del('/api/tasks/'+editingId).catch(e => console.error('Delete task failed:', e));
     tasks = tasks.filter(t=>t.id!==editingId);
     closeModal(true);
