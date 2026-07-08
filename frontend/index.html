@@ -1383,6 +1383,11 @@
     return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
 
+  function shortenUrl(url, maxLen){
+    if(maxLen === undefined) maxLen = 45;
+    return url.length > maxLen ? url.slice(0, maxLen) + '...' : url;
+  }
+
   function fmtDateTime(isoStr){
     if(!isoStr) return '';
     const d = new Date(isoStr);
@@ -1687,7 +1692,7 @@
       tr.innerHTML = `
         <td class="evidence-num">${i+1}</td>
         <td class="evidence-date">${ev.created_at ? new Date(ev.created_at).toLocaleDateString('id-ID') : '-'}</td>
-        <td class="evidence-link"><a href="${escapeHtml(ev.link)}" target="_blank" class="evidence-link-text">${escapeHtml(ev.link)}</a></td>
+        <td class="evidence-link"><a href="${escapeHtml(ev.link)}" target="_blank" class="evidence-link-text" title="${escapeHtml(ev.link)}">${escapeHtml(shortenUrl(ev.link))}</a></td>
         <td>${escapeHtml(ev.keterangan || '')}</td>
         <td class="evidence-del"><button class="evidence-del-btn" data-ev-id="${ev.id}">&times;</button></td>
       `;
