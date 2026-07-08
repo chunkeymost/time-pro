@@ -1517,10 +1517,12 @@
         if(task){
           const t = task.todos.find(td => td.id === todo.id);
           if(t) t.done = todo.done;
+          updateProgressFromTodos(task);
           await api.put('/api/tasks/'+todo.taskId+'/todos/'+todo.id, { done: todo.done }).catch(e => console.error('Save notif todo failed:', e));
         }
         openNotifPanel();
         updateBellDot();
+        renderAll(false);
       });
 
       tr.querySelector('.todo-text').addEventListener('click', function(){
