@@ -23,6 +23,7 @@
     --status-planned:#8996A8;
     --status-risk:#B5482F;
     --cut-line:#C0392B;
+    --sky:#74B9FF;
     --shadow:0 1px 2px rgba(27,51,80,.06), 0 6px 16px rgba(27,51,80,.07);
     --radius:0px;
   }
@@ -438,6 +439,7 @@
   .cat-peluncuran{ background:var(--status-risk); }
   .cat-lainnya{ background:var(--status-planned); }
   .cat-research{ background:var(--gold); }
+  .cat-operasional{ background:var(--sky); }
 
   .legend-dot.cat-desain, .tag-dot.cat-desain{ clip-path:polygon(50% 0%,0% 100%,100% 100%); }
   .legend-dot.cat-pengembangan, .tag-dot.cat-pengembangan{ clip-path:circle(50%); }
@@ -445,6 +447,7 @@
   .legend-dot.cat-peluncuran, .tag-dot.cat-peluncuran{ clip-path:none; }
   .legend-dot.cat-lainnya, .tag-dot.cat-lainnya{ clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%); }
   .legend-dot.cat-research, .tag-dot.cat-research{ clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%); }
+  .legend-dot.cat-operasional, .tag-dot.cat-operasional{ clip-path:polygon(5% 75%,5% 50%,15% 35%,30% 25%,50% 20%,65% 25%,80% 15%,90% 30%,95% 50%,95% 75%); }
   .cat-today{ background:var(--cut-line); }
   .legend-dot.cat-today{ clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%); }
 
@@ -805,6 +808,7 @@
           <option value="pengujian">Pengujian</option>
           <option value="peluncuran">Peluncuran</option>
           <option value="research">RnD (Research & Development)</option>
+          <option value="operasional">Operasional</option>
           <option value="lainnya">Lainnya</option>
         </select>
       </div>
@@ -896,6 +900,7 @@
     peluncuran:    { label:"Peluncuran",    cls:"cat-peluncuran" },
     lainnya:       { label:"Lainnya",       cls:"cat-lainnya" },
     research:      { label:"RnD (Research & Development)", cls:"cat-research" },
+    operasional:   { label:"Operasional",                 cls:"cat-operasional" },
   };
 
   function today(){

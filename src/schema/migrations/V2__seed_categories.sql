@@ -4,4 +4,5 @@ INSERT INTO categories (slug, name, color, sort_order) VALUES
 ('pengujian',    'Pengujian',    '#f59e0b', 3),
 ('peluncuran',   'Peluncuran',   '#ef4444', 4),
 ('research',     'Research',     '#8b5cf6', 5),
-('lainnya',      'Lainnya',      '#6b7280', 6);
+('operasional',  'Operasional',  '#74B9FF', 6),
+('lainnya',      'Lainnya',      '#6b7280', 7);
