@@ -187,6 +187,7 @@ class JsonStorage {
       id: data.nextEvidenceId || 1,
       link: evData.link || '',
       keterangan: evData.keterangan || '',
+      created_at: new Date().toISOString(),
     };
     data.nextEvidenceId = (data.nextEvidenceId || 1) + 1;
     task.evidences.push(ev);

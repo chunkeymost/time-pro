@@ -30,7 +30,7 @@ class MysqlStorage {
       }
 
       const [evidences] = await conn.execute(
-        'SELECT id, task_id, link, keterangan FROM evidences WHERE deleted_at IS NULL ORDER BY id'
+        'SELECT id, task_id, link, keterangan, created_at FROM evidences WHERE deleted_at IS NULL ORDER BY id'
       );
       const evidenceMap = {};
       for (const e of evidences) {
@@ -39,6 +39,7 @@ class MysqlStorage {
           id: e.id,
           link: e.link,
           keterangan: e.keterangan,
+          created_at: e.created_at ? e.created_at.toISOString() : null,
         });
       }
 
@@ -94,7 +95,7 @@ class MysqlStorage {
       );
 
       const [evidences] = await conn.execute(
-        'SELECT id, link, keterangan FROM evidences WHERE task_id = ? AND deleted_at IS NULL',
+        'SELECT id, link, keterangan, created_at FROM evidences WHERE task_id = ? AND deleted_at IS NULL',
         [id]
       );
 
@@ -117,6 +118,7 @@ class MysqlStorage {
           id: e.id,
           link: e.link,
           keterangan: e.keterangan,
+          created_at: e.created_at ? e.created_at.toISOString() : null,
         })),
         createdAt: t.created_at ? t.created_at.toISOString() : null,
         updatedAt: t.updated_at ? t.updated_at.toISOString() : null,
@@ -265,10 +267,12 @@ class MysqlStorage {
         'INSERT INTO evidences (task_id, link, keterangan) VALUES (?, ?, ?)',
         [taskId, evData.link || '', evData.keterangan || '']
       );
+      const now = new Date().toISOString();
       return {
         id: result.insertId,
         link: evData.link || '',
         keterangan: evData.keterangan || '',
+        created_at: now,
       };
     } finally {
       await conn.end();

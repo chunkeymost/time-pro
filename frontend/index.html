@@ -748,7 +748,8 @@
     vertical-align:middle;
   }
   .evidence-num{ width:32px; }
-  .evidence-link{ width:45%; }
+  .evidence-date{ width:85px; }
+  .evidence-link{ width:38%; }
   .evidence-del{ width:28px; }
   .evidence-table tbody tr:hover{ background:var(--paper); }
   .evidence-link-text{
@@ -968,6 +969,7 @@
       <thead>
         <tr>
           <th class="evidence-num">No.</th>
+          <th class="evidence-date">Tanggal</th>
           <th class="evidence-link">Link Evidence</th>
           <th>Keterangan</th>
           <th class="evidence-del"></th>
@@ -1675,7 +1677,7 @@
     els.evidenceBody.innerHTML = '';
     const task = tasks.find(t => t.id === evidenceTaskId);
     if(!task || !task.evidences || task.evidences.length === 0){
-      els.evidenceBody.innerHTML = '<tr><td colspan="4" class="evidence-empty">Belum ada evidence.</td></tr>';
+      els.evidenceBody.innerHTML = '<tr><td colspan="5" class="evidence-empty">Belum ada evidence.</td></tr>';
       els.evidenceSub.textContent = 'Belum ada link evidence.';
       return;
     }
@@ -1684,6 +1686,7 @@
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td class="evidence-num">${i+1}</td>
+        <td class="evidence-date">${ev.created_at ? new Date(ev.created_at).toLocaleDateString('id-ID') : '-'}</td>
         <td class="evidence-link"><a href="${escapeHtml(ev.link)}" target="_blank" class="evidence-link-text">${escapeHtml(ev.link)}</a></td>
         <td>${escapeHtml(ev.keterangan || '')}</td>
         <td class="evidence-del"><button class="evidence-del-btn" data-ev-id="${ev.id}">&times;</button></td>
