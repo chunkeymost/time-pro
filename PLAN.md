@@ -228,6 +228,21 @@ Enable manual sync antara JSON file dan MySQL database — pengguna bisa "commit
 
 ---
 
+## Frontend Enhancement (Completed)
+
+### 🔔 Bell Notification
+
+Fitur notifikasi yang ditambahkan setelah Phase 2:
+
+- Ikon lonceng (`bell-btn`) di `header-actions` dengan SVG inline
+- Titik merah berkedip (`bell-dot`) — animasi `bell-blink` 1.2s ease-in-out infinite
+- Sidepeek notifikasi (`#notif-overlay`) — overlay + modal reuse dengan lebar 45%
+- Tabel menampilkan todo **pending** dari semua task, dengan kolom tambahan **Sisa Hari**
+- Perhitungan sisa hari: `dayDiff(T, due)` → `diff < 0` = "Overdue" (merah), `diff === 0` = "Hari ini", `diff > 0` = "N hari"
+- Klik teks todo → tutup notifikasi + buka modal tugas utama
+- Toggle checkbox → `updateProgressFromTodos()` + `renderAll()` + `updateBellDot()`
+- Dot merah otomatis muncul/sembunyi berdasarkan ada/tidaknya todo pending
+
 ## How to Run
 
 ```bash

@@ -41,7 +41,8 @@ Jangan gunakan skill ini jika pengguna secara eksplisit meminta file `.xlsx` (pa
 - **Drag** batang tugas untuk memindahkan jadwal, **tarik ujung kiri/kanan** untuk mengubah durasi — tanggal otomatis disnap ke hari kerja (Sen-Jum).
 - **Weekend skip** — bar timeline otomatis terpotong di Sabtu-Minggu, hanya muncul di hari kerja.
 - **Side panel kanan** — modal tambah/ubah/hapus tugas (nama, tanggal, kategori, penanggung jawab, progres %, todo list) tampil sebagai panel slide dari kanan, bukan popup tengah.
-- **To Do List** — setiap task bisa memiliki subtask checklist. Tiap todo punya due date (date picker) yang mengacu pada rentang start-end task utama. Progress task otomatis dihitung dari persentase todo yang selesai (slider progres disabled saat ada todos). Klik teks todo untuk mengedit. 
+- **To Do List** — setiap task bisa memiliki subtask checklist. Tiap todo punya due date (date picker) yang mengacu pada rentang start-end task utama. Progress task otomatis dihitung dari persentase todo yang selesai (slider progres disabled saat ada todos). Klik teks todo untuk mengedit.
+- **🔔 Notifikasi Tugas** — Ikon lonceng di header dengan titik merah berkedip jika ada todo yang belum selesai. Klik ikon membuka sidepeek kanan (lebar 45%) yang menampilkan daftar todo **pending** dari semua tugas, dilengkapi kolom **Sisa Hari** (Overdue/Hari ini/N hari), dan checkbox yang bisa di-toggle langsung. Klik teks todo navigasi ke tugas utama dan menutup panel notifikasi. 
 - **Tag shapes unik** — tiap kategori punya bentuk berbeda di legend (segitiga, lingkaran, segi lima, kotak, belah ketupat, bintang).
 - Sidebar daftar tugas yang selalu sinkron dengan lini waktu.
 - Konfirmasi hapus — tombol hapus memunculkan dialog konfirmasi sebelum task dihapus.

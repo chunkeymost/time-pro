@@ -228,4 +228,5 @@ Proses commit (JSON → MySQL) menggunakan `seed-from-json.js` sebagai dasar:
 3. **Edit**: form submit → `PUT /api/tasks/:id` → update local task → render
 4. **Delete**: click Hapus → confirm dialog → `DELETE /api/tasks/:id` → filter local array → `closeModal(true)` → render
 5. **Drag/Resize**: update local Date object immediately → save via `PUT` on `mouseup`
-6. **Todos**: create/update/delete via API → render ulang
+6. **Todos**: create/update/delete via API → render ulang → `updateBellDot()`
+7. **Notification Panel**: klik bell btn → `openNotifPanel()` → collect semua `todos` dari semua `tasks` → filter `!done` → urut by due date → hitung `dayDiff(T, due)` → render tabel (No, To Do List, Tanggal, Sisa Hari, Status). Toggle checkbox → `updateProgressFromTodos(task)` + `renderAll()` + `updateBellDot()`. Klik teks todo → tutup panel notifikasi + `openModal(task)`.

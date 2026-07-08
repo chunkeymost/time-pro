@@ -35,6 +35,7 @@ Aplikasi web ringan untuk memvisualisasikan, melacak, dan mengelola jadwal tugas
 - **Kategori & Warna** — 6 kategori tugas (Desain, Pengembangan, Pengujian, Peluncuran, Research, Lainnya) dengan kode warna berbeda
 - **Progress Bar** — Visualisasi persentase progres per tugas
 - **To Do List** — Subtask checklist dengan due date; progress otomatis terhitung dari todo yang selesai
+- **🔔 Notifikasi Tugas** — Ikon lonceng dengan indikator merah berkedip jika ada todo pending; sidepeek menampilkan semua todo belum selesai dengan info sisa hari (Overdue jika lewat)
 - **Garis "Hari Ini"** — Penanda tanggal sekarang secara otomatis
 - **Dual Storage** — JSON file (default) atau MySQL (opsional via `STORAGE=mysql`)
 - **Migration System** — Perubahan schema database terversioning dan repeatable
