@@ -5,6 +5,9 @@ Project management timeline / Gantt chart interaktif dengan backend Node.js + du
 ## Cara Menjalankan
 
 ```bash
+# Masuk ke folder backend
+cd backend
+
 # Install dependencies
 npm install
 
@@ -45,18 +48,18 @@ Aplikasi web ringan untuk memvisualisasikan, melacak, dan mengelola jadwal tugas
 ## Arsitektur
 
 ```
-Browser (index.html)
+Browser (frontend/index.html)      ← Frontend
       ↕ REST API (fetch / JSON)
-Node.js + Express (server.js)
+Node.js + Express (backend/server.js) ← Backend
       ↕
-data/tasks.json        ← Mode default (JSON)
-MySQL Database         ← Mode STORAGE=mysql
+backend/data/tasks.json            ← Mode default (JSON)
+MySQL Database                     ← Mode STORAGE=mysql
       ↕
-npm run db:migrate     ← Migration runner
-npm run db:seed        ← Import JSON → MySQL
+cd backend && npm run db:migrate   ← Migration runner
+cd backend && npm run db:seed      ← Import JSON → MySQL
 ```
 
-Lihat `ARCHITECTURE.md` untuk detail arsitektur.
+Lihat `know-me/ARCHITECTURE.md` untuk detail arsitektur.
 
 ## API
 
@@ -79,7 +82,7 @@ Lihat `ARCHITECTURE.md` untuk detail arsitektur.
 | **Phase 2** | ✅ Selesai | MySQL storage engine + migration runner + seed |
 | **Phase 3** | 📋 Rencana | Sync mechanism (JSON ↔ MySQL) |
 
-Lihat `PLAN.md` untuk detail rencana implementasi.
+Lihat `know-me/PLAN.md` untuk detail rencana implementasi.
 
 ## Tech Stack
 
@@ -90,7 +93,7 @@ Lihat `PLAN.md` untuk detail rencana implementasi.
 
 ## Catatan
 
-- Data tersimpan secara persistent di `data/tasks.json` — tidak hilang saat browser di-refresh
-- File `index.html` tetap single-file; backend terpisah di `server.js` + `src/`
-- MySQL membutuhkan: `npm run db:migrate` (buat tabel) lalu `npm run db:seed` (import data) sebelum `STORAGE=mysql npm start`
-- Lihat `PLAN.md` untuk migration path lengkap
+- Data tersimpan secara persistent di `backend/data/tasks.json` — tidak hilang saat browser di-refresh
+- File `frontend/index.html` tetap single-file; backend terpisah di `backend/server.js` + `backend/src/`
+- MySQL membutuhkan: `cd backend && npm run db:migrate` (buat tabel) lalu `cd backend && npm run db:seed` (import data) sebelum `STORAGE=mysql npm start`
+- Lihat `know-me/PLAN.md` untuk migration path lengkap

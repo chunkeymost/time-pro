@@ -22,11 +22,11 @@ Mengganti penyimpanan data in-memory dengan persistent JSON file storage melalui
 
 | File | Purpose |
 |------|---------|
-| `package.json` | Dependencies: express, cors, mysql2 |
-| `server.js` | Express server + semua REST API routes |
-| `src/config.js` | Configuration (port, data path, MySQL credentials) |
-| `src/storage/JsonStorage.js` | JSON file read/write dengan CRUD methods |
-| `data/tasks.json` | Auto-created dengan seed data (7 tasks) |
+| `backend/package.json` | Dependencies: express, cors, mysql2 |
+| `backend/server.js` | Express server + semua REST API routes |
+| `backend/src/config.js` | Configuration (port, data path, MySQL credentials) |
+| `backend/src/storage/JsonStorage.js` | JSON file read/write dengan CRUD methods |
+| `backend/data/tasks.json` | Auto-created dengan seed data (7 tasks) |
 
 ### API Endpoints (Phase 1)
 
@@ -53,18 +53,18 @@ Menambahkan MySQL sebagai storage engine alternatif (dapat dipilih via environme
 
 | File | Purpose |
 |------|---------|
-| `src/schema/migrations/V1__initial_schema.sql` | DDL 5 tabel: categories, tasks, todos, app_metadata, schema_migrations |
-| `src/schema/migrations/V2__seed_categories.sql` | Seed 6 kategori default |
-| `src/schema/migrate.js` | Migration runner — versioning & execute DDL |
-| `src/storage/MysqlStorage.js` | Database-based storage dengan interface sama seperti JsonStorage |
-| `src/seed-from-json.js` | Import data dari `data/tasks.json` ke MySQL |
+| `backend/src/schema/migrations/V1__initial_schema.sql` | DDL 5 tabel: categories, tasks, todos, app_metadata, schema_migrations |
+| `backend/src/schema/migrations/V2__seed_categories.sql` | Seed 6 kategori default |
+| `backend/src/schema/migrate.js` | Migration runner — versioning & execute DDL |
+| `backend/src/storage/MysqlStorage.js` | Database-based storage dengan interface sama seperti JsonStorage |
+| `backend/src/seed-from-json.js` | Import data dari `backend/data/tasks.json` ke MySQL |
 
 ### Files Modified
 
 | File | Changes |
 |------|---------|
-| `server.js` | Storage switching via `STORAGE=mysql` env; semua route handler jadi `async`; fix path config |
-| `package.json` | Tambah script `db:migrate` dan `db:seed` |
+| `backend/server.js` | Storage switching via `STORAGE=mysql` env; semua route handler jadi `async`; fix path config |
+| `backend/package.json` | Tambah script `db:migrate` dan `db:seed` |
 
 ### MySQL Schema (5 Tables)
 
@@ -139,19 +139,19 @@ const storage = process.env.STORAGE === 'mysql'
 
 ```bash
 # 1. Setup database & tabel
-npm run db:migrate
+cd backend && npm run db:migrate
 
 # 2. Import data dari JSON ke MySQL
-npm run db:seed
+cd backend && npm run db:seed
 
 # 3. Jalankan dengan MySQL
-STORAGE=mysql node server.js
+cd backend && STORAGE=mysql node server.js
 ```
 
 ### Migration Runner (`migrate.js`)
 
 - Auto-create `schema_migrations` table
-- Baca file `.sql` dari `src/schema/migrations/` urut versi
+- Baca file `.sql` dari `backend/src/schema/migrations/` urut versi
 - Execute hanya file yang belum tercatat (pending)
 - Setiap file dalam **transaction** — rollback jika gagal
 - Tambah file `.sql` baru = tambah migrasi, tanpa edit file lama
@@ -246,6 +246,9 @@ Fitur notifikasi yang ditambahkan setelah Phase 2:
 ## How to Run
 
 ```bash
+# Masuk ke folder backend
+cd backend
+
 # Install dependencies
 npm install
 

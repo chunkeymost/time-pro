@@ -64,8 +64,8 @@ Jangan gunakan skill ini jika pengguna secara eksplisit meminta file `.xlsx` (pa
 ## Cara menjalankan (dengan Node.js backend)
 
 1. Pastikan Node.js 20+ terinstall
-2. `npm install`
-3. `node server.js` (atau `npm run dev` untuk auto-reload)
+2. `cd backend && npm install`
+3. `node backend/server.js` (atau `cd backend && npm run dev` untuk auto-reload)
 4. Buka `http://localhost:3000` di browser
 
 ## API Backend (Express + Dual Storage)
@@ -100,7 +100,7 @@ STORAGE=mysql npm start         # Jalankan dengan MySQL
 
 Lihat `ARCHITECTURE.md` untuk detail data model Task, Todo, dan schema MySQL.
 
-### Scripts
+### Scripts (jalankan dari dalam `backend/`)
 
 | Command | Fungsi |
 |---------|--------|
@@ -117,7 +117,7 @@ Lihat `ARCHITECTURE.md` untuk detail data model Task, Todo, dan schema MySQL.
 - Progress task otomatis berasal dari todo checklist jika `task.todos.length > 0`; jika kosong, progress manual via slider.
 - Setiap todo memiliki field `due: Date` — date picker di sisi kiri input teks, range dibatasi oleh start-end task utama.
 - Helpers weekend: `isWeekend(d)`, `nextWeekday(d)`, `countWeekdays(a,b)` untuk menangani hari kerja.
-- File `index.html` harus tetap **satu file tunggal** (CSS & JS inline) — backend terpisah di `server.js` dan `src/`.
+- File `frontend/index.html` harus tetap **satu file tunggal** (CSS & JS inline) — backend terpisah di `backend/server.js` dan `backend/src/`.
 - MySQL mode menggunakan **soft delete** — task/todo tidak dihapus permanen, hanya di-set `deleted_at`.
-- Migration runner otomatis mendeteksi file SQL baru — cukup tambah file `V3__*.sql` di `src/schema/migrations/`.
-- Lihat `ARCHITECTURE.md` untuk arsitektur dan `PLAN.md` untuk rencana implementasi.
+- Migration runner otomatis mendeteksi file SQL baru — cukup tambah file `V3__*.sql` di `backend/src/schema/migrations/`.
+- Lihat `ARCHITECTURE.md` untuk arsitektur dan `PLAN.md` untuk rencana implementasi (keduanya di `know-me/`).

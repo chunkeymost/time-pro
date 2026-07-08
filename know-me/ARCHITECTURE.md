@@ -5,15 +5,15 @@
 Time Pro adalah aplikasi project timeline / Gantt chart interaktif dengan arsitektur client-server dan dual storage:
 
 ```
-Browser (index.html)              ← Frontend: Vanilla HTML/CSS/JS
+Browser (frontend/index.html)          ← Frontend: Vanilla HTML/CSS/JS
       ↕  fetch() / REST JSON
-Node.js Server (Express)           ← Backend API
+Node.js Server (backend/server.js)      ← Backend API
       ↕
-data/tasks.json                    ← JSON File Storage (default)
-MySQL Database                     ← MySQL Storage (STORAGE=mysql)
+backend/data/tasks.json                 ← JSON File Storage (default)
+MySQL Database                          ← MySQL Storage (STORAGE=mysql)
       ↕
-src/schema/migrate.js              ← Migration runner (DDL versioning)
-src/seed-from-json.js              ← Import data JSON → MySQL (DML)
+backend/src/schema/migrate.js           ← Migration runner (DDL versioning)
+backend/src/seed-from-json.js           ← Import data JSON → MySQL (DML)
 ```
 
 Storage dipilih via environment variable `STORAGE=mysql` — default JSON.
@@ -33,26 +33,30 @@ Storage dipilih via environment variable `STORAGE=mysql` — default JSON.
 
 ```
 time-pro/
-├── index.html                  # Frontend (single-page app)
-├── server.js                   # Entry point + Express router + storage switching
-├── package.json                # Dependencies + scripts
-├── src/
-│   ├── config.js               # Konfigurasi path & database
-│   ├── schema/
-│   │   ├── migrate.js          # Migration runner — execute pending SQL
-│   │   └── migrations/
-│   │       ├── V1__initial_schema.sql
-│   │       └── V2__seed_categories.sql
-│   ├── storage/
-│   │   ├── JsonStorage.js      # File-based storage (sync, default)
-│   │   └── MysqlStorage.js     # Database-based storage (async)
-│   └── seed-from-json.js       # Import data tasks.json → MySQL
-├── data/
-│   └── tasks.json              # Auto-created dengan seed data
-├── ARCHITECTURE.md
-├── PLAN.md
-├── README.md
-└── SKILL.md
+├── frontend/
+│   └── index.html                  # Frontend (single-page app)
+├── backend/
+│   ├── server.js                   # Entry point + Express router + storage switching
+│   ├── package.json                # Dependencies + scripts
+│   ├── .gitignore                  # Ignore node_modules, data, lockfile
+│   ├── src/
+│   │   ├── config.js               # Konfigurasi path & database
+│   │   ├── schema/
+│   │   │   ├── migrate.js          # Migration runner — execute pending SQL
+│   │   │   └── migrations/
+│   │   │       ├── V1__initial_schema.sql
+│   │   │       └── V2__seed_categories.sql
+│   │   ├── storage/
+│   │   │   ├── JsonStorage.js      # File-based storage (sync, default)
+│   │   │   └── MysqlStorage.js     # Database-based storage (async)
+│   │   └── seed-from-json.js       # Import data tasks.json → MySQL
+│   └── data/
+│       └── tasks.json              # Auto-created dengan seed data
+├── know-me/
+│   ├── ARCHITECTURE.md
+│   ├── PLAN.md
+│   └── SKILL.md
+└── README.md
 ```
 
 ## Data Model (MySQL)
@@ -133,7 +137,7 @@ deleteTodo(taskId, todoId)       → boolean   // soft delete (MySQL)
 ## Storage Switching
 
 ```js
-// server.js
+// backend/server.js
 const storage = process.env.STORAGE === 'mysql'
   ? new MysqlStorage(config.mysql)
   : new JsonStorage(config.dataPath);
