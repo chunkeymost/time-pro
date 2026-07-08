@@ -1523,6 +1523,12 @@
         updateBellDot();
       });
 
+      tr.querySelector('.todo-text').addEventListener('click', function(){
+        els.notifOverlay.classList.remove('open');
+        const task = tasks.find(t => t.id === todo.taskId);
+        if(task) openModal(task);
+      });
+
       els.notifBody.appendChild(tr);
     });
   }
