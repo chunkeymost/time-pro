@@ -29,8 +29,22 @@ class MysqlStorage {
         });
       }
 
+      const [evidences] = await conn.execute(
+        'SELECT id, task_id, link, keterangan FROM evidences WHERE deleted_at IS NULL ORDER BY id'
+      );
+      const evidenceMap = {};
+      for (const e of evidences) {
+        if (!evidenceMap[e.task_id]) evidenceMap[e.task_id] = [];
+        evidenceMap[e.task_id].push({
+          id: e.id,
+          link: e.link,
+          keterangan: e.keterangan,
+        });
+      }
+
       const [maxTaskId] = await conn.execute('SELECT MAX(id) AS maxId FROM tasks');
       const [maxTodoId] = await conn.execute('SELECT MAX(id) AS maxId FROM todos');
+      const [maxEvidenceId] = await conn.execute('SELECT MAX(id) AS maxId FROM evidences');
       const [metaRows] = await conn.execute("SELECT `key`, `value` FROM app_metadata");
 
       const metadata = { version: 1, lastSynced: null, updatedAt: null };
@@ -50,11 +64,13 @@ class MysqlStorage {
           assignee: t.assignee,
           progress: t.progress,
           todos: todoMap[t.id] || [],
+          evidences: evidenceMap[t.id] || [],
           createdAt: t.created_at ? t.created_at.toISOString() : null,
           updatedAt: t.updated_at ? t.updated_at.toISOString() : null,
         })),
         nextId: (maxTaskId[0].maxId || 0) + 1,
         nextTodoId: (maxTodoId[0].maxId || 0) + 1,
+        nextEvidenceId: (maxEvidenceId[0].maxId || 0) + 1,
         metadata,
       };
     } finally {
@@ -77,6 +93,11 @@ class MysqlStorage {
         [id]
       );
 
+      const [evidences] = await conn.execute(
+        'SELECT id, link, keterangan FROM evidences WHERE task_id = ? AND deleted_at IS NULL',
+        [id]
+      );
+
       return {
         id: t.id,
         name: t.name,
@@ -91,6 +112,11 @@ class MysqlStorage {
           text: td.text,
           done: !!td.done,
           due: td.due_date ? td.due_date.toISOString().slice(0, 10) : null,
+        })),
+        evidences: evidences.map(e => ({
+          id: e.id,
+          link: e.link,
+          keterangan: e.keterangan,
         })),
         createdAt: t.created_at ? t.created_at.toISOString() : null,
         updatedAt: t.updated_at ? t.updated_at.toISOString() : null,
@@ -225,6 +251,63 @@ class MysqlStorage {
       const [result] = await conn.execute(
         'UPDATE todos SET deleted_at = NOW() WHERE id = ? AND task_id = ? AND deleted_at IS NULL',
         [todoId, taskId]
+      );
+      return result.affectedRows > 0;
+    } finally {
+      await conn.end();
+    }
+  }
+
+  async addEvidence(taskId, evData) {
+    const conn = await this._getConnection();
+    try {
+      const [result] = await conn.execute(
+        'INSERT INTO evidences (task_id, link, keterangan) VALUES (?, ?, ?)',
+        [taskId, evData.link || '', evData.keterangan || '']
+      );
+      return {
+        id: result.insertId,
+        link: evData.link || '',
+        keterangan: evData.keterangan || '',
+      };
+    } finally {
+      await conn.end();
+    }
+  }
+
+  async updateEvidence(taskId, evId, evData) {
+    const conn = await this._getConnection();
+    try {
+      const sets = [];
+      const params = [];
+      if (evData.link !== undefined) { sets.push('link = ?'); params.push(evData.link); }
+      if (evData.keterangan !== undefined) { sets.push('keterangan = ?'); params.push(evData.keterangan); }
+
+      if (sets.length === 0) return null;
+
+      params.push(evId, taskId);
+      const [result] = await conn.execute(
+        `UPDATE evidences SET ${sets.join(', ')} WHERE id = ? AND task_id = ? AND deleted_at IS NULL`,
+        params
+      );
+      if (result.affectedRows === 0) return null;
+
+      return {
+        id: evId,
+        link: evData.link !== undefined ? evData.link : undefined,
+        keterangan: evData.keterangan !== undefined ? evData.keterangan : undefined,
+      };
+    } finally {
+      await conn.end();
+    }
+  }
+
+  async deleteEvidence(taskId, evId) {
+    const conn = await this._getConnection();
+    try {
+      const [result] = await conn.execute(
+        'UPDATE evidences SET deleted_at = NOW() WHERE id = ? AND task_id = ? AND deleted_at IS NULL',
+        [evId, taskId]
       );
       return result.affectedRows > 0;
     } finally {

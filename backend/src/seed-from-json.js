@@ -63,6 +63,7 @@ async function seedFromJson() {
 
     let taskCount = 0;
     let todoCount = 0;
+    let evidenceCount = 0;
 
     for (const task of tasks) {
       const catId = catMap[task.cat];
@@ -124,6 +125,26 @@ async function seedFromJson() {
           todoCount++;
         }
       }
+
+      if (task.evidences && task.evidences.length > 0) {
+        for (const ev of task.evidences) {
+          await conn.execute(
+            `INSERT INTO evidences (id, task_id, link, keterangan, created_at, updated_at)
+             VALUES (?, ?, ?, ?, NOW(), NOW())
+             ON DUPLICATE KEY UPDATE
+               link = VALUES(link),
+               keterangan = VALUES(keterangan),
+               updated_at = NOW()`,
+            [
+              ev.id,
+              task.id,
+              ev.link || '',
+              ev.keterangan || '',
+            ]
+          );
+          evidenceCount++;
+        }
+      }
     }
 
     await conn.execute(
@@ -132,7 +153,7 @@ async function seedFromJson() {
 
     await conn.commit();
 
-    console.log(`Import selesai: ${taskCount} tasks, ${todoCount} todos`);
+    console.log(`Import selesai: ${taskCount} tasks, ${todoCount} todos, ${evidenceCount} evidences`);
   } catch (err) {
     await conn.rollback();
     console.error('Gagal import data:', err.message);

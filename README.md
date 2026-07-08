@@ -72,6 +72,9 @@ Lihat `know-me/ARCHITECTURE.md` untuk detail arsitektur.
 | `POST` | `/api/tasks/:id/todos` | Tambah todo |
 | `PUT` | `/api/tasks/:id/todos/:todoId` | Update todo |
 | `DELETE` | `/api/tasks/:id/todos/:todoId` | Hapus todo |
+| `POST` | `/api/tasks/:id/evidences` | Tambah evidence |
+| `PUT` | `/api/tasks/:id/evidences/:evId` | Update evidence |
+| `DELETE` | `/api/tasks/:id/evidences/:evId` | Hapus evidence |
 | `POST` | `/api/backup` | Backup tasks.json ke file timestamp |
 
 ## Rencana Pengembangan

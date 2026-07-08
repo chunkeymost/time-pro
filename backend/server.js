@@ -133,6 +133,45 @@ app.delete('/api/tasks/:id/todos/:todoId', async (req, res) => {
   }
 });
 
+/* ---------- Evidences ---------- */
+
+app.post('/api/tasks/:id/evidences', async (req, res) => {
+  try {
+    const taskId = parseInt(req.params.id, 10);
+    const { link, keterangan } = req.body;
+    if (!link) return res.status(400).json({ error: 'link is required' });
+    const ev = await storage.addEvidence(taskId, { link, keterangan: keterangan || '' });
+    if (!ev) return res.status(404).json({ error: 'Task not found' });
+    res.status(201).json({ evidence: ev });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/tasks/:id/evidences/:evId', async (req, res) => {
+  try {
+    const taskId = parseInt(req.params.id, 10);
+    const evId = parseInt(req.params.evId, 10);
+    const ev = await storage.updateEvidence(taskId, evId, req.body);
+    if (!ev) return res.status(404).json({ error: 'Task or Evidence not found' });
+    res.json({ evidence: ev });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/tasks/:id/evidences/:evId', async (req, res) => {
+  try {
+    const taskId = parseInt(req.params.id, 10);
+    const evId = parseInt(req.params.evId, 10);
+    const ok = await storage.deleteEvidence(taskId, evId);
+    if (!ok) return res.status(404).json({ error: 'Task or Evidence not found' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ---------- Sync stub ---------- */
 
 app.post('/api/sync/commit', (req, res) => {

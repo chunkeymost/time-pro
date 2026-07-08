@@ -697,6 +697,80 @@
   .todo-del-btn:hover{ color:var(--status-risk); }
   .overdue{ color:var(--status-risk); font-weight:600; }
   .notif-empty{ padding:16px 4px; color:var(--ink-faint); font-size:12px; }
+
+  /* ---------- Evidence Panel ---------- */
+  .overlay-left{
+    justify-content:flex-start;
+  }
+  .evidence-modal{
+    transform:translateX(-100%);
+  }
+  .overlay.open .evidence-modal{
+    transform:translateX(0);
+  }
+  .evidence-add{
+    display:flex;
+    gap:8px;
+    margin-bottom:14px;
+  }
+  .evidence-add input{
+    flex:1;
+    padding:7px 10px;
+    border:1px solid var(--paper-line-strong);
+    border-radius:7px;
+    font-size:13px;
+    font-family:'Inter', sans-serif;
+    color:var(--ink);
+    background:var(--paper);
+    outline:none;
+  }
+  .evidence-add input:focus{ outline:2px solid var(--gold); outline-offset:1px; }
+  .evidence-add .btn{ font-size:12px; padding:7px 12px; white-space:nowrap; }
+  .evidence-table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:12.5px;
+    table-layout:fixed;
+  }
+  .evidence-table thead th{
+    text-align:left;
+    font-size:10px;
+    font-weight:600;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    padding:4px 4px 6px;
+    border-bottom:1px solid var(--paper-line);
+  }
+  .evidence-table tbody td{
+    padding:6px 4px;
+    border-bottom:1px solid var(--paper-line);
+    vertical-align:middle;
+  }
+  .evidence-num{ width:32px; }
+  .evidence-link{ width:45%; }
+  .evidence-del{ width:28px; }
+  .evidence-table tbody tr:hover{ background:var(--paper); }
+  .evidence-link-text{
+    color:var(--status-progress);
+    word-wrap:break-word;
+    overflow-wrap:break-word;
+    text-decoration:none;
+  }
+  .evidence-link-text:hover{ text-decoration:underline; }
+  .evidence-del-btn{
+    background:none; border:none;
+    color:var(--ink-faint);
+    cursor:pointer;
+    font-size:16px;
+    line-height:1;
+    padding:2px;
+    opacity:0;
+  }
+  .evidence-table tbody tr:hover .evidence-del-btn{ opacity:1; }
+  .evidence-del-btn:hover{ color:var(--status-risk); }
+  .evidence-empty{ padding:16px 4px; color:var(--ink-faint); font-size:12px; }
+
   .empty-board{
     padding:60px 20px;
     text-align:center;
@@ -847,6 +921,7 @@
       <div class="modal-actions-right">
         <button class="btn btn-ghost" id="cancel-btn">Batal</button>
         <button class="btn btn-primary" id="save-btn">Simpan</button>
+        <button class="btn btn-ghost" id="evidence-btn">+ Add Evidence</button>
       </div>
     </div>
   </div>
@@ -872,6 +947,33 @@
         </tr>
       </thead>
       <tbody id="notif-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Evidence sidepeek -->
+<div class="overlay overlay-left" id="evidence-overlay">
+  <div class="modal evidence-modal">
+    <div class="modal-head">
+      <h2>Daftar Evidence</h2>
+      <button class="modal-close" id="evidence-close-btn">&times;</button>
+    </div>
+    <div class="modal-sub" id="evidence-sub">Kumpulan link evidence tugas.</div>
+    <div class="evidence-add">
+      <input type="text" id="evidence-link-input" placeholder="Link Evidence (URL)...">
+      <input type="text" id="evidence-desc-input" placeholder="Keterangan...">
+      <button class="btn btn-ghost" id="evidence-add-btn">Tambah</button>
+    </div>
+    <table class="evidence-table">
+      <thead>
+        <tr>
+          <th class="evidence-num">No.</th>
+          <th class="evidence-link">Link Evidence</th>
+          <th>Keterangan</th>
+          <th class="evidence-del"></th>
+        </tr>
+      </thead>
+      <tbody id="evidence-body"></tbody>
     </table>
   </div>
 </div>
@@ -973,6 +1075,12 @@
     notifOverlay: document.getElementById('notif-overlay'),
     notifBody: document.getElementById('notif-body'),
     notifSub: document.getElementById('notif-sub'),
+    evidenceOverlay: document.getElementById('evidence-overlay'),
+    evidenceBody: document.getElementById('evidence-body'),
+    evidenceSub: document.getElementById('evidence-sub'),
+    evidenceLinkInput: document.getElementById('evidence-link-input'),
+    evidenceDescInput: document.getElementById('evidence-desc-input'),
+    evidenceAddBtn: document.getElementById('evidence-add-btn'),
   };
 
   /* ---------------- API helper ---------------- */
@@ -1007,6 +1115,7 @@
         start: parseDate(t.start),
         end: parseDate(t.end),
         todos: (t.todos||[]).map(td => ({ ...td, due: td.due ? parseDate(td.due) : null })),
+        evidences: t.evidences || [],
       }));
       nextId = data.nextId;
       nextTodoId = data.nextTodoId;
@@ -1384,6 +1493,7 @@
     editingId = null;
     selectedId = null;
     renderSidebar();
+    closeEvidencePanel();
   }
 
   els.fProgress.addEventListener('input', ()=>{
@@ -1545,6 +1655,73 @@
     els.bellDot.classList.toggle('active', pending);
   }
 
+  /* ---------------- Evidence Panel ---------------- */
+  let evidenceTaskId = null;
+
+  function openEvidencePanel(taskId){
+    evidenceTaskId = taskId;
+    renderEvidences();
+    els.evidenceOverlay.classList.add('open');
+  }
+
+  function closeEvidencePanel(){
+    els.evidenceOverlay.classList.remove('open');
+    evidenceTaskId = null;
+    els.evidenceLinkInput.value = '';
+    els.evidenceDescInput.value = '';
+  }
+
+  function renderEvidences(){
+    els.evidenceBody.innerHTML = '';
+    const task = tasks.find(t => t.id === evidenceTaskId);
+    if(!task || !task.evidences || task.evidences.length === 0){
+      els.evidenceBody.innerHTML = '<tr><td colspan="4" class="evidence-empty">Belum ada evidence.</td></tr>';
+      els.evidenceSub.textContent = 'Belum ada link evidence.';
+      return;
+    }
+    els.evidenceSub.textContent = 'Kumpulan link evidence tugas.';
+    task.evidences.forEach((ev, i) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="evidence-num">${i+1}</td>
+        <td class="evidence-link"><a href="${escapeHtml(ev.link)}" target="_blank" class="evidence-link-text">${escapeHtml(ev.link)}</a></td>
+        <td>${escapeHtml(ev.keterangan || '')}</td>
+        <td class="evidence-del"><button class="evidence-del-btn" data-ev-id="${ev.id}">&times;</button></td>
+      `;
+      tr.querySelector('.evidence-del-btn').addEventListener('click', async function(){
+        const evId = parseInt(this.dataset.evId, 10);
+        await api.del('/api/tasks/'+task.id+'/evidences/'+evId).catch(e => console.error('Delete evidence failed:', e));
+        task.evidences = task.evidences.filter(e => e.id !== evId);
+        renderEvidences();
+      });
+      els.evidenceBody.appendChild(tr);
+    });
+  }
+
+  els.evidenceAddBtn.addEventListener('click', async ()=>{
+    const task = tasks.find(t => t.id === evidenceTaskId);
+    if(!task) return;
+    const link = els.evidenceLinkInput.value.trim();
+    if(!link){ alert('Link evidence harus diisi.'); return; }
+    const keterangan = els.evidenceDescInput.value.trim();
+    try {
+      const result = await api.post('/api/tasks/'+task.id+'/evidences', { link, keterangan });
+      if(!task.evidences) task.evidences = [];
+      task.evidences.push(result.evidence);
+      els.evidenceLinkInput.value = '';
+      els.evidenceDescInput.value = '';
+      renderEvidences();
+      els.evidenceLinkInput.focus();
+    } catch(e){ console.error('Failed to add evidence:', e); }
+  });
+
+  els.evidenceLinkInput.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter') els.evidenceAddBtn.click();
+  });
+  els.evidenceDescInput.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter') els.evidenceAddBtn.click();
+  });
+
   els.todoAddBtn.addEventListener('click', async ()=>{
     const t = tasks.find(x=>x.id===editingId);
     if(!t) return;
@@ -1630,6 +1807,10 @@
   document.getElementById('add-task-btn').addEventListener('click', ()=> openModal(null));
   document.getElementById('add-task-btn-2').addEventListener('click', ()=> openModal(null));
 
+  document.getElementById('evidence-btn').addEventListener('click', ()=>{
+    if(editingId) openEvidencePanel(editingId);
+  });
+
   /* ---------------- Notification Panel Events ---------------- */
   els.bellBtn.addEventListener('click', ()=>{
     openNotifPanel();
@@ -1644,10 +1825,18 @@
     els.notifOverlay.classList.remove('open');
   });
 
+  /* ---------------- Evidence Panel Events ---------------- */
+  els.evidenceOverlay.addEventListener('click', (e)=>{
+    if(e.target === els.evidenceOverlay) closeEvidencePanel();
+  });
+
+  document.getElementById('evidence-close-btn').addEventListener('click', closeEvidencePanel);
+
   document.addEventListener('keydown', (e)=>{
     if(e.key==='Escape' && els.confirmOverlay.classList.contains('open')){ closeConfirm(); return; }
     if(e.key==='Escape' && els.overlay.classList.contains('open')) closeModal();
     if(e.key==='Escape' && els.notifOverlay.classList.contains('open')) els.notifOverlay.classList.remove('open');
+    if(e.key==='Escape' && els.evidenceOverlay.classList.contains('open')) closeEvidencePanel();
   });
 
   /* ---------------- Init ---------------- */

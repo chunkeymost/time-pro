@@ -177,6 +177,50 @@ class JsonStorage {
     this._save(data);
     return true;
   }
+
+  addEvidence(taskId, evData) {
+    const data = this._load();
+    const task = data.tasks.find(t => t.id === taskId);
+    if (!task) return null;
+    if (!task.evidences) task.evidences = [];
+    const ev = {
+      id: data.nextEvidenceId || 1,
+      link: evData.link || '',
+      keterangan: evData.keterangan || '',
+    };
+    data.nextEvidenceId = (data.nextEvidenceId || 1) + 1;
+    task.evidences.push(ev);
+    task.updatedAt = new Date().toISOString();
+    this._save(data);
+    return ev;
+  }
+
+  updateEvidence(taskId, evId, evData) {
+    const data = this._load();
+    const task = data.tasks.find(t => t.id === taskId);
+    if (!task) return null;
+    if (!task.evidences) return null;
+    const ev = task.evidences.find(e => e.id === evId);
+    if (!ev) return null;
+    if (evData.link !== undefined) ev.link = evData.link;
+    if (evData.keterangan !== undefined) ev.keterangan = evData.keterangan;
+    task.updatedAt = new Date().toISOString();
+    this._save(data);
+    return ev;
+  }
+
+  deleteEvidence(taskId, evId) {
+    const data = this._load();
+    const task = data.tasks.find(t => t.id === taskId);
+    if (!task) return false;
+    if (!task.evidences) return false;
+    const idx = task.evidences.findIndex(e => e.id === evId);
+    if (idx === -1) return false;
+    task.evidences.splice(idx, 1);
+    task.updatedAt = new Date().toISOString();
+    this._save(data);
+    return true;
+  }
 }
 
 module.exports = JsonStorage;

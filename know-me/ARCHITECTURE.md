@@ -102,6 +102,18 @@ Foreign Key: `category_id` → `categories(id)`
 | `createdAt` | — | `todos.created_at` TIMESTAMP | Created timestamp |
 | `updatedAt` | — | `todos.updated_at` TIMESTAMP | Updated timestamp |
 
+### `evidences` — Link evidence tugas
+
+| Field | JSON Type | MySQL Column | Description |
+|-------|-----------|-------------|-------------|
+| `id` | `number` | `evidences.id` INT UNSIGNED AUTO_INCREMENT | Primary key |
+| `taskId` | — | `evidences.task_id` INT UNSIGNED FK | → `tasks.id` ON DELETE CASCADE |
+| `link` | `string` | `evidences.link` VARCHAR(500) | URL evidence |
+| `keterangan` | `string` | `evidences.keterangan` TEXT | Deskripsi evidence |
+| — | — | `evidences.deleted_at` TIMESTAMP NULL | Soft delete |
+| `createdAt` | — | `evidences.created_at` TIMESTAMP | Created timestamp |
+| `updatedAt` | — | `evidences.updated_at` TIMESTAMP | Updated timestamp |
+
 ### `app_metadata` — Key-value store untuk metadata aplikasi
 
 | Column | Type | Description |
@@ -185,6 +197,9 @@ npm run db:seed -- --force   # Force re-import (hapus data lama)
 | `POST` | `/api/tasks/:id/todos` | Add todo to task | 1 |
 | `PUT` | `/api/tasks/:id/todos/:todoId` | Update todo | 1 |
 | `DELETE` | `/api/tasks/:id/todos/:todoId` | Delete todo (soft delete on MySQL) | 1 |
+| `POST` | `/api/tasks/:id/evidences` | Add evidence link to task | 1 |
+| `PUT` | `/api/tasks/:id/evidences/:evId` | Update evidence | 1 |
+| `DELETE` | `/api/tasks/:id/evidences/:evId` | Delete evidence (soft delete on MySQL) | 1 |
 | `POST` | `/api/backup` | Backup tasks.json ke file timestamp | 1 |
 | `POST` | `/api/sync/commit` | Sync JSON → MySQL | 3 |
 

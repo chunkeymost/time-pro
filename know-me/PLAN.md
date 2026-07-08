@@ -38,6 +38,9 @@ DELETE /api/tasks/:id          → Delete task + todos
 POST   /api/tasks/:id/todos    → Add todo
 PUT    /api/tasks/:id/todos/:todoId → Update todo
 DELETE /api/tasks/:id/todos/:todoId → Delete todo
+POST   /api/tasks/:id/evidences    → Add evidence
+PUT    /api/tasks/:id/evidences/:evId → Update evidence
+DELETE /api/tasks/:id/evidences/:evId → Delete evidence
 POST   /api/sync/commit        → (stub, Phase 3)
 ```
 
@@ -242,6 +245,19 @@ Fitur notifikasi yang ditambahkan setelah Phase 2:
 - Klik teks todo → tutup notifikasi + buka modal tugas utama
 - Toggle checkbox → `updateProgressFromTodos()` + `renderAll()` + `updateBellDot()`
 - Dot merah otomatis muncul/sembunyi berdasarkan ada/tidaknya todo pending
+
+### 📎 Evidence Panel
+
+Fitur evidence yang ditambahkan untuk melampirkan link bukti/dokumentasi ke tugas:
+
+- Tombol **"+ Add Evidence"** di `modal-actions-right` (sejajar dengan Simpan)
+- Sidepeek dari **kiri** layar (`#evidence-overlay`) — terlihat bersamaan dengan modal task
+- Form input: `[Link URL] [Keterangan] [Tambah]`
+- Tabel evidence: No. | Link Evidence (clickable `<a>` target blank) | Keterangan | ✕
+- CRUD via API: `POST/PUT/DELETE /api/tasks/:id/evidences/:evId`
+- Data persist di JSON (`task.evidences[]`) dan MySQL (`evidences` table via V3 migration)
+- Migration `V3__create_evidences.sql` — tabel `evidences` dengan soft delete
+- Seed otomatis: `seed-from-json.js` mengimpor evidence dari JSON ke MySQL
 
 ## How to Run
 
