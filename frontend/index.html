@@ -1125,6 +1125,7 @@
         todos: (t.todos||[]).map(td => ({ ...td, due: td.due ? parseDate(td.due) : null })),
         evidences: t.evidences || [],
       }));
+      tasks.sort((a, b) => a.start - b.start);
       nextId = data.nextId;
       nextTodoId = data.nextTodoId;
       lastUpdated = data.metadata?.updatedAt || null;
@@ -1804,6 +1805,7 @@
         });
       } catch(e){ console.error('Failed to create task:', e); return; }
     }
+    tasks.sort((a, b) => a.start - b.start);
     closeModal();
     renderAll(false);
   });
