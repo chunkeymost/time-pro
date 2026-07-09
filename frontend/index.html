@@ -262,6 +262,12 @@
   }
   .sidebar-row:hover{ background:var(--paper); }
   .sidebar-row.selected{ background:var(--gold-soft); }
+  .sidebar-row.done{ background:rgba(34,197,94,0.1); }
+  .sidebar-row.done:hover{ background:rgba(34,197,94,0.16); }
+  .sidebar-row.done.selected{ background:rgba(34,197,94,0.18); }
+  .sidebar-row-top{ display:flex; align-items:center; gap:6px; }
+  .sidebar-row-top .name{ flex:1; min-width:0; }
+  .done-flag{ flex-shrink:0; font-size:14px; }
   .sidebar-row .name{
     font-size:13.5px;
     font-weight:600;
@@ -1376,9 +1382,13 @@
     els.sidebarList.innerHTML = '';
     tasks.forEach(t=>{
       const row = document.createElement('div');
-      row.className = 'sidebar-row' + (t.id===selectedId ? ' selected':'');
+      const isDone = t.progress === 100;
+      row.className = 'sidebar-row' + (t.id===selectedId ? ' selected':'') + (isDone ? ' done':'');
       row.innerHTML = `
-        <span class="name">${escapeHtml(t.name)}</span>
+        <div class="sidebar-row-top">
+          <span class="name">${escapeHtml(t.name)}</span>
+          ${isDone ? '<span class="done-flag">🏁</span>' : ''}
+        </div>
         <span class="meta"><span class="tag-dot ${CATS[t.cat].cls}"></span>${CATS[t.cat].label} · ${t.progress}% · ${countWeekdays(t.start,t.end)} Hari Pengerjaan</span>
       `;
       row.addEventListener('click', ()=> openModal(t));
