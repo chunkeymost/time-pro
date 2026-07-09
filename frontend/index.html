@@ -6,6 +6,7 @@
 <title>Proyek Management | as System Analyst</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <style>
   :root{
     --paper:#F6F8FB;
@@ -677,6 +678,7 @@
   .todo-due{ width:90px; }
   .todo-status{ width:40px; text-align:center !important; }
   .todo-del{ width:28px; }
+  .todo-aksi{ width:40px; text-align:center !important; padding-left:12px !important; }
   .todo-table tbody tr:hover{ background:var(--paper); }
   .todo-text{
     color:var(--ink);
@@ -701,6 +703,18 @@
   }
   .todo-table tbody tr:hover .todo-del-btn{ opacity:1; }
   .todo-del-btn:hover{ color:var(--status-risk); }
+  .todo-copy-btn{
+    background:none; border:none;
+    color:var(--ink-faint);
+    cursor:pointer;
+    font-size:16px;
+    line-height:1;
+    padding:2px;
+    opacity:0;
+    transition:opacity .15s;
+  }
+  .todo-table tbody tr:hover .todo-copy-btn{ opacity:1; }
+  .todo-copy-btn:hover{ color:var(--ink); }
   .overdue{ color:var(--status-risk); font-weight:600; }
   .notif-empty{ padding:16px 4px; color:var(--ink-faint); font-size:12px; }
 
@@ -951,6 +965,7 @@
           <th class="todo-due">Tanggal</th>
           <th class="todo-due">Sisa Hari</th>
           <th class="todo-status">Status</th>
+          <th class="todo-aksi">Aksi</th>
         </tr>
       </thead>
       <tbody id="notif-body"></tbody>
@@ -1615,7 +1630,7 @@
     const ordered = sorted.filter(t => !t.done);
 
     if(ordered.length === 0){
-      els.notifBody.innerHTML = '<tr><td colspan="5" class="notif-empty">Semua aktivitas telah selesai.</td></tr>';
+      els.notifBody.innerHTML = '<tr><td colspan="6" class="notif-empty">Semua aktivitas telah selesai.</td></tr>';
       els.notifSub.textContent = 'Tidak ada aktivitas yang perlu diproses.';
       return;
     }
@@ -1648,6 +1663,7 @@
         <td class="todo-due" style="font-size:11px;font-family:'IBM Plex Mono',monospace;">${todo.due ? fmt(todo.due) : '—'}</td>
         <td class="todo-due" style="font-size:11px;font-family:'IBM Plex Mono',monospace;${sisaClass ? 'color:var(--status-risk);font-weight:600;' : ''}">${sisaHariText}</td>
         <td class="todo-status"><input type="checkbox" class="todo-cb" data-task-id="${todo.taskId}" data-todo-id="${todo.id}"${todo.done?' checked':''}></td>
+        <td class="todo-aksi"><button class="todo-copy-btn" title="Copy teks"><i class="bi bi-copy"></i></button></td>
       `;
 
       tr.querySelector('.todo-cb').addEventListener('change', async function(){
@@ -1668,6 +1684,10 @@
         els.notifOverlay.classList.remove('open');
         const task = tasks.find(t => t.id === todo.taskId);
         if(task) openModal(task);
+      });
+
+      tr.querySelector('.todo-copy-btn').addEventListener('click', function(){
+        navigator.clipboard.writeText(todo.text).catch(() => alert('Gagal copy teks'));
       });
 
       els.notifBody.appendChild(tr);
