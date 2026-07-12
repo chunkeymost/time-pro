@@ -1687,7 +1687,7 @@
       });
 
       tr.querySelector('.todo-copy-btn').addEventListener('click', function(){
-        navigator.clipboard.writeText(todo.text).catch(() => alert('Gagal copy teks'));
+        navigator.clipboard.writeText(todo.text).then(() => showToast('Teks berhasil tercopy')).catch(() => showToast('Gagal copy teks', 'error'));
       });
 
       els.notifBody.appendChild(tr);
