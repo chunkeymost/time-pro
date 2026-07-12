@@ -35,10 +35,14 @@ Aplikasi web ringan untuk memvisualisasikan, melacak, dan mengelola jadwal tugas
 - **Dua Mode Tampilan** — Minggu (40px/hari) dan Bulan (14px/hari)
 - **Manajemen Tugas CRUD** — Tambah, ubah, dan hapus tugas lewat modal form
 - **Sidebar Daftar Tugas** — Selalu sinkron dengan timeline
-- **Kategori & Warna** — 6 kategori tugas (Desain, Pengembangan, Pengujian, Peluncuran, Research, Lainnya) dengan kode warna berbeda
+- **Kategori & Warna** — 7 kategori tugas (Desain, Pengembangan, Pengujian, Peluncuran, Research, Operasional, Lainnya) dengan kode warna berbeda
 - **Progress Bar** — Visualisasi persentase progres per tugas
 - **To Do List** — Subtask checklist dengan due date; progress otomatis terhitung dari todo yang selesai
-- **🔔 Notifikasi Tugas** — Ikon lonceng dengan indikator merah berkedip jika ada todo pending; sidepeek menampilkan semua todo belum selesai dengan info sisa hari (Overdue jika lewat)
+- **🔔 Notifikasi Tugas** — Ikon lonceng dengan indikator merah berkedip jika ada todo pending; sidepeek menampilkan semua todo belum selesai dengan info sisa hari (Overdue jika lewat) + tombol copy teks
+- **🍞 Toast Notification** — Popup notifikasi sukses/gagal di pojok kanan bawah (copy teks, backup)
+- **📎 Evidence Panel** — Sidepeek dari kiri untuk lampiran link bukti tugas dengan tanggal dan shorten URL
+- **🏁 Finish Flag** — Tugas selesai (100%) ditandai latar hijau + emoji 🏁 di sidebar
+- **📊 Jumlah Hari Pengerjaan** — Tampilan jumlah hari kerja pada setiap item daftar tugas
 - **Garis "Hari Ini"** — Penanda tanggal sekarang secara otomatis
 - **Dual Storage** — JSON file (default) atau MySQL (opsional via `STORAGE=mysql`)
 - **Migration System** — Perubahan schema database terversioning dan repeatable
@@ -66,6 +70,7 @@ Lihat `know-me/ARCHITECTURE.md` untuk detail arsitektur.
 | Method | Endpoint | Deskripsi |
 |--------|----------|-----------|
 | `GET` | `/api/tasks` | Ambil semua data |
+| `GET` | `/api/tasks/:id` | Ambil detail task |
 | `POST` | `/api/tasks` | Buat task baru |
 | `PUT` | `/api/tasks/:id` | Update task |
 | `DELETE` | `/api/tasks/:id` | Hapus task + todos |
@@ -89,7 +94,7 @@ Lihat `know-me/PLAN.md` untuk detail rencana implementasi.
 
 ## Tech Stack
 
-- **Frontend:** Vanilla HTML5, CSS3, JavaScript (ES6+) — single file
+- **Frontend:** Vanilla HTML5, CSS3, JavaScript (ES6+) — single file + Bootstrap Icons (CDN)
 - **Backend:** Node.js 20+, Express 4
 - **Database:** MySQL 8+ via `mysql2` (opsional)
 - **Migration:** Custom runner (file-based SQL versioning)
@@ -98,5 +103,9 @@ Lihat `know-me/PLAN.md` untuk detail rencana implementasi.
 
 - Data tersimpan secara persistent di `backend/data/tasks.json` — tidak hilang saat browser di-refresh
 - File `frontend/index.html` tetap single-file; backend terpisah di `backend/server.js` + `backend/src/`
+- Bootstrap Icons dimuat dari CDN untuk ikon copy di notifikasi
+- Daftar tugas diurutkan ASC berdasarkan tanggal mulai
+- Sidebar diperluas `calc(350px + 7vw)` agar lebih lega
 - MySQL membutuhkan: `cd backend && npm run db:migrate` (buat tabel) lalu `cd backend && npm run db:seed` (import data) sebelum `STORAGE=mysql npm start`
+- Seed otomatis: jika ada kategori baru di JSON yang belum ada di DB, akan dibuat otomatis
 - Lihat `know-me/PLAN.md` untuk migration path lengkap

@@ -240,7 +240,7 @@ Fitur notifikasi yang ditambahkan setelah Phase 2:
 - Ikon lonceng (`bell-btn`) di `header-actions` dengan SVG inline
 - Titik merah berkedip (`bell-dot`) — animasi `bell-blink` 1.2s ease-in-out infinite
 - Sidepeek notifikasi (`#notif-overlay`) — overlay + modal reuse dengan lebar 45%
-- Tabel menampilkan todo **pending** dari semua task, dengan kolom tambahan **Sisa Hari**
+- Tabel menampilkan todo **pending** dari semua task, kolom: No., To Do List, Tanggal, Sisa Hari, Status, **Aksi**
 - Perhitungan sisa hari: `dayDiff(T, due)` → `diff < 0` = "Overdue" (merah), `diff === 0` = "Hari ini", `diff > 0` = "N hari"
 - Klik teks todo → tutup notifikasi + buka modal tugas utama
 - Toggle checkbox → `updateProgressFromTodos()` + `renderAll()` + `updateBellDot()`
@@ -253,11 +253,62 @@ Fitur evidence yang ditambahkan untuk melampirkan link bukti/dokumentasi ke tuga
 - Tombol **"+ Add Evidence"** di `modal-actions-right` (sejajar dengan Simpan)
 - Sidepeek dari **kiri** layar (`#evidence-overlay`) — terlihat bersamaan dengan modal task
 - Form input: `[Link URL] [Keterangan] [Tambah]`
-- Tabel evidence: No. | Link Evidence (clickable `<a>` target blank) | Keterangan | ✕
+- Tabel evidence: No. | Tanggal | Link Evidence (shortened 45 char + tooltip) | Keterangan | ✕
+- Kolom **Tanggal** menampilkan `created_at` evidence format `id-ID`
+- Link evidence di-shorten dengan `shortenUrl(url, 45)` — full URL di `title` tooltip
 - CRUD via API: `POST/PUT/DELETE /api/tasks/:id/evidences/:evId`
 - Data persist di JSON (`task.evidences[]`) dan MySQL (`evidences` table via V3 migration)
 - Migration `V3__create_evidences.sql` — tabel `evidences` dengan soft delete
-- Seed otomatis: `seed-from-json.js` mengimpor evidence dari JSON ke MySQL
+- Seed otomatis: `seed-from-json.js` mengimpor evidence dari JSON ke MySQL (termasuk `created_at`)
+
+### 🍞 Toast Notification
+
+Fitur notifikasi popup kecil (`showToast`) untuk feedback aksi:
+
+- `toast-container` fixed bottom-right dengan `z-index: 999`
+- `showToast(msg, type)` — type `success` (hijau) / `error` (merah)
+- Animasi `toast-in` — fade-in + translateY, auto-hide 3 detik
+- Digunakan oleh: copy teks todo (`showToast('Teks berhasil tercopy')`), backup (`showToast('Backup berhasil: '+file)`)
+
+### 📋 Copy Todo (Aksi)
+
+Fitur copy teks todo dengan Bootstrap Icons:
+
+- Bootstrap Icons CDN: `bootstrap-icons.min.css` dari `cdn.jsdelivr.net`
+- Kolom **Aksi** di tabel notifikasi dengan tombol `bi-copy`
+- Copy via `navigator.clipboard.writeText()` + Toast Notification
+- Hover reveal — tombol muncul saat hover row
+
+### 🏁 Finish Flag
+
+Fitur visual untuk tugas yang sudah selesai (progress 100%):
+
+- Class `done` pada `sidebar-row` — latar hijau `rgba(34,197,94,0.1)`
+- Emoji 🏁 (`done-flag`) di samping nama tugas
+- Hover & selected state dengan warna hijau lebih kuat
+
+### 📊 Jumlah Hari Pengerjaan
+
+Fitur penghitung hari kerja per tugas:
+
+- Helper `countWeekdays(start, end)` — menghitung Sen–Jum dalam rentang tanggal
+- Muncul di sidebar: `... · 60% · 12 Hari Pengerjaan`
+- Update otomatis saat drag/resize task
+
+### 🔼 Sorting ASC
+
+Fitur pengurutan daftar tugas:
+
+- `tasks.sort((a, b) => a.start - b.start)` — di `loadTasks()` setelah fetch
+- Sorting ulang setelah `POST /api/tasks` (create task baru)
+- Urut berdasarkan `start` date ascending
+
+### ↔️ Lebar Sidebar Diperluas
+
+Fitur penyesuaian lebar sidebar:
+
+- Dari fixed `350px` → `calc(350px + 7vw)` (25% lebih lebar)
+- Responsive: `250px` → `calc(250px + 7vw)`
 
 ## How to Run
 

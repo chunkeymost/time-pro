@@ -24,12 +24,12 @@ Jangan gunakan skill ini jika pengguna secara eksplisit meminta file `.xlsx` (pa
 2. **Kumpulkan konteks minimum** sebelum menyesuaikan (boleh berasumsi wajar dan sebutkan asumsinya, jangan berhenti hanya untuk bertanya):
    - Nama proyek dan rentang waktu kasar (kalau tidak disebutkan, pakai tanggal hari ini sebagai acuan seperti pada template).
    - Daftar tugas nyata jika pengguna sudah menyebutkannya (nama tugas, tanggal mulai/selesai, penanggung jawab, kategori). Jika belum ada, isi dengan data contoh yang masuk akal seperti pada template, lalu jelaskan bahwa itu bisa diubah lewat tombol "+ Tugas Baru".
-   - Kategori/tim yang relevan (default: Desain, Pengembangan, Pengujian, Peluncuran, Lainnya) — ganti label & warna kelas `cat-*` di CSS bila pengguna menyebut tim/kategori berbeda (misalnya Marketing, Riset, Produksi).
+   - Kategori/tim yang relevan (default: Desain, Pengembangan, Pengujian, Peluncuran, Research, Operasional, Lainnya) — ganti label & warna kelas `cat-*` di CSS bila pengguna menyebut tim/kategori berbeda (misalnya Marketing, Riset, Produksi).
 3. **Edit seperlunya di `<script>`**, bagian `let tasks = [...]` — ini satu-satunya tempat yang biasanya perlu diubah untuk mengganti data proyek. Setiap task punya bentuk:
    ```js
-   { id:1, name:"Nama Tugas", start:addDays(T,-4), end:addDays(T,4), cat:"desain", assignee:"Nama", progress:60, todos:[] }
+   { id:1, name:"Nama Tugas", start:addDays(T,-4), end:addDays(T,4), cat:"desain", assignee:"Nama", progress:60, todos:[], evidences:[] }
    ```
-    `T` adalah variabel hari ini (`today()`), gunakan `addDays(T, n)` untuk tanggal relatif, atau `new Date(2026,6,15)` (bulan berbasis 0) untuk tanggal absolut. Field `todos` adalah array `{ id, text, done, due }` — progress otomatis terhitung dari checklist ini jika ada isinya.
+    `T` adalah variabel hari ini (`today()`), gunakan `addDays(T, n)` untuk tanggal relatif, atau `new Date(2026,6,15)` (bulan berbasis 0) untuk tanggal absolut. Field `todos` adalah array `{ id, text, done, due }` — progress otomatis terhitung dari checklist ini jika ada isinya. Field `evidences` adalah array `{ id, link, keterangan, created_at }` untuk lampiran bukti tugas.
 4. **Judul proyek**: ubah `value` pada `<input id="project-title">` di HTML sesuai nama proyek pengguna.
 5. **Jangan tambahkan localStorage/sessionStorage** — file ini dirender sebagai artifact HTML di Claude.ai, dan browser storage API tidak didukung di sana. Semua data tetap di variabel JS in-memory (`tasks` array), sesuai desain template.
 6. Simpan hasil akhir ke `/mnt/user-data/outputs/<nama-proyek>-timeline.html`, lalu presentasikan dengan `present_files`.
@@ -42,9 +42,14 @@ Jangan gunakan skill ini jika pengguna secara eksplisit meminta file `.xlsx` (pa
 - **Weekend skip** — bar timeline otomatis terpotong di Sabtu-Minggu, hanya muncul di hari kerja.
 - **Side panel kanan** — modal tambah/ubah/hapus tugas (nama, tanggal, kategori, penanggung jawab, progres %, todo list) tampil sebagai panel slide dari kanan, bukan popup tengah.
 - **To Do List** — setiap task bisa memiliki subtask checklist. Tiap todo punya due date (date picker) yang mengacu pada rentang start-end task utama. Progress task otomatis dihitung dari persentase todo yang selesai (slider progres disabled saat ada todos). Klik teks todo untuk mengedit.
-- **🔔 Notifikasi Tugas** — Ikon lonceng di header dengan titik merah berkedip jika ada todo yang belum selesai. Klik ikon membuka sidepeek kanan (lebar 45%) yang menampilkan daftar todo **pending** dari semua tugas, dilengkapi kolom **Sisa Hari** (Overdue/Hari ini/N hari), dan checkbox yang bisa di-toggle langsung. Klik teks todo navigasi ke tugas utama dan menutup panel notifikasi. 
+- **🔔 Notifikasi Tugas** — Ikon lonceng di header dengan titik merah berkedip jika ada todo yang belum selesai. Klik ikon membuka sidepeek kanan (lebar 45%) yang menampilkan daftar todo **pending** dari semua tugas, dilengkapi kolom **Sisa Hari** (Overdue/Hari ini/N hari), **Aksi** (copy teks via Bootstrap Icons), dan checkbox yang bisa di-toggle langsung. Klik teks todo navigasi ke tugas utama dan menutup panel notifikasi. Copy todo menampilkan **Toast Notification** (sukses/gagal).
+- **Toast Notification** — Notifikasi popup kecil di pojok kanan bawah dengan animasi fade-in. Muncul saat backup sukses/gagal dan saat copy teks todo.
+- **📎 Evidence Panel** — Sidepeek dari **kiri** layar untuk melampirkan link bukti/dokumentasi ke tugas. Form input Link URL + Keterangan, tabel dengan kolom No., Tanggal, Link Evidence (shortened 45 char + tooltip), Keterangan, dan tombol hapus. CRUD via API. Kolom Tanggal menampilkan `created_at` evidence.
+- **🏁 Finish Flag** — Tugas dengan progress 100% mendapat latar hijau (`done` class) dan emoji 🏁 di sidebar.
+- **📊 Jumlah Hari Pengerjaan** — Sidebar menampilkan jumlah hari kerja (weekday count) setiap tugas.
 - **Tag shapes unik** — tiap kategori punya bentuk berbeda di legend (segitiga, lingkaran, segi lima, kotak, belah ketupat, bintang).
-- Sidebar daftar tugas yang selalu sinkron dengan lini waktu.
+- Sidebar daftar tugas yang selalu sinkron dengan lini waktu — **lebar diperluas 25%** dengan `calc(350px + 7vw)`.
+- **Sorting ASC** — Daftar tugas otomatis diurutkan berdasarkan tanggal mulai (ASC).
 - Konfirmasi hapus — tombol hapus memunculkan dialog konfirmasi sebelum task dihapus.
 - Input tanggal native — field start/end date menggunakan `<input type="date">` (date picker browser).
 - Palet warna gaya "blueprint drafting" (kertas gambar teknis, tinta navy, aksen emas, garis potong merah) — token warna ada di `:root` CSS. Jika pengguna minta gaya visual berbeda, ubah token warna & font di `:root`, jangan tulis ulang struktur HTML/JS.
@@ -94,6 +99,9 @@ STORAGE=mysql npm start         # Jalankan dengan MySQL
 | `POST` | `/api/tasks/:id/todos` | Tambah todo |
 | `PUT` | `/api/tasks/:id/todos/:todoId` | Update todo |
 | `DELETE` | `/api/tasks/:id/todos/:todoId` | Hapus todo |
+| `POST` | `/api/tasks/:id/evidences` | Tambah evidence |
+| `PUT` | `/api/tasks/:id/evidences/:evId` | Update evidence |
+| `DELETE` | `/api/tasks/:id/evidences/:evId` | Hapus evidence |
 | `POST` | `/api/backup` | Backup data ke file (JSON mode) |
 
 ### Struktur data
@@ -118,6 +126,7 @@ Lihat `ARCHITECTURE.md` untuk detail data model Task, Todo, dan schema MySQL.
 - Setiap todo memiliki field `due: Date` — date picker di sisi kiri input teks, range dibatasi oleh start-end task utama.
 - Helpers weekend: `isWeekend(d)`, `nextWeekday(d)`, `countWeekdays(a,b)` untuk menangani hari kerja.
 - File `frontend/index.html` harus tetap **satu file tunggal** (CSS & JS inline) — backend terpisah di `backend/server.js` dan `backend/src/`.
-- MySQL mode menggunakan **soft delete** — task/todo tidak dihapus permanen, hanya di-set `deleted_at`.
+- Bootstrap Icons dimuat dari CDN (`bootstrap-icons.min.css`) untuk ikon copy di notifikasi.
+- MySQL mode menggunakan **soft delete** — task/todo/evidence tidak dihapus permanen, hanya di-set `deleted_at`.
 - Migration runner otomatis mendeteksi file SQL baru — cukup tambah file `V3__*.sql` di `backend/src/schema/migrations/`.
 - Lihat `ARCHITECTURE.md` untuk arsitektur dan `PLAN.md` untuk rencana implementasi (keduanya di `know-me/`).

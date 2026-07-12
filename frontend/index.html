@@ -1294,7 +1294,7 @@
 
     tasks.forEach((t, idx) => {
       const bar = document.createElement('div');
-      bar.className = 'bar ' + CATS[t.cat].cls;
+      bar.className = 'bar ' + (CATS[t.cat] ?? CATS.lainnya).cls;
       bar.dataset.id = t.id;
       const left = dayDiff(range.start, t.start)*dayWidth;
       const width = (dayDiff(t.start,t.end)+1)*dayWidth - 4;
@@ -1404,7 +1404,7 @@
           <span class="name">${escapeHtml(t.name)}</span>
           ${isDone ? '<span class="done-flag">🏁</span>' : ''}
         </div>
-        <span class="meta"><span class="tag-dot ${CATS[t.cat].cls}"></span>${CATS[t.cat].label} · ${t.progress}% · ${countWeekdays(t.start,t.end)} Hari Pengerjaan</span>
+        <span class="meta"><span class="tag-dot ${(CATS[t.cat] ?? CATS.lainnya).cls}"></span>${(CATS[t.cat] ?? CATS.lainnya).label} · ${t.progress}% · ${countWeekdays(t.start,t.end)} Hari Pengerjaan</span>
       `;
       row.addEventListener('click', ()=> openModal(t));
       els.sidebarList.appendChild(row);

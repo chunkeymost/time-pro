@@ -45,7 +45,8 @@ time-pro/
 │   │   │   ├── migrate.js          # Migration runner — execute pending SQL
 │   │   │   └── migrations/
 │   │   │       ├── V1__initial_schema.sql
-│   │   │       └── V2__seed_categories.sql
+│   │   │       ├── V2__seed_categories.sql
+│   │   │       └── V3__create_evidences.sql
 │   │   ├── storage/
 │   │   │   ├── JsonStorage.js      # File-based storage (sync, default)
 │   │   │   └── MysqlStorage.js     # Database-based storage (async)
@@ -111,7 +112,7 @@ Foreign Key: `category_id` → `categories(id)`
 | `link` | `string` | `evidences.link` VARCHAR(500) | URL evidence |
 | `keterangan` | `string` | `evidences.keterangan` TEXT | Deskripsi evidence |
 | — | — | `evidences.deleted_at` TIMESTAMP NULL | Soft delete |
-| `createdAt` | — | `evidences.created_at` TIMESTAMP | Created timestamp |
+| `createdAt` / `created_at` | — | `evidences.created_at` TIMESTAMP | Created timestamp (ditampilkan di kolom Tanggal evidence panel) |
 | `updatedAt` | — | `evidences.updated_at` TIMESTAMP | Updated timestamp |
 
 ### `app_metadata` — Key-value store untuk metadata aplikasi
@@ -144,6 +145,7 @@ delete(id)               → boolean           // soft delete (MySQL)
 addTodo(taskId, data)    → todo | null
 updateTodo(taskId, todoId, data) → todo | null
 deleteTodo(taskId, todoId)       → boolean   // soft delete (MySQL)
+getCategories()          → [{ id, slug, name, color, sort_order }]  // MySQL only
 ```
 
 ## Storage Switching
@@ -180,8 +182,14 @@ Mengimport data dari `data/tasks.json` ke MySQL. Preserve ID asli dari JSON.
 Guard: mengecek `app_metadata.json_seeded_at`. Jika sudah pernah di-seed → skip.
 Force re-import: `npm run db:seed -- --force`
 
+**New behaviors:**
+- **Auto-create kategori** — Jika task memiliki `cat` slug yang belum ada di tabel `categories`, seed otomatis membuat kategori baru.
+- **Sync evidence** — Jika data sudah pernah di-seed, seed tetap melakukan sync evidence (INSERT IGNORE) untuk mengakomodasi penambahan tabel `evidences` via migrasi V3.
+- **Force hapus evidence** — Force mode sekarang menghapus `evidences`, `todos`, dan `tasks` sebelum re-import.
+- **Preserve created_at** — Evidence di-seed dengan `created_at` asli dari JSON.
+
 ```
-npm run db:seed              # Import (dengan guard)
+npm run db:seed              # Import (dengan guard) + sync evidence
 npm run db:seed -- --force   # Force re-import (hapus data lama)
 ```
 
@@ -222,12 +230,14 @@ npm run db:seed -- --force   # Force re-import (hapus data lama)
       "assignee": "Dewi",
       "progress": 100,
       "todos": [],
+      "evidences": [],
       "createdAt": "2026-07-07T12:00:00.000Z",
       "updatedAt": "2026-07-07T12:00:00.000Z"
     }
   ],
   "nextId": 8,
-  "nextTodoId": 4
+  "nextTodoId": 4,
+  "nextEvidenceId": 1
 }
 ```
 
@@ -242,10 +252,13 @@ Proses commit (JSON → MySQL) menggunakan `seed-from-json.js` sebagai dasar:
 
 ## Frontend Data Flow
 
-1. **Init**: `loadTasks()` → `GET /api/tasks` → parse Date strings → render
-2. **Create**: form submit → `POST /api/tasks` → push response to local array → render
+1. **Init**: `loadTasks()` → `GET /api/tasks` → parse Date strings → sorting ASC by start date → render
+2. **Create**: form submit → `POST /api/tasks` → push response to local array → sorting ASC → closeModal → render
 3. **Edit**: form submit → `PUT /api/tasks/:id` → update local task → render
-4. **Delete**: click Hapus → confirm dialog → `DELETE /api/tasks/:id` → filter local array → `closeModal(true)` → render
+4. **Delete**: click Hapus → confirm dialog → `DELETE /api/tasks/:id` → filter local array → `closeModal(true)` → `closeEvidencePanel()` → render
 5. **Drag/Resize**: update local Date object immediately → save via `PUT` on `mouseup`
 6. **Todos**: create/update/delete via API → render ulang → `updateBellDot()`
-7. **Notification Panel**: klik bell btn → `openNotifPanel()` → collect semua `todos` dari semua `tasks` → filter `!done` → urut by due date → hitung `dayDiff(T, due)` → render tabel (No, To Do List, Tanggal, Sisa Hari, Status). Toggle checkbox → `updateProgressFromTodos(task)` + `renderAll()` + `updateBellDot()`. Klik teks todo → tutup panel notifikasi + `openModal(task)`.
+7. **Notification Panel**: klik bell btn → `openNotifPanel()` → collect semua `todos` dari semua `tasks` → filter `!done` → urut by due date → hitung `dayDiff(T, due)` → render tabel (No, To Do List, Tanggal, Sisa Hari, Status, Aksi). Toggle checkbox → `updateProgressFromTodos(task)` + `renderAll()` + `updateBellDot()`. Copy teks todo → `showToast()` navigator.clipboard. Klik teks todo → tutup panel notifikasi + `openModal(task)`.
+8. **Evidence Panel**: klik "+ Add Evidence" → `openEvidencePanel(taskId)` → sidepeek dari kiri dengan form Link + Keterangan. Render tabel (No, Tanggal, Link Evidence shortened 45 char, Keterangan, ✕ Hapus). CRUD via API. Kolom Tanggal menampilkan `created_at` dalam format `id-ID`.
+9. **Toast Notification**: `showToast(msg, type)` — popup di kanan bawah dengan animasi. Digunakan oleh backup (sukses/gagal), copy teks todo (sukses/gagal).
+10. **MysqlStorage cat resolution**: `getAll()` dan `getById()` melakukan query lookup `categories` untuk mengembalikan field `cat: slug` dari `category_id`, sehingga frontend mendapatkan data kompatibel dengan format JSON storage.
