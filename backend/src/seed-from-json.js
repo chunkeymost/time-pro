@@ -45,11 +45,33 @@ async function seedFromJson() {
     if (seeded.length > 0) {
       if (!FORCE) {
         console.log(`Data sudah pernah di-seed pada ${seeded[0].value}.`);
+
+        // Sync evidence jika tabel evidences baru ditambahkan via V3 migration
+        let syncCount = 0;
+        for (const task of tasks) {
+          if (!task.evidences || task.evidences.length === 0) continue;
+          const [exists] = await conn.execute('SELECT id FROM tasks WHERE id = ?', [task.id]);
+          if (exists.length === 0) continue;
+          for (const ev of task.evidences) {
+            const evCreatedAt = ev.created_at
+              ? new Date(ev.created_at).toISOString().slice(0, 19).replace('T', ' ')
+              : new Date().toISOString().slice(0, 19).replace('T', ' ');
+            await conn.execute(
+              `INSERT IGNORE INTO evidences (id, task_id, link, keterangan, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, NOW())`,
+              [ev.id, task.id, ev.link || '', ev.keterangan || '', evCreatedAt]
+            );
+            syncCount++;
+          }
+        }
+        console.log(`Sync ${syncCount} evidences dari data JSON.`);
+
         console.log('Gunakan --force untuk mengulang (hapus data lama + re-import).');
         await conn.end();
         process.exit(0);
       }
       console.log('Force mode: menghapus data existing...');
+      await conn.execute('DELETE FROM evidences');
       await conn.execute('DELETE FROM todos');
       await conn.execute('DELETE FROM tasks');
       await conn.execute("DELETE FROM app_metadata WHERE `key` = 'json_seeded_at'");
@@ -66,10 +88,21 @@ async function seedFromJson() {
     let evidenceCount = 0;
 
     for (const task of tasks) {
-      const catId = catMap[task.cat];
+      let catId = catMap[task.cat];
       if (!catId) {
-        console.warn(`  [SKIP] Task "${task.name}" — kategori "${task.cat}" tidak ditemukan, skip.`);
-        continue;
+        const catName = task.cat.charAt(0).toUpperCase() + task.cat.slice(1);
+        await conn.execute(
+          'INSERT IGNORE INTO categories (slug, name) VALUES (?, ?)',
+          [task.cat, catName]
+        );
+        const [newCat] = await conn.execute('SELECT id FROM categories WHERE slug = ?', [task.cat]);
+        if (newCat.length === 0) {
+          console.warn(`  [SKIP] Task "${task.name}" — kategori "${task.cat}" gagal dibuat.`);
+          continue;
+        }
+        catMap[task.cat] = newCat[0].id;
+        catId = newCat[0].id;
+        console.log(`  [AUTO] Kategori "${task.cat}" dibuat otomatis.`);
       }
 
       const createdAt = task.createdAt
@@ -128,9 +161,13 @@ async function seedFromJson() {
 
       if (task.evidences && task.evidences.length > 0) {
         for (const ev of task.evidences) {
+          const evCreatedAt = ev.created_at
+            ? new Date(ev.created_at).toISOString().slice(0, 19).replace('T', ' ')
+            : new Date().toISOString().slice(0, 19).replace('T', ' ');
+
           await conn.execute(
             `INSERT INTO evidences (id, task_id, link, keterangan, created_at, updated_at)
-             VALUES (?, ?, ?, ?, NOW(), NOW())
+             VALUES (?, ?, ?, ?, ?, NOW())
              ON DUPLICATE KEY UPDATE
                link = VALUES(link),
                keterangan = VALUES(keterangan),
@@ -140,6 +177,7 @@ async function seedFromJson() {
               task.id,
               ev.link || '',
               ev.keterangan || '',
+              evCreatedAt,
             ]
           );
           evidenceCount++;

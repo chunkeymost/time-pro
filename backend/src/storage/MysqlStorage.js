@@ -43,6 +43,10 @@ class MysqlStorage {
         });
       }
 
+      const [catRows] = await conn.execute('SELECT id, slug FROM categories');
+      const catMap = {};
+      for (const c of catRows) catMap[c.id] = c.slug;
+
       const [maxTaskId] = await conn.execute('SELECT MAX(id) AS maxId FROM tasks');
       const [maxTodoId] = await conn.execute('SELECT MAX(id) AS maxId FROM todos');
       const [maxEvidenceId] = await conn.execute('SELECT MAX(id) AS maxId FROM evidences');
@@ -60,7 +64,7 @@ class MysqlStorage {
           name: t.name,
           start: t.start_date.toISOString().slice(0, 10),
           end: t.end_date.toISOString().slice(0, 10),
-          cat: '', // resolved by frontend from category_id if needed
+          cat: catMap[t.category_id] || '',
           category_id: t.category_id,
           assignee: t.assignee,
           progress: t.progress,
@@ -89,6 +93,9 @@ class MysqlStorage {
       if (tasks.length === 0) return null;
       const t = tasks[0];
 
+      const [catRows] = await conn.execute('SELECT slug FROM categories WHERE id = ?', [t.category_id]);
+      const catSlug = catRows.length > 0 ? catRows[0].slug : '';
+
       const [todos] = await conn.execute(
         'SELECT id, text, done, due_date FROM todos WHERE task_id = ? AND deleted_at IS NULL',
         [id]
@@ -104,7 +111,7 @@ class MysqlStorage {
         name: t.name,
         start: t.start_date.toISOString().slice(0, 10),
         end: t.end_date.toISOString().slice(0, 10),
-        cat: '',
+        cat: catSlug,
         category_id: t.category_id,
         assignee: t.assignee,
         progress: t.progress,
