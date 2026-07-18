@@ -310,6 +310,31 @@ Fitur penyesuaian lebar sidebar:
 - Dari fixed `350px` → `calc(350px + 7vw)` (25% lebih lebar)
 - Responsive: `250px` → `calc(250px + 7vw)`
 
+### ✏️ Editable Project Title
+
+Fitur edit judul proyek secara inline:
+
+- Klik teks judul (`#project-title`) atau icon pensil → berubah jadi `<input>` dengan font & style yang sama
+- `Enter` atau `blur` → simpan via `PUT /api/metadata { title }`
+- `Escape` → cancel, kembali ke nilai semula
+- Validasi: empty string tidak diizinkan (revert fokus ke input)
+- Icon ✏️ (28px) muncul saat hover `.title-row`, opacity 0 → 1
+- CSS: `.title-row` flex container, `.title-input` dengan outline gold focus
+- Data persist di JSON metadata dan MySQL app_metadata
+
+### 📐 BASE_DESIGN.md
+
+Dokumentasi design system sebagai acuan konsistensi UI:
+
+- Font family: Space Grotesk (heading), Inter (body), IBM Plex Mono (monospace)
+- Color palette: 16 CSS custom properties (paper, ink, gold, status, dll)
+- Typography scale: 9px–30px
+- Spacing system, border radius, shadows, animations
+- Responsive breakpoints: 820px (tablet), 480px (mobile)
+- Component patterns: buttons, forms, tables, overlay, toast, confirm dialog
+- JavaScript conventions: IIFE, API helper, utility functions, keyboard shortcuts
+- File structure dan backend stack
+
 ## How to Run
 
 ```bash

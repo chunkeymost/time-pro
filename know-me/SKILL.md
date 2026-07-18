@@ -30,7 +30,7 @@ Jangan gunakan skill ini jika pengguna secara eksplisit meminta file `.xlsx` (pa
    { id:1, name:"Nama Tugas", start:addDays(T,-4), end:addDays(T,4), cat:"desain", assignee:"Nama", progress:60, todos:[], evidences:[] }
    ```
     `T` adalah variabel hari ini (`today()`), gunakan `addDays(T, n)` untuk tanggal relatif, atau `new Date(2026,6,15)` (bulan berbasis 0) untuk tanggal absolut. Field `todos` adalah array `{ id, text, done, due }` — progress otomatis terhitung dari checklist ini jika ada isinya. Field `evidences` adalah array `{ id, link, keterangan, created_at }` untuk lampiran bukti tugas.
-4. **Judul proyek**: ubah `value` pada `<input id="project-title">` di HTML sesuai nama proyek pengguna.
+4. **Judul proyek**: judul proyek bisa diedit langsung oleh pengguna di browser — klik teks judul di header (`#project-title`) atau icon ✏️ untuk mengedit, Enter untuk simpan (via `PUT /api/metadata`), Escape untuk batal. Default: `Timeframe as a System Analyst`.
 5. **Penyimpanan data** — semua data disimpan via backend ke `data/tasks.json` melalui REST API. Frontend menggunakan `fetch()` untuk setiap operasi CRUD.
 6. Simpan hasil akhir dan presentasikan ke pengguna.
 
@@ -99,7 +99,12 @@ STORAGE=mysql npm start         # Jalankan dengan MySQL
 | `POST` | `/api/tasks/:id/todos` | Tambah todo |
 | `PUT` | `/api/tasks/:id/todos/:todoId` | Update todo |
 | `DELETE` | `/api/tasks/:id/todos/:todoId` | Hapus todo |
-| `POST` | `/api/sync/commit` | (Phase 3, stub) Sync ke MySQL |
+| `POST` | `/api/tasks/:id/evidences` | Tambah evidence |
+| `PUT` | `/api/tasks/:id/evidences/:evId` | Update evidence |
+| `DELETE` | `/api/tasks/:id/evidences/:evId` | Hapus evidence |
+| `POST` | `/api/sync/commit` | Sync JSON ke MySQL |
+| `GET` | `/api/metadata` | Ambil metadata (title, versi, lastSynced) |
+| `PUT` | `/api/metadata` | Update metadata (title) |
 
 ### Struktur data
 
@@ -127,3 +132,5 @@ Lihat `ARCHITECTURE.md` untuk detail data model Task, Todo, dan schema MySQL.
 - MySQL mode menggunakan **soft delete** — task/todo/evidence tidak dihapus permanen, hanya di-set `deleted_at`.
 - Migration runner otomatis mendeteksi file SQL baru — cukup tambah file `V3__*.sql` di `backend/src/schema/migrations/`.
 - Lihat `ARCHITECTURE.md` untuk arsitektur dan `PLAN.md` untuk rencana implementasi (keduanya di `know-me/`).
+- Lihat `BASE_DESIGN.md` di `know-me/` untuk panduan design system (font, warna, komponen, layout) — gunakan sebagai acuan konsistensi UI.
+- Judul proyek bersifat inline-editable dan persist di metadata server — jangan hardcode di HTML.

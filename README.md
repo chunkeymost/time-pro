@@ -48,6 +48,7 @@ Aplikasi web ringan untuk memvisualisasikan, melacak, dan mengelola jadwal tugas
 - **Migration System** — Perubahan schema database terversioning dan repeatable
 - **Soft Delete** — Task/todo tidak hilang permanen, bisa di-restore (MySQL mode)
 - **Seed Data** — Import data dari JSON ke MySQL dengan guard double-import
+- **Editable Project Title** — Judul proyek bisa diubah langsung via klik (inline edit) — tersimpan di metadata server
 
 ## Arsitektur
 
@@ -81,6 +82,8 @@ Lihat `know-me/ARCHITECTURE.md` untuk detail arsitektur.
 | `PUT` | `/api/tasks/:id/evidences/:evId` | Update evidence |
 | `DELETE` | `/api/tasks/:id/evidences/:evId` | Hapus evidence |
 | `POST` | `/api/backup` | Backup tasks.json ke file timestamp |
+| `GET` | `/api/metadata` | Ambil metadata (title, versi, lastSynced) |
+| `PUT` | `/api/metadata` | Update metadata (title) |
 
 ## Rencana Pengembangan
 
@@ -88,7 +91,7 @@ Lihat `know-me/ARCHITECTURE.md` untuk detail arsitektur.
 |-------|--------|-----------|
 | **Phase 1** | ✅ Selesai | JSON file storage via Node.js backend |
 | **Phase 2** | ✅ Selesai | MySQL storage engine + migration runner + seed |
-| **Phase 3** | 📋 Rencana | Sync mechanism (JSON ↔ MySQL) |
+| **Phase 3** | ✅ Selesai | Sync mechanism (JSON ↔ MySQL) + metadata API |
 
 Lihat `know-me/PLAN.md` untuk detail rencana implementasi.
 
@@ -98,6 +101,7 @@ Lihat `know-me/PLAN.md` untuk detail rencana implementasi.
 - **Backend:** Node.js 20+, Express 4
 - **Database:** MySQL 8+ via `mysql2` (opsional)
 - **Migration:** Custom runner (file-based SQL versioning)
+- **Design System:** Dokumentasi di `know-me/BASE_DESIGN.md`
 
 ## Catatan
 
@@ -109,3 +113,5 @@ Lihat `know-me/PLAN.md` untuk detail rencana implementasi.
 - MySQL membutuhkan: `cd backend && npm run db:migrate` (buat tabel) lalu `cd backend && npm run db:seed` (import data) sebelum `STORAGE=mysql npm start`
 - Seed otomatis: jika ada kategori baru di JSON yang belum ada di DB, akan dibuat otomatis
 - Lihat `know-me/PLAN.md` untuk migration path lengkap
+- Lihat `know-me/BASE_DESIGN.md` untuk panduan design system dan konsistensi UI
+- Judul proyek bisa diedit langsung dengan mengklik teks judul di header — perubahan otomatis tersimpan ke server

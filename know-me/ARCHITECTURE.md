@@ -69,6 +69,7 @@ Buka `http://localhost:3000` di browser.
 | **Finish Flag** | Tugas selesai (100%) ditandai latar hijau + emoji 🏁 di sidebar |
 | **Jumlah Hari Pengerjaan** | Tampilan jumlah hari kerja pada setiap item daftar tugas |
 | **Garis Hari Ini** | Penanda tanggal sekarang secara otomatis |
+| **Editable Project Title** | Judul proyek bisa diedit inline dengan klik — tersimpan via `PUT /api/metadata` |
 
 ## Directory Structure
 
@@ -96,6 +97,7 @@ time-pro/
 │       └── tasks.json              # Auto-created dengan seed data
 ├── know-me/
 │   ├── ARCHITECTURE.md
+│   ├── BASE_DESIGN.md
 │   ├── PLAN.md
 │   └── SKILL.md
 └── README.md
@@ -187,6 +189,8 @@ addTodo(taskId, data)    → todo | null
 updateTodo(taskId, todoId, data) → todo | null
 deleteTodo(taskId, todoId)       → boolean   // soft delete (MySQL)
 getCategories()          → [{ id, slug, name, color, sort_order }]  // MySQL only
+getMetadata()            → { version, lastSynced, updatedAt, title }
+updateMetadata(updates)  → { version, lastSynced, updatedAt, title }
 ```
 
 ## Storage Switching
@@ -250,6 +254,8 @@ npm run db:seed -- --force   # Force re-import (hapus data lama)
 | `PUT` | `/api/tasks/:id/evidences/:evId` | Update evidence | 1 |
 | `DELETE` | `/api/tasks/:id/evidences/:evId` | Delete evidence (soft delete on MySQL) | 1 |
 | `POST` | `/api/backup` | Backup tasks.json ke file timestamp | 1 |
+| `GET` | `/api/metadata` | Ambil metadata (title, versi, lastSynced) | 1 |
+| `PUT` | `/api/metadata` | Update metadata (title) | 1 |
 | `POST` | `/api/sync/commit` | Sync JSON → MySQL | 3 |
 
 ## JSON File Structure (`data/tasks.json`)
@@ -261,7 +267,8 @@ Default kosong saat pertama kali install:
   "metadata": {
     "version": 1,
     "lastSynced": null,
-    "updatedAt": null
+    "updatedAt": null,
+    "title": "Time Pro"
   },
   "tasks": [],
   "nextId": 1,
@@ -277,7 +284,8 @@ Contoh setelah ada data:
   "metadata": {
     "version": 1,
     "lastSynced": null,
-    "updatedAt": "2026-07-07T12:00:00.000Z"
+    "updatedAt": "2026-07-07T12:00:00.000Z",
+    "title": "Timeframe as a System Analyst"
   },
   "tasks": [
     {
@@ -300,7 +308,7 @@ Contoh setelah ada data:
 }
 ```
 
-## Sync Mechanism (Phase 3 — Planned)
+## Sync Mechanism (Phase 3 — Completed)
 
 Proses commit (JSON → MySQL) menggunakan `seed-from-json.js` sebagai dasar:
 
@@ -321,3 +329,4 @@ Proses commit (JSON → MySQL) menggunakan `seed-from-json.js` sebagai dasar:
 8. **Evidence Panel**: klik "+ Add Evidence" → `openEvidencePanel(taskId)` → sidepeek dari kiri dengan form Link + Keterangan. Render tabel (No, Tanggal, Link Evidence shortened 45 char, Keterangan, ✕ Hapus). CRUD via API. Kolom Tanggal menampilkan `created_at` dalam format `id-ID`.
 9. **Toast Notification**: `showToast(msg, type)` — popup di kanan bawah dengan animasi. Digunakan oleh backup (sukses/gagal), copy teks todo (sukses/gagal).
 10. **MysqlStorage cat resolution**: `getAll()` dan `getById()` melakukan query lookup `categories` untuk mengembalikan field `cat: slug` dari `category_id`, sehingga frontend mendapatkan data kompatibel dengan format JSON storage.
+11. **Title Edit**: Inline edit — klik teks judul di header → span diganti `<input>` → Enter/blur → `PUT /api/metadata { title }` → simpan ke metadata server. Escape untuk cancel. Icon ✏️ (28px) muncul saat hover.

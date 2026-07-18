@@ -346,6 +346,15 @@ body{
 ```
 Grid size: 28px × 28px
 
+### Editable Project Title
+- Title in `.title-row` flex container with inline edit icon ✏️ (28px, `--ink-faint`)
+- Icon hidden by default (`opacity:0`), appears on row hover (`opacity:1` transition 0.15s)
+- Click title or icon → span replaced with `<input class="title-input">`
+- Enter/blur → save via `PUT /api/metadata { title }`
+- Escape → cancel, revert to saved value
+- Empty value not allowed — keeps focus on input
+- See backend `GET/PUT /api/metadata` endpoints, stored in `app_metadata` (MySQL) or `metadata.title` (JSON)
+
 ---
 
 ## 13. CDN Dependencies
