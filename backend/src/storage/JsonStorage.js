@@ -37,42 +37,12 @@ class JsonStorage {
   }
 
   _createSeedData() {
-    const now = new Date();
-    const T = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const fmt = (d) => {
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${y}-${m}-${day}`;
-    };
-    const addDays = (d, n) => {
-      const r = new Date(d);
-      r.setDate(r.getDate() + n);
-      return r;
-    };
-    const ts = now.toISOString();
-
     return {
-      metadata: { version: 1, lastSynced: null, updatedAt: ts },
-      tasks: [
-        { id: 1, name: 'Riset & Perencanaan', start: fmt(addDays(T, -10)), end: fmt(addDays(T, -3)), cat: 'lainnya', assignee: 'Dewi', progress: 100, todos: [], createdAt: ts, updatedAt: ts },
-        { id: 2, name: 'Desain Wireframe', start: fmt(addDays(T, -4)), end: fmt(addDays(T, 4)), cat: 'desain', assignee: 'Rangga', progress: 60, todos: [], createdAt: ts, updatedAt: ts },
-        {
-          id: 3, name: 'Desain Visual UI', start: fmt(addDays(T, 2)), end: fmt(addDays(T, 9)), cat: 'desain', assignee: 'Sari', progress: 20,
-          todos: [
-            { id: 1, text: 'Buat wireframe halaman utama', done: true, due: fmt(addDays(T, -2)) },
-            { id: 2, text: 'Buat mockup dashboard', done: false, due: fmt(addDays(T, 3)) },
-            { id: 3, text: 'Revisi color palette', done: false, due: fmt(addDays(T, 6)) },
-          ],
-          createdAt: ts, updatedAt: ts,
-        },
-        { id: 4, name: 'Pengembangan Backend', start: fmt(addDays(T, 3)), end: fmt(addDays(T, 18)), cat: 'pengembangan', assignee: 'Bima', progress: 10, todos: [], createdAt: ts, updatedAt: ts },
-        { id: 5, name: 'Pengembangan Frontend', start: fmt(addDays(T, 6)), end: fmt(addDays(T, 20)), cat: 'pengembangan', assignee: 'Putri', progress: 0, todos: [], createdAt: ts, updatedAt: ts },
-        { id: 6, name: 'Pengujian QA', start: fmt(addDays(T, 18)), end: fmt(addDays(T, 25)), cat: 'pengujian', assignee: 'Fajar', progress: 0, todos: [], createdAt: ts, updatedAt: ts },
-        { id: 7, name: 'Peluncuran ke Publik', start: fmt(addDays(T, 26)), end: fmt(addDays(T, 28)), cat: 'peluncuran', assignee: 'Tim', progress: 0, todos: [], createdAt: ts, updatedAt: ts },
-      ],
-      nextId: 8,
-      nextTodoId: 4,
+      metadata: { version: 1, lastSynced: null, updatedAt: new Date().toISOString() },
+      tasks: [],
+      nextId: 1,
+      nextTodoId: 1,
+      nextEvidenceId: 1,
     };
   }
 

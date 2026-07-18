@@ -18,16 +18,57 @@ backend/src/seed-from-json.js           ← Import data JSON → MySQL (DML)
 
 Storage dipilih via environment variable `STORAGE=mysql` — default JSON.
 
+## Cara Menjalankan
+
+```bash
+# Masuk ke folder backend
+cd backend
+
+# Install dependencies
+npm install
+
+# Mode JSON (default, tanpa MySQL)
+npm start
+
+# Mode MySQL
+npm run db:migrate              # Buat tabel + seed kategori
+npm run db:seed                 # Import data JSON → MySQL
+STORAGE=mysql npm start
+
+# Auto-reload (development)
+npm run dev
+```
+
+Buka `http://localhost:3000` di browser.
+
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | Vanilla HTML5, CSS3, JavaScript (ES6+) — single file |
+| Frontend | Vanilla HTML5, CSS3, JavaScript (ES6+) — single file + Bootstrap Icons (CDN) |
 | Backend | Node.js 20+, Express 4 |
 | Storage (default) | JSON file (`data/tasks.json`) |
 | Storage (opsional) | MySQL 8+ via `mysql2` |
 | Migration | Custom runner (`src/schema/migrate.js`) |
 | Dependencies | `express`, `cors`, `mysql2` |
+
+## Fitur Utama
+
+| Fitur | Deskripsi |
+|-------|-----------|
+| **Gantt Chart Interaktif** | Tampilan timeline tugas dengan drag & drop untuk menggeser jadwal dan resize durasi |
+| **Dua Mode Tampilan** | Minggu (40px/hari) dan Bulan (14px/hari) |
+| **Manajemen Tugas CRUD** | Tambah, ubah, dan hapus tugas lewat modal form |
+| **Sidebar Daftar Tugas** | Selalu sinkron dengan timeline |
+| **Kategori & Warna** | 7 kategori tugas (Desain, Pengembangan, Pengujian, Peluncuran, Research, Operasional, Lainnya) dengan kode warna berbeda |
+| **Progress Bar** | Visualisasi persentase progres per tugas |
+| **To Do List** | Subtask checklist dengan due date; progress otomatis terhitung dari todo yang selesai |
+| **Notifikasi Tugas** | Ikon lonceng dengan indikator merah berkedip jika ada todo pending |
+| **Toast Notification** | Popup notifikasi sukses/gagal di pojok kanan bawah |
+| **Evidence Panel** | Sidepeek dari kiri untuk lampiran link bukti tugas dengan tanggal dan shorten URL |
+| **Finish Flag** | Tugas selesai (100%) ditandai latar hijau + emoji 🏁 di sidebar |
+| **Jumlah Hari Pengerjaan** | Tampilan jumlah hari kerja pada setiap item daftar tugas |
+| **Garis Hari Ini** | Penanda tanggal sekarang secara otomatis |
 
 ## Directory Structure
 
@@ -213,6 +254,24 @@ npm run db:seed -- --force   # Force re-import (hapus data lama)
 
 ## JSON File Structure (`data/tasks.json`)
 
+Default kosong saat pertama kali install:
+
+```json
+{
+  "metadata": {
+    "version": 1,
+    "lastSynced": null,
+    "updatedAt": null
+  },
+  "tasks": [],
+  "nextId": 1,
+  "nextTodoId": 1,
+  "nextEvidenceId": 1
+}
+```
+
+Contoh setelah ada data:
+
 ```json
 {
   "metadata": {
@@ -235,8 +294,8 @@ npm run db:seed -- --force   # Force re-import (hapus data lama)
       "updatedAt": "2026-07-07T12:00:00.000Z"
     }
   ],
-  "nextId": 8,
-  "nextTodoId": 4,
+  "nextId": 2,
+  "nextTodoId": 1,
   "nextEvidenceId": 1
 }
 ```
