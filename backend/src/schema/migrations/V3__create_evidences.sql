@@ -1,0 +1,12 @@
+CREATE TABLE evidences (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  task_id INT UNSIGNED NOT NULL,
+  link VARCHAR(500) NOT NULL,
+  keterangan TEXT,
+  deleted_at TIMESTAMP NULL DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+  INDEX idx_evidences_task (task_id),
+  INDEX idx_evidences_deleted (deleted_at)
+) ENGINE=InnoDB CHARSET=utf8mb4;

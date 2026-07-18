@@ -1,31 +1,36 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const JsonStorage = require('./src/storage/JsonStorage');
+const MysqlStorage = require('./src/storage/MysqlStorage');
 const config = require('./src/config');
 
 const app = express();
-const storage = new JsonStorage(config.dataPath);
+
+const storage = process.env.STORAGE === 'mysql'
+  ? new MysqlStorage(config.mysql)
+  : new JsonStorage(config.dataPath);
 
 app.use(cors());
 app.use(express.json());
 
-app.use(express.static(path.join(__dirname, '.')));
+app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
 /* ---------- Tasks ---------- */
 
-app.get('/api/tasks', (req, res) => {
+app.get('/api/tasks', async (req, res) => {
   try {
-    const data = storage.getAll();
+    const data = await storage.getAll();
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get('/api/tasks/:id', (req, res) => {
+app.get('/api/tasks/:id', async (req, res) => {
   try {
-    const task = storage.getById(parseInt(req.params.id, 10));
+    const task = await storage.getById(parseInt(req.params.id, 10));
     if (!task) return res.status(404).json({ error: 'Task not found' });
     res.json({ task });
   } catch (err) {
@@ -33,23 +38,23 @@ app.get('/api/tasks/:id', (req, res) => {
   }
 });
 
-app.post('/api/tasks', (req, res) => {
+app.post('/api/tasks', async (req, res) => {
   try {
     const { name, start, end, cat, assignee, progress } = req.body;
     if (!name || !start || !end) {
       return res.status(400).json({ error: 'name, start, and end are required' });
     }
-    const task = storage.create({ name, start, end, cat, assignee, progress });
+    const task = await storage.create({ name, start, end, cat, assignee, progress });
     res.status(201).json({ task });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.put('/api/tasks/:id', (req, res) => {
+app.put('/api/tasks/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const task = storage.update(id, req.body);
+    const task = await storage.update(id, req.body);
     if (!task) return res.status(404).json({ error: 'Task not found' });
     res.json({ task });
   } catch (err) {
@@ -57,10 +62,10 @@ app.put('/api/tasks/:id', (req, res) => {
   }
 });
 
-app.delete('/api/tasks/:id', (req, res) => {
+app.delete('/api/tasks/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const ok = storage.delete(id);
+    const ok = await storage.delete(id);
     if (!ok) return res.status(404).json({ error: 'Task not found' });
     res.json({ success: true });
   } catch (err) {
@@ -70,9 +75,7 @@ app.delete('/api/tasks/:id', (req, res) => {
 
 /* ---------- Backup ---------- */
 
-app.post('/api/backup', (req, res) => {
-  const fs = require('fs');
-  const path = require('path');
+app.post('/api/backup', async (req, res) => {
   const dataDir = path.dirname(config.dataPath);
   const now = new Date();
   const y = now.getFullYear();
@@ -93,12 +96,12 @@ app.post('/api/backup', (req, res) => {
 
 /* ---------- Todos ---------- */
 
-app.post('/api/tasks/:id/todos', (req, res) => {
+app.post('/api/tasks/:id/todos', async (req, res) => {
   try {
     const taskId = parseInt(req.params.id, 10);
     const { text, due } = req.body;
     if (!text) return res.status(400).json({ error: 'text is required' });
-    const todo = storage.addTodo(taskId, { text, due: due || null });
+    const todo = await storage.addTodo(taskId, { text, due: due || null });
     if (!todo) return res.status(404).json({ error: 'Task not found' });
     res.status(201).json({ todo });
   } catch (err) {
@@ -106,11 +109,11 @@ app.post('/api/tasks/:id/todos', (req, res) => {
   }
 });
 
-app.put('/api/tasks/:id/todos/:todoId', (req, res) => {
+app.put('/api/tasks/:id/todos/:todoId', async (req, res) => {
   try {
     const taskId = parseInt(req.params.id, 10);
     const todoId = parseInt(req.params.todoId, 10);
-    const todo = storage.updateTodo(taskId, todoId, req.body);
+    const todo = await storage.updateTodo(taskId, todoId, req.body);
     if (!todo) return res.status(404).json({ error: 'Task or Todo not found' });
     res.json({ todo });
   } catch (err) {
@@ -118,12 +121,51 @@ app.put('/api/tasks/:id/todos/:todoId', (req, res) => {
   }
 });
 
-app.delete('/api/tasks/:id/todos/:todoId', (req, res) => {
+app.delete('/api/tasks/:id/todos/:todoId', async (req, res) => {
   try {
     const taskId = parseInt(req.params.id, 10);
     const todoId = parseInt(req.params.todoId, 10);
-    const ok = storage.deleteTodo(taskId, todoId);
+    const ok = await storage.deleteTodo(taskId, todoId);
     if (!ok) return res.status(404).json({ error: 'Task or Todo not found' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ---------- Evidences ---------- */
+
+app.post('/api/tasks/:id/evidences', async (req, res) => {
+  try {
+    const taskId = parseInt(req.params.id, 10);
+    const { link, keterangan } = req.body;
+    if (!link) return res.status(400).json({ error: 'link is required' });
+    const ev = await storage.addEvidence(taskId, { link, keterangan: keterangan || '' });
+    if (!ev) return res.status(404).json({ error: 'Task not found' });
+    res.status(201).json({ evidence: ev });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/tasks/:id/evidences/:evId', async (req, res) => {
+  try {
+    const taskId = parseInt(req.params.id, 10);
+    const evId = parseInt(req.params.evId, 10);
+    const ev = await storage.updateEvidence(taskId, evId, req.body);
+    if (!ev) return res.status(404).json({ error: 'Task or Evidence not found' });
+    res.json({ evidence: ev });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/tasks/:id/evidences/:evId', async (req, res) => {
+  try {
+    const taskId = parseInt(req.params.id, 10);
+    const evId = parseInt(req.params.evId, 10);
+    const ok = await storage.deleteEvidence(taskId, evId);
+    if (!ok) return res.status(404).json({ error: 'Task or Evidence not found' });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

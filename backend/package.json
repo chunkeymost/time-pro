@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "db:migrate": "node src/schema/migrate.js",
+    "db:seed": "node src/seed-from-json.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

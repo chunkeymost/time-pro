@@ -8,6 +8,6 @@ module.exports = {
     port: 8889,
     user: 'root',
     password: 'root',
-    database: 'time_pro',
+    database: 'db_timepro',
   },
 };
