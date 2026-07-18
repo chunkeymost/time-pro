@@ -10,7 +10,7 @@ Browser (index.html)              ← Frontend: Vanilla HTML/CSS/JS
 Node.js Server (Express)           ← Backend API
       ↕
 data/tasks.json                    ← Phase 1: JSON File Storage
-MySQL Database                     ← Phase 2: MySQL (in progress)
+MySQL Database                     ← Phase 2: MySQL (planned)
       ↕
 POST /api/sync/commit              ← Phase 3: Manual Sync
 ```
@@ -35,10 +35,10 @@ time-pro/
 ├── src/
 │   ├── config.js           # Konfigurasi path & database
 │   ├── schema/
-│   │   └── database.sql    # MySQL DDL
+│   │   └── database.sql    # MySQL DDL (Phase 2 - planned)
 │   └── storage/
 │       ├── JsonStorage.js  # File-based storage (Phase 1)
-│       └── MysqlStorage.js # Database-based storage (Phase 2)
+│       └── MysqlStorage.js # Database-based storage (Phase 2 - planned)
 ├── data/
 │   └── tasks.json          # Auto-created dengan seed data
 ├── ARCHITECTURE.md
@@ -87,8 +87,9 @@ time-pro/
 | `POST` | `/api/tasks/:id/todos` | Add todo to task | 1 |
 | `PUT` | `/api/tasks/:id/todos/:todoId` | Update todo | 1 |
 | `DELETE` | `/api/tasks/:id/todos/:todoId` | Delete todo | 1 |
-| `POST` | `/api/sync/commit` | Sync JSON → MySQL | 3 |
-| `POST` | `/api/sync/pull` | Pull MySQL → JSON | 3 |
+| `POST` | `/api/backup` | Backup JSON to timestamped file | 1 |
+| `POST` | `/api/sync/commit` | Sync JSON → MySQL (stub) | 3 |
+| `POST` | `/api/sync/pull` | Pull MySQL → JSON (planned) | 3 |
 
 ## Storage Layer Abstraction
 
@@ -133,7 +134,7 @@ deleteTodo(taskId, todoId)       → boolean
 }
 ```
 
-## Sync Mechanism (Phase 3)
+## Sync Mechanism (Phase 3 — not yet implemented)
 
 Proses commit (JSON → MySQL):
 

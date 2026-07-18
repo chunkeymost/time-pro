@@ -59,7 +59,8 @@ Lihat `ARCHITECTURE.md` untuk detail arsitektur.
 | `POST` | `/api/tasks/:id/todos` | Tambah todo |
 | `PUT` | `/api/tasks/:id/todos/:todoId` | Update todo |
 | `DELETE` | `/api/tasks/:id/todos/:todoId` | Hapus todo |
-| `POST` | `/api/sync/commit` | (Phase 3) Sync JSON → MySQL |
+| `POST` | `/api/backup` | Backup JSON ke file timestamped |
+| `POST` | `/api/sync/commit` | (Phase 3, stub) Sync ke MySQL |
 
 ## Rencana Pengembangan
 
@@ -75,7 +76,7 @@ Lihat `PLAN.md` untuk detail rencana implementasi.
 
 - **Frontend:** Vanilla HTML5, CSS3, JavaScript (ES6+) — single file
 - **Backend:** Node.js 20+, Express 4
-- **Dependencies:** express, cors, mysql2
+- **Dependencies:** express, cors (+ mysql2 for Phase 2)
 
 ## Catatan
 

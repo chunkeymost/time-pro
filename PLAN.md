@@ -6,7 +6,7 @@ Tiga phase implementasi untuk menambahkan persistence pada aplikasi Time Pro.
 
 ```
 Phase 1: JSON File Storage  [COMPLETED]
-Phase 2: MySQL Storage      [NEXT]
+Phase 2: MySQL Storage      [PLANNED]
 Phase 3: Sync (JSON ↔ MySQL) [FUTURE]
 ```
 
@@ -48,6 +48,7 @@ DELETE /api/tasks/:id          → Delete task + todos
 POST   /api/tasks/:id/todos    → Add todo
 PUT    /api/tasks/:id/todos/:todoId → Update todo
 DELETE /api/tasks/:id/todos/:todoId → Delete todo
+POST   /api/backup             → Backup JSON to timestamped file
 POST   /api/sync/commit        → (stub, Phase 3)
 ```
 
