@@ -38,7 +38,7 @@ class JsonStorage {
 
   _createSeedData() {
     return {
-      metadata: { version: 1, lastSynced: null, updatedAt: new Date().toISOString() },
+      metadata: { version: 1, lastSynced: null, updatedAt: new Date().toISOString(), title: 'Timeframe as a System Analyst' },
       tasks: [],
       nextId: 1,
       nextTodoId: 1,
@@ -48,11 +48,12 @@ class JsonStorage {
 
   getAll() {
     const data = this._load();
+    const meta = data.metadata || {};
     return {
       tasks: data.tasks,
       nextId: data.nextId,
       nextTodoId: data.nextTodoId,
-      metadata: data.metadata,
+      metadata: { version: meta.version || 1, lastSynced: meta.lastSynced || null, updatedAt: meta.updatedAt || null, title: meta.title || 'Timeframe as a System Analyst' },
     };
   }
 
@@ -191,6 +192,21 @@ class JsonStorage {
     task.updatedAt = new Date().toISOString();
     this._save(data);
     return true;
+  }
+  getMetadata() {
+    const data = this._load();
+    const meta = data.metadata || {};
+    return { version: meta.version || 1, lastSynced: meta.lastSynced || null, updatedAt: meta.updatedAt || null, title: meta.title || 'Timeframe as a System Analyst' };
+  }
+
+  updateMetadata(updates) {
+    const data = this._load();
+    if (!data.metadata) {
+      data.metadata = { version: 1, lastSynced: null, updatedAt: null, title: 'Timeframe as a System Analyst' };
+    }
+    if (updates.title !== undefined) data.metadata.title = updates.title;
+    this._save(data);
+    return data.metadata;
   }
 }
 

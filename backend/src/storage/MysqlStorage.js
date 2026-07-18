@@ -52,10 +52,11 @@ class MysqlStorage {
       const [maxEvidenceId] = await conn.execute('SELECT MAX(id) AS maxId FROM evidences');
       const [metaRows] = await conn.execute("SELECT `key`, `value` FROM app_metadata");
 
-      const metadata = { version: 1, lastSynced: null, updatedAt: null };
+      const metadata = { version: 1, lastSynced: null, updatedAt: null, title: 'Timeframe as a System Analyst' };
       for (const row of metaRows) {
         if (row.key === 'lastSynced') metadata.lastSynced = row.value;
         if (row.key === 'updatedAt') metadata.updatedAt = row.value;
+        if (row.key === 'title') metadata.title = row.value;
       }
 
       return {
@@ -333,6 +334,37 @@ class MysqlStorage {
       [slug]
     );
     return rows.length > 0 ? rows[0].id : 2;
+  }
+
+  async getMetadata() {
+    const conn = await this._getConnection();
+    try {
+      const [metaRows] = await conn.execute("SELECT `key`, `value` FROM app_metadata");
+      const metadata = { version: 1, lastSynced: null, updatedAt: null, title: 'Timeframe as a System Analyst' };
+      for (const row of metaRows) {
+        if (row.key === 'lastSynced') metadata.lastSynced = row.value;
+        if (row.key === 'updatedAt') metadata.updatedAt = row.value;
+        if (row.key === 'title') metadata.title = row.value;
+      }
+      return metadata;
+    } finally {
+      await conn.end();
+    }
+  }
+
+  async updateMetadata(updates) {
+    const conn = await this._getConnection();
+    try {
+      if (updates.title !== undefined) {
+        await conn.execute(
+          "INSERT INTO app_metadata (`key`, `value`) VALUES ('title', ?) ON DUPLICATE KEY UPDATE `value` = ?",
+          [updates.title, updates.title]
+        );
+      }
+      return this.getMetadata();
+    } finally {
+      await conn.end();
+    }
   }
 }
 

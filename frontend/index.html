@@ -64,6 +64,30 @@
     position:relative;
   }
   .title-block{display:flex; flex-direction:column; gap:6px; min-width:280px;}
+  .title-row{display:flex; align-items:center; gap:6px;}
+  .title-edit-icon{
+    font-size:28px;
+    color:var(--ink-faint);
+    cursor:pointer;
+    opacity:0;
+    transition:opacity .15s;
+    flex-shrink:0;
+  }
+  .title-row:hover .title-edit-icon{ opacity:1; }
+  .title-edit-icon:hover{ color:var(--ink); }
+  .title-input{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:30px;
+    font-weight:700;
+    color:var(--ink);
+    background:var(--surface);
+    border:1px solid var(--paper-line-strong);
+    border-radius:7px;
+    padding:0 6px;
+    outline:2px solid var(--gold);
+    width:100%;
+    min-width:200px;
+  }
   .eyebrow{
     font-family:'IBM Plex Mono', monospace;
     font-size:11px;
@@ -802,6 +826,7 @@
   @media (max-width: 820px){
     .board{ grid-template-columns:calc(250px + 7vw) 1fr; }
     #project-title{ font-size:22px; }
+    .title-input{ font-size:22px; }
     .app-header{ gap:12px; }
     .header-actions{ width:100%; }
     .view-toggle{ flex:1; }
@@ -812,6 +837,7 @@
     .board{ grid-template-columns:1fr; border-radius:6px; }
     .sidebar{ border-right:none; border-bottom:1px solid var(--paper-line-strong); }
     #project-title{ font-size:18px; }
+    .title-input{ font-size:18px; }
     .legend{ gap:8px; font-size:10.5px; }
     .title-block{ min-width:0; }
     .modal{ width:100vw; }
@@ -828,7 +854,10 @@
   <header class="app-header">
     <div class="title-block">
       <span class="eyebrow">Proyek Management</span>
-      <span id="project-title">Timeframe as a System Analyst</span>
+      <div class="title-row">
+        <span id="project-title">Timeframe as a System Analyst</span>
+        <span class="title-edit-icon" id="title-edit-icon">&#9998;</span>
+      </div>
       <span class="project-sub" id="project-range">—</span>
     </div>
     <div class="header-actions">
@@ -1151,6 +1180,7 @@
       nextId = data.nextId;
       nextTodoId = data.nextTodoId;
       lastUpdated = data.metadata?.updatedAt || null;
+      if (data.metadata?.title) els.title.textContent = data.metadata.title;
     } catch(e){
       console.error('Gagal memuat data:', e);
       alert('Gagal memuat data. Pastikan server API berjalan (node server.js).');
@@ -1885,6 +1915,55 @@
     if(e.key==='Escape' && els.overlay.classList.contains('open')) closeModal();
     if(e.key==='Escape' && els.notifOverlay.classList.contains('open')) els.notifOverlay.classList.remove('open');
     if(e.key==='Escape' && els.evidenceOverlay.classList.contains('open')) closeEvidencePanel();
+  });
+
+  /* ---------------- Inline Title Edit ---------------- */
+  let _savedTitle = '';
+
+  function enableTitleEdit(){
+    const current = els.title.textContent;
+    _savedTitle = current;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'title-input';
+    input.value = current;
+    els.title.replaceWith(input);
+    input.focus();
+    input.select();
+
+    function commit(){
+      const val = input.value.trim();
+      if(!val){
+        input.focus();
+        return;
+      }
+      const span = document.createElement('span');
+      span.id = 'project-title';
+      span.textContent = val;
+      input.replaceWith(span);
+      els.title = span;
+      api.put('/api/metadata', { title: val }).catch(e => console.error('Save title failed:', e));
+    }
+
+    function cancel(){
+      const span = document.createElement('span');
+      span.id = 'project-title';
+      span.textContent = _savedTitle;
+      input.replaceWith(span);
+      els.title = span;
+    }
+
+    input.addEventListener('keydown', function(e){
+      if(e.key === 'Enter'){ e.preventDefault(); commit(); }
+      if(e.key === 'Escape'){ e.preventDefault(); cancel(); }
+    });
+    input.addEventListener('blur', commit);
+  }
+
+  document.querySelector('.title-row').addEventListener('click', function(e){
+    if(e.target.id === 'project-title' || e.target.id === 'title-edit-icon'){
+      enableTitleEdit();
+    }
   });
 
   /* ---------------- Init ---------------- */

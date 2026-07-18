@@ -172,6 +172,30 @@ app.delete('/api/tasks/:id/evidences/:evId', async (req, res) => {
   }
 });
 
+/* ---------- Metadata ---------- */
+
+app.get('/api/metadata', async (req, res) => {
+  try {
+    const metadata = await storage.getMetadata();
+    res.json({ metadata });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/metadata', async (req, res) => {
+  try {
+    const { title } = req.body;
+    if (!title || !title.trim()) {
+      return res.status(400).json({ error: 'title is required' });
+    }
+    const metadata = await storage.updateMetadata({ title: title.trim() });
+    res.json({ metadata });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ---------- Sync stub ---------- */
 
 app.post('/api/sync/commit', (req, res) => {

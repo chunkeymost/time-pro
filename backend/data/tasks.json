@@ -2,10 +2,49 @@
   "metadata": {
     "version": 1,
     "lastSynced": null,
-    "updatedAt": "2026-07-18T06:14:47.680Z"
+    "updatedAt": "2026-07-18T07:33:45.650Z",
+    "title": "Timeframe as Project Manager"
   },
-  "tasks": [],
-  "nextId": 2,
-  "nextTodoId": 1,
+  "tasks": [
+    {
+      "id": 2,
+      "name": "Ini adalah contoh tugas Baru",
+      "start": "2026-07-18",
+      "end": "2026-07-21",
+      "cat": "pengembangan",
+      "assignee": "Asep",
+      "progress": 50,
+      "todos": [
+        {
+          "id": 1,
+          "text": "Test 1",
+          "done": true,
+          "due": "2026-07-18"
+        },
+        {
+          "id": 2,
+          "text": "test 2",
+          "done": true,
+          "due": "2026-07-19"
+        },
+        {
+          "id": 3,
+          "text": "test 3",
+          "done": false,
+          "due": "2026-07-20"
+        },
+        {
+          "id": 4,
+          "text": "test 4",
+          "done": false,
+          "due": "2026-07-21"
+        }
+      ],
+      "createdAt": "2026-07-18T07:26:13.143Z",
+      "updatedAt": "2026-07-18T07:26:41.175Z"
+    }
+  ],
+  "nextId": 3,
+  "nextTodoId": 5,
   "nextEvidenceId": 1
 }
