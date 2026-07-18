@@ -20,7 +20,7 @@ Jangan gunakan skill ini jika pengguna secara eksplisit meminta file `.xlsx` (pa
 
 ## Cara memakai skill ini
 
-1. **Mulai dari template**, jangan menulis ulang dari nol. Salin `assets/template.html` ke `/home/claude/`, lalu sesuaikan sesuai kebutuhan pengguna sebelum menyalin hasil akhirnya ke `/mnt/user-data/outputs/`.
+1. **Mulai dari template**, jangan menulis ulang dari nol. Salin `index.html` sebagai basis, lalu sesuaikan sesuai kebutuhan pengguna.
 2. **Kumpulkan konteks minimum** sebelum menyesuaikan (boleh berasumsi wajar dan sebutkan asumsinya, jangan berhenti hanya untuk bertanya):
    - Nama proyek dan rentang waktu kasar (kalau tidak disebutkan, pakai tanggal hari ini sebagai acuan seperti pada template).
    - Daftar tugas nyata jika pengguna sudah menyebutkannya (nama tugas, tanggal mulai/selesai, penanggung jawab, kategori). Jika belum ada, isi dengan data contoh yang masuk akal seperti pada template, lalu jelaskan bahwa itu bisa diubah lewat tombol "+ Tugas Baru".
@@ -31,8 +31,8 @@ Jangan gunakan skill ini jika pengguna secara eksplisit meminta file `.xlsx` (pa
    ```
     `T` adalah variabel hari ini (`today()`), gunakan `addDays(T, n)` untuk tanggal relatif, atau `new Date(2026,6,15)` (bulan berbasis 0) untuk tanggal absolut. Field `todos` adalah array `{ id, text, done, due }` — progress otomatis terhitung dari checklist ini jika ada isinya. Field `evidences` adalah array `{ id, link, keterangan, created_at }` untuk lampiran bukti tugas.
 4. **Judul proyek**: ubah `value` pada `<input id="project-title">` di HTML sesuai nama proyek pengguna.
-5. **Jangan tambahkan localStorage/sessionStorage** — file ini dirender sebagai artifact HTML di Claude.ai, dan browser storage API tidak didukung di sana. Semua data tetap di variabel JS in-memory (`tasks` array), sesuai desain template.
-6. Simpan hasil akhir ke `/mnt/user-data/outputs/<nama-proyek>-timeline.html`, lalu presentasikan dengan `present_files`.
+5. **Penyimpanan data** — semua data disimpan via backend ke `data/tasks.json` melalui REST API. Frontend menggunakan `fetch()` untuk setiap operasi CRUD.
+6. Simpan hasil akhir dan presentasikan ke pengguna.
 
 ## Fitur bawaan template (jangan dihapus tanpa alasan kuat)
 
@@ -63,7 +63,7 @@ Jangan gunakan skill ini jika pengguna secara eksplisit meminta file `.xlsx` (pa
 | Ganti skema warna | Variabel CSS di `:root` (`--paper`, `--ink`, `--gold`, dst.) |
 | Ganti bahasa ke Inggris | Semua teks berbahasa Indonesia (label, placeholder, `MONTHS_ID`, `DOW_ID`, teks tombol) |
 | Tambah kolom baru (mis. anggaran) | Tambah field di side panel (`<div class="field">`) + properti baru di object task + tampilkan di `renderSidebar`/bar label sesuai kebutuhan |
-| Export/import data (persist) | Tambahkan tombol export JSON (unduh file) / import (upload file) — **hindari** localStorage karena tidak didukung di artifact Claude.ai |
+| Export/import data (persist) | Data sudah persist via backend (`data/tasks.json`). Untuk export/import antar instance, tambahkan tombol export JSON (unduh file) / import (upload file) |
 | Ubah bentuk tag di legend | Edit `clip-path` di selector `.legend-dot.cat-*` dan `.tag-dot.cat-*` |
 
 ## Cara menjalankan (dengan Node.js backend)
@@ -99,10 +99,7 @@ STORAGE=mysql npm start         # Jalankan dengan MySQL
 | `POST` | `/api/tasks/:id/todos` | Tambah todo |
 | `PUT` | `/api/tasks/:id/todos/:todoId` | Update todo |
 | `DELETE` | `/api/tasks/:id/todos/:todoId` | Hapus todo |
-| `POST` | `/api/tasks/:id/evidences` | Tambah evidence |
-| `PUT` | `/api/tasks/:id/evidences/:evId` | Update evidence |
-| `DELETE` | `/api/tasks/:id/evidences/:evId` | Hapus evidence |
-| `POST` | `/api/backup` | Backup data ke file (JSON mode) |
+| `POST` | `/api/sync/commit` | (Phase 3, stub) Sync ke MySQL |
 
 ### Struktur data
 
@@ -120,7 +117,7 @@ Lihat `ARCHITECTURE.md` untuk detail data model Task, Todo, dan schema MySQL.
 
 ## Catatan teknis
 
-- Font dimuat dari Google Fonts CDN (`fonts.googleapis.com`) — ini dimuat oleh browser pengguna saat file dibuka, bukan oleh sandbox Claude, jadi tidak terpengaruh pembatasan jaringan di sisi Claude.
+- Font dimuat dari Google Fonts CDN (`fonts.googleapis.com`) — ini dimuat oleh browser pengguna saat file dibuka.
 - Semua tanggal dibandingkan sebagai objek `Date` dengan `setHours(0,0,0,0)` agar perbandingan hari akurat tanpa masalah zona waktu jam.
 - Progress task otomatis berasal dari todo checklist jika `task.todos.length > 0`; jika kosong, progress manual via slider.
 - Setiap todo memiliki field `due: Date` — date picker di sisi kiri input teks, range dibatasi oleh start-end task utama.
