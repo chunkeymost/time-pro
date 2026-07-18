@@ -7,7 +7,7 @@ Tiga phase implementasi persistence pada aplikasi Time Pro.
 ```
 Phase 1: JSON File Storage  [COMPLETED]
 Phase 2: MySQL Storage      [COMPLETED]
-Phase 3: Sync (JSON ↔ MySQL) [FUTURE]
+Phase 3: Sync (JSON ↔ MySQL) [COMPLETED]
 ```
 
 ---
@@ -178,7 +178,7 @@ cd backend && STORAGE=mysql node server.js
 
 ---
 
-## Phase 3: Sync (JSON ↔ MySQL) 📋 PLANNED
+## Phase 3: Sync (JSON ↔ MySQL) ✅ COMPLETED
 
 ### Goal
 
@@ -186,18 +186,18 @@ Enable manual sync antara JSON file dan MySQL database — pengguna bisa "commit
 
 ### Tasks
 
-- [ ] Buat `POST /api/sync/commit` — push semua data JSON ke MySQL
+- [x] Buat `POST /api/sync/commit` — push semua data JSON ke MySQL
   - Baca seluruh data dari `data/tasks.json`
   - Begin transaction
   - Untuk setiap task: `REPLACE INTO tasks (...) VALUES (...)`
   - Hapus todos lama per task, insert ulang dari JSON
   - Update `metadata.lastSynced` di JSON dan `app_metadata` di MySQL
   - Commit transaction
-- [ ] Buat `POST /api/sync/pull` — tarik data MySQL ke JSON (overwrite)
-- [ ] Buat `GET /api/sync/status` — dapatkan timestamp sync terakhir
-- [ ] Tambah tombol "Commit ke Database" di frontend (header-actions)
-- [ ] Tambah indikator status sync (last synced timestamp)
-- [ ] Tambah error handling untuk konflik data
+- [x] Buat `POST /api/sync/pull` — tarik data MySQL ke JSON (overwrite)
+- [x] Buat `GET /api/sync/status` — dapatkan timestamp sync terakhir
+- [x] Tambah tombol "Commit ke Database" di frontend (header-actions)
+- [x] Tambah indikator status sync (last synced timestamp)
+- [x] Tambah error handling untuk konflik data
 
 ### Frontend Addition
 
