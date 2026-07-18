@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lini Waktu Proyek</title>
+<title>Proyek Management | as System Analyst</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -145,6 +145,8 @@
     color:var(--ink);
   }
   .btn-ghost:hover{ border-color:var(--ink-soft); }
+  #backup-btn{ background:#E67E22; border-color:#E67E22; color:#fff; }
+  #backup-btn:hover{ background:#D35400; border-color:#D35400; }
 
   /* ---------- Legend ---------- */
   .legend{
@@ -159,6 +161,26 @@
   .legend-label{font-weight:600; color:var(--ink); margin-right:4px;}
   .legend-item{display:flex; align-items:center; gap:7px;}
   .legend-dot{width:9px; height:9px; display:inline-block;}
+
+  /* ---------- Toast ---------- */
+  .toast-container{
+    position:fixed; bottom:24px; right:24px;
+    display:flex; flex-direction:column-reverse; gap:8px;
+    z-index:999;
+  }
+  .toast{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:13px; font-weight:500;
+    padding:12px 20px; border-radius:8px;
+    color:#fff; box-shadow:var(--shadow);
+    animation:toast-in .25s ease;
+  }
+  .toast.success{ background:var(--status-done); }
+  .toast.error{ background:var(--status-risk); }
+  @keyframes toast-in{
+    from{ opacity:0; transform:translateY(12px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
 
   /* ---------- Board layout ---------- */
   .board{
@@ -379,12 +401,14 @@
   .cat-pengujian{ background:var(--status-done); }
   .cat-peluncuran{ background:var(--status-risk); }
   .cat-lainnya{ background:var(--status-planned); }
+  .cat-research{ background:var(--gold); }
 
   .legend-dot.cat-desain, .tag-dot.cat-desain{ clip-path:polygon(50% 0%,0% 100%,100% 100%); }
   .legend-dot.cat-pengembangan, .tag-dot.cat-pengembangan{ clip-path:circle(50%); }
   .legend-dot.cat-pengujian, .tag-dot.cat-pengujian{ clip-path:polygon(50% 0%,100% 38%,82% 100%,18% 100%,0% 38%); }
   .legend-dot.cat-peluncuran, .tag-dot.cat-peluncuran{ clip-path:none; }
   .legend-dot.cat-lainnya, .tag-dot.cat-lainnya{ clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%); }
+  .legend-dot.cat-research, .tag-dot.cat-research{ clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%); }
   .cat-today{ background:var(--cut-line); }
   .legend-dot.cat-today{ clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%); }
 
@@ -417,6 +441,7 @@
     overflow-y:auto;
     transform:translateX(100%);
     transition:transform .25s ease;
+    position:relative;
   }
   .overlay.open .modal{
     transform:translateX(0);
@@ -511,6 +536,7 @@
     align-items:center;
     justify-content:center;
     padding:20px;
+    pointer-events:auto;
   }
   .confirm-overlay.open{ display:flex; }
   .confirm-box{
@@ -664,7 +690,7 @@
 
   <header class="app-header">
     <div class="title-block">
-      <span class="eyebrow">Lini Waktu Proyek</span>
+      <span class="eyebrow">Proyek Management</span>
       <span id="project-title">Timeframe as a System Analyst</span>
       <span class="project-sub" id="project-range">—</span>
     </div>
@@ -673,7 +699,8 @@
         <button data-view="week" class="active">MINGGU</button>
         <button data-view="month">BULAN</button>
       </div>
-      <button class="btn btn-ghost" id="today-btn">KE HARI INI</button>
+       <button class="btn btn-ghost" id="today-btn">KE HARI INI</button>
+      <button class="btn btn-ghost" id="backup-btn">KEPT ON IT</button>
       <button class="btn btn-primary" id="add-task-btn">+ TUGAS BARU</button>
     </div>
   </header>
@@ -696,6 +723,7 @@
     </div>
   </div>
 
+  <div class="toast-container" id="toast-container"></div>
 </div>
 
 <!-- Modal -->
@@ -731,6 +759,7 @@
           <option value="pengembangan">Pengembangan</option>
           <option value="pengujian">Pengujian</option>
           <option value="peluncuran">Peluncuran</option>
+          <option value="research">RnD (Research & Development)</option>
           <option value="lainnya">Lainnya</option>
         </select>
       </div>
@@ -772,6 +801,7 @@
       </div>
     </div>
   </div>
+
 </div>
 
 <!-- Confirm dialog -->
@@ -797,6 +827,7 @@
     pengujian:     { label:"Pengujian",     cls:"cat-pengujian" },
     peluncuran:    { label:"Peluncuran",    cls:"cat-peluncuran" },
     lainnya:       { label:"Lainnya",       cls:"cat-lainnya" },
+    research:      { label:"RnD (Research & Development)", cls:"cat-research" },
   };
 
   function today(){
@@ -826,21 +857,10 @@
 
   const T = today();
 
-  let tasks = [
-    { id:1, name:"Riset & Perencanaan",      start:addDays(T,-10), end:addDays(T,-3), cat:"lainnya",      assignee:"Dewi",  progress:100, todos:[] },
-    { id:2, name:"Desain Wireframe",          start:addDays(T,-4),  end:addDays(T,4),  cat:"desain",       assignee:"Rangga",progress:60,  todos:[] },
-    { id:3, name:"Desain Visual UI",          start:addDays(T,2),   end:addDays(T,9),  cat:"desain",       assignee:"Sari",  progress:20,  todos:[
-    { id:1, text:"Buat wireframe halaman utama", done:true, due:addDays(T,-2) },
-    { id:2, text:"Buat mockup dashboard", done:false, due:addDays(T,3) },
-    { id:3, text:"Revisi color palette", done:false, due:addDays(T,6) },
-    ] },
-    { id:4, name:"Pengembangan Backend",      start:addDays(T,3),   end:addDays(T,18), cat:"pengembangan", assignee:"Bima",  progress:10,  todos:[] },
-    { id:5, name:"Pengembangan Frontend",     start:addDays(T,6),   end:addDays(T,20), cat:"pengembangan", assignee:"Putri", progress:0,   todos:[] },
-    { id:6, name:"Pengujian QA",              start:addDays(T,18),  end:addDays(T,25), cat:"pengujian",    assignee:"Fajar", progress:0,   todos:[] },
-    { id:7, name:"Peluncuran ke Publik",      start:addDays(T,26),  end:addDays(T,28), cat:"peluncuran",   assignee:"Tim",   progress:0,   todos:[] },
-  ];
-  let nextId = 8;
+  let tasks = [];
+  let nextId = 1;
   let nextTodoId = 1;
+  let lastUpdated = null;
   let editingTodoId = null;
   let selectedId = null;
   let view = "week"; // "week" | "month"
@@ -877,22 +897,76 @@
     todoSection: document.getElementById('todo-section'),
   };
 
-  let confirmCallback = null;
+  /* ---------------- API helper ---------------- */
+  const api = {
+    async get(path) {
+      const r = await fetch(path);
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    },
+    async post(path, body) {
+      const r = await fetch(path, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    },
+    async put(path, body) {
+      const r = await fetch(path, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    },
+    async del(path) {
+      const r = await fetch(path, { method:'DELETE' });
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    },
+  };
 
-  function showConfirm(msg, cb){
-    els.confirmMsg.innerHTML = msg;
-    confirmCallback = cb;
-    els.confirmOverlay.classList.add('open');
+  async function loadTasks(){
+    try {
+      const data = await api.get('/api/tasks');
+      tasks = data.tasks.map(t => ({
+        ...t,
+        start: parseDate(t.start),
+        end: parseDate(t.end),
+        todos: (t.todos||[]).map(td => ({ ...td, due: td.due ? parseDate(td.due) : null })),
+      }));
+      nextId = data.nextId;
+      nextTodoId = data.nextTodoId;
+      lastUpdated = data.metadata?.updatedAt || null;
+    } catch(e){
+      console.error('Gagal memuat data:', e);
+      alert('Gagal memuat data. Pastikan server API berjalan (node server.js).');
+    }
+    renderLegend();
+    renderAll(true);
+  }
+
+  let _confirmResolve = null;
+
+  function showConfirm(msg, confirmLabel = 'Ya, Hapus', cancelLabel = 'Batal', confirmClass = 'confirm-yes'){
+    return new Promise(resolve => {
+      els.confirmMsg.innerHTML = msg;
+      document.getElementById('confirm-cancel').textContent = cancelLabel;
+      const confirmBtn = document.getElementById('confirm-yes');
+      confirmBtn.textContent = confirmLabel;
+      confirmBtn.className = 'btn ' + confirmClass;
+      _confirmResolve = resolve;
+      els.confirmOverlay.classList.add('open');
+    });
   }
   function closeConfirm(){
     els.confirmOverlay.classList.remove('open');
-    confirmCallback = null;
+    _confirmResolve = null;
   }
-  document.getElementById('confirm-cancel').addEventListener('click', closeConfirm);
+  document.getElementById('confirm-cancel').addEventListener('click', ()=>{
+    els.confirmOverlay.classList.remove('open');
+    _confirmResolve = null;
+  });
   els.confirmYes.addEventListener('click', ()=>{
-    const cb = confirmCallback;
-    closeConfirm();
-    if(cb) cb();
+    const resolve = _confirmResolve;
+    els.confirmOverlay.classList.remove('open');
+    _confirmResolve = null;
+    if(resolve) resolve();
   });
 
   /* ---------------- Legend ---------------- */
@@ -1083,6 +1157,12 @@
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
       mode = null;
+      if(task && bar._dragged){
+        api.put('/api/tasks/'+task.id, {
+          name: task.name, start: fmt(task.start), end: fmt(task.end),
+          cat: task.cat, assignee: task.assignee, progress: task.progress,
+        }).catch(e => console.error('Save drag failed:', e));
+      }
     }
 
     bar.addEventListener('mousedown', (e)=> onDown(e,'move'));
@@ -1113,12 +1193,19 @@
     return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
 
+  function fmtDateTime(isoStr){
+    if(!isoStr) return '';
+    const d = new Date(isoStr);
+    return `${String(d.getDate()).padStart(2,'0')} ${MONTHS_ID[d.getMonth()]} ${d.getFullYear()}, ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  }
+
   /* ---------------- Project range label ---------------- */
   function renderProjectRange(){
     if(tasks.length===0){ els.range.textContent='Belum ada tugas'; return; }
     let min=tasks[0].start, max=tasks[0].end;
     tasks.forEach(t=>{ if(t.start<min) min=t.start; if(t.end>max) max=t.end; });
-    els.range.textContent = `${fmt(min)} — ${fmt(max)} · ${tasks.length} tugas`;
+    const updated = lastUpdated ? ` · Last updated ${fmtDateTime(lastUpdated)}` : '';
+    els.range.textContent = `${fmt(min)} — ${fmt(max)} · ${tasks.length} tugas${updated}`;
   }
 
   /* ---------------- Master render ---------------- */
@@ -1149,6 +1236,34 @@
 
   document.getElementById('today-btn').addEventListener('click', ()=>{
     renderAll(true);
+  });
+
+  /* ---------------- Toast ---------------- */
+  function showToast(msg, type='success'){
+    const el = document.createElement('div');
+    el.className = 'toast '+type;
+    el.textContent = msg;
+    document.getElementById('toast-container').appendChild(el);
+    setTimeout(()=>{ el.remove(); }, 3000);
+  }
+
+  /* ---------------- Backup ---------------- */
+  document.getElementById('backup-btn').addEventListener('click', async ()=>{
+    await showConfirm('Yakin ingin melakukan backup data?', 'Ya, Backup', 'Batal', 'btn-primary');
+    const btn = document.getElementById('backup-btn');
+    btn.textContent = 'MENYIMPAN...';
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/backup', { method:'POST' });
+      const data = await res.json();
+      if(data.success) showToast('Backup berhasil: '+data.file);
+      else showToast('Backup gagal', 'error');
+    } catch(e){
+      showToast('Backup gagal: '+e.message, 'error');
+    } finally {
+      btn.textContent = 'KEPT ON IT';
+      btn.disabled = false;
+    }
   });
 
   /* ---------------- Modal logic ---------------- */
@@ -1182,7 +1297,8 @@
     els.fName.focus();
   }
 
-  function closeModal(){
+  function closeModal(force){
+    if(!force && els.confirmOverlay.classList.contains('open')) return;
     els.overlay.classList.remove('open');
     els.todoSection.style.display = '';
     cancelTodoEdit();
@@ -1213,10 +1329,12 @@
       `;
       tr.querySelector('.todo-cb').addEventListener('change', function(){
         todo.done = this.checked;
+        api.put('/api/tasks/'+task.id+'/todos/'+todo.id, { done: todo.done }).catch(e => console.error('Save todo cb failed:', e));
         updateProgressFromTodos(task);
         renderTodos(task);
       });
       tr.querySelector('.todo-del-btn').addEventListener('click', function(){
+        api.del('/api/tasks/'+task.id+'/todos/'+todo.id).catch(e => console.error('Delete todo failed:', e));
         task.todos = task.todos.filter(t=>t.id!==todo.id);
         updateProgressFromTodos(task);
         renderTodos(task);
@@ -1262,19 +1380,23 @@
     els.todoCancelBtn.style.display = 'none';
   }
 
-  els.todoAddBtn.addEventListener('click', ()=>{
+  els.todoAddBtn.addEventListener('click', async ()=>{
     const t = tasks.find(x=>x.id===editingId);
     if(!t) return;
     const text = els.todoInput.value.trim();
     if(!text) return;
-    const due = els.todoDate.value ? parseDate(els.todoDate.value) : null;
+    const dueStr = els.todoDate.value || null;
     t.todos = t.todos || [];
     if(editingTodoId){
       const todo = t.todos.find(x=>x.id===editingTodoId);
-      if(todo){ todo.text = text; todo.due = due; }
+      if(todo){ todo.text = text; todo.due = dueStr ? parseDate(dueStr) : null; }
+      api.put('/api/tasks/'+t.id+'/todos/'+editingTodoId, { text, due: dueStr }).catch(e => console.error('Save todo failed:', e));
       cancelTodoEdit();
     } else {
-      t.todos.push({ id:nextTodoId++, text, done:false, due });
+      try {
+        const result = await api.post('/api/tasks/'+t.id+'/todos', { text, due: dueStr });
+        t.todos.push({ id: result.todo.id, text: result.todo.text, done: false, due: result.todo.due ? parseDate(result.todo.due) : null });
+      } catch(e){ console.error('Failed to add todo:', e); return; }
       els.todoInput.value = '';
       els.todoDate.value = '';
     }
@@ -1296,7 +1418,7 @@
   els.overlay.addEventListener('click', (e)=>{ if(e.target===els.overlay) closeModal(); });
   els.confirmOverlay.addEventListener('click', (e)=>{ if(e.target===els.confirmOverlay) closeConfirm(); });
 
-  document.getElementById('save-btn').addEventListener('click', ()=>{
+  document.getElementById('save-btn').addEventListener('click', async ()=>{
     const name = els.fName.value.trim();
     const start = parseDate(els.fStart.value);
     const end = parseDate(els.fEnd.value);
@@ -1304,31 +1426,39 @@
     if(!start || !end){ alert('Format tanggal harus YYYY-MM-DD.'); return; }
     if(end < start){ alert('Tanggal selesai harus setelah tanggal mulai.'); return; }
 
+    const cat = els.fCat.value;
+    const assignee = els.fAssignee.value.trim();
+    const progress = Number(els.fProgress.value);
+
     if(editingId){
       const t = tasks.find(x=>x.id===editingId);
+      if(!t) return;
       t.name = name; t.start = start; t.end = end;
-      t.cat = els.fCat.value; t.assignee = els.fAssignee.value.trim();
-      t.progress = Number(els.fProgress.value);
+      t.cat = cat; t.assignee = assignee; t.progress = progress;
+      api.put('/api/tasks/'+editingId, { name, start:fmt(start), end:fmt(end), cat, assignee, progress }).catch(e => console.error('Save task failed:', e));
     } else {
-      tasks.push({
-        id: nextId++, name, start, end,
-        cat: els.fCat.value,
-        assignee: els.fAssignee.value.trim(),
-        progress: Number(els.fProgress.value),
-        todos: []
-      });
+      try {
+        const result = await api.post('/api/tasks', { name, start:fmt(start), end:fmt(end), cat, assignee, progress });
+        tasks.push({
+          ...result.task,
+          start: parseDate(result.task.start),
+          end: parseDate(result.task.end),
+          todos: (result.task.todos||[]).map(td => ({ ...td, due: td.due ? parseDate(td.due) : null })),
+        });
+      } catch(e){ console.error('Failed to create task:', e); return; }
     }
     closeModal();
     renderAll(false);
   });
 
-  document.getElementById('delete-btn').addEventListener('click', ()=>{
+  document.getElementById('delete-btn').addEventListener('click', async ()=>{
     if(!editingId) return;
-    showConfirm('Yakin ingin menghapus tugas <strong>'+escapeHtml(tasks.find(t=>t.id===editingId)?.name||'')+'</strong>?', ()=>{
-      tasks = tasks.filter(t=>t.id!==editingId);
-      closeModal();
-      renderAll(false);
-    });
+    const name = tasks.find(t=>t.id===editingId)?.name||'';
+    await showConfirm('Yakin ingin menghapus tugas <strong>'+escapeHtml(name)+'</strong>?', 'Ya, Hapus', 'Batal', 'confirm-yes');
+    api.del('/api/tasks/'+editingId).catch(e => console.error('Delete task failed:', e));
+    tasks = tasks.filter(t=>t.id!==editingId);
+    closeModal(true);
+    renderAll(false);
   });
 
   document.getElementById('add-task-btn').addEventListener('click', ()=> openModal(null));
@@ -1340,8 +1470,7 @@
   });
 
   /* ---------------- Init ---------------- */
-  renderLegend();
-  renderAll(true);
+  loadTasks();
 
 })();
 </script>
