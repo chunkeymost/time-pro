@@ -345,12 +345,13 @@ Fitur persistence, backup, dan restore data:
 
 - **Backup** — Tombol "KEPT ON IT" di header → konfirmasi → `POST /api/backup` → simpan salinan `tasks.json` ke file timestamp di `data/`
 - **Restore** — Tombol "RESTORE" di header → sidepeek panel → `GET /api/backups` → pilih file backup → konfirmasi → `POST /api/restore { filename }` → overwrite `tasks.json`
-- **Restore Log** — History restore disimpan terpisah di `data/restore-log.json` (bukan di `tasks.json`)
+- **Restore Log** — History restore & backup disimpan terpisah di `data/restore-log.json` (bukan di `tasks.json`)
 - **Endpoint baru:**
   - `GET /api/backups` — List semua file `task-*.json` di `data/`, diurutkan dari terbaru
   - `POST /api/restore` — Baca file backup, overwrite `tasks.json`, catat log (Restored/Failed)
-  - `GET /api/restore-log` — Ambil array history restore dari `data/restore-log.json`
-- **History Log di UI** — Sidepeek restore panel menampilkan daftar history (status, filename, timestamp) setelah daftar file backup
+  - `GET /api/restore-log` — Ambil array history restore & backup dari `data/restore-log.json`
+- **Backup juga tercatat** — `POST /api/backup` kini memanggil `appendRestoreLog('BackedUp', filename)`, sehingga backup muncul di History Log Restore & Backup
+- **History Log di UI** — Sidepeek restore panel menampilkan daftar history (status, filename, timestamp) setelah daftar file backup; judul section berubah jadi "History Log Restore & Backup"
 - **File terpisah** — `data/restore-log.json`: array `[{ status, filename, restoreAt }]` — tidak tercampur dengan data tugas
 
 ## How to Run

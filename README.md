@@ -48,7 +48,7 @@ Aplikasi web ringan untuk memvisualisasikan, melacak, dan mengelola jadwal tugas
 - **Migration System** — Perubahan schema database terversioning dan repeatable
 - **Soft Delete** — Task/todo tidak hilang permanen, bisa di-restore (MySQL mode)
 - **Seed Data** — Import data dari JSON ke MySQL dengan guard double-import
-- **Backup & Restore** — Backup data ke file timestamp, restore dari backup, history log terpisah
+- **Backup & Restore** — Backup data ke file timestamp, restore dari backup, history log backup & restore terpisah
 - **Editable Project Title** — Judul proyek bisa diubah langsung via klik (inline edit) — tersimpan di metadata server
 
 ## Arsitektur
@@ -85,7 +85,7 @@ Lihat `know-me/ARCHITECTURE.md` untuk detail arsitektur.
 | `POST` | `/api/backup` | Backup tasks.json ke file timestamp |
 | `GET` | `/api/backups` | List semua file backup di data/ |
 | `POST` | `/api/restore` | Restore data dari file backup |
-| `GET` | `/api/restore-log` | Ambil history log restore |
+| `GET` | `/api/restore-log` | Ambil history log restore & backup |
 | `GET` | `/api/metadata` | Ambil metadata (title, versi, lastSynced) |
 | `PUT` | `/api/metadata` | Update metadata (title) |
 
@@ -110,7 +110,7 @@ Lihat `know-me/PLAN.md` untuk detail rencana implementasi.
 ## Catatan
 
 - Data tersimpan secara persistent di `backend/data/tasks.json` — tidak hilang saat browser di-refresh
-- History restore disimpan di `backend/data/restore-log.json` (terpisah dari data tugas)
+- History restore & backup disimpan di `backend/data/restore-log.json` (terpisah dari data tugas)
 - File `frontend/index.html` tetap single-file; backend terpisah di `backend/server.js` + `backend/src/`
 - Bootstrap Icons dimuat dari CDN untuk ikon copy di notifikasi
 - Daftar tugas diurutkan ASC berdasarkan tanggal mulai
