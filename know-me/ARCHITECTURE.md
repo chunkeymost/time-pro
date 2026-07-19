@@ -69,6 +69,7 @@ Buka `http://localhost:3000` di browser.
 | **Finish Flag** | Tugas selesai (100%) ditandai latar hijau + emoji 🏁 di sidebar |
 | **Jumlah Hari Pengerjaan** | Tampilan jumlah hari kerja pada setiap item daftar tugas |
 | **Garis Hari Ini** | Penanda tanggal sekarang secara otomatis |
+| **Backup & Restore** | Backup data ke file timestamp (`POST /api/backup`), restore dari backup (`POST /api/restore`), history log backup & restore terpisah di `restore-log.json` |
 | **Editable Project Title** | Judul proyek bisa diedit inline dengan klik — tersimpan via `PUT /api/metadata` |
 
 ## Directory Structure
@@ -94,7 +95,8 @@ time-pro/
 │   │   │   └── MysqlStorage.js     # Database-based storage (async)
 │   │   └── seed-from-json.js       # Import data tasks.json → MySQL
 │   └── data/
-│       └── tasks.json              # Auto-created dengan seed data
+│       ├── tasks.json              # Auto-created dengan seed data
+  │   └── restore-log.json         # History log restore & backup (terpisah)
 ├── know-me/
 │   ├── ARCHITECTURE.md
 │   ├── BASE_DESIGN.md
@@ -254,13 +256,16 @@ npm run db:seed -- --force   # Force re-import (hapus data lama)
 | `PUT` | `/api/tasks/:id/evidences/:evId` | Update evidence | 1 |
 | `DELETE` | `/api/tasks/:id/evidences/:evId` | Delete evidence (soft delete on MySQL) | 1 |
 | `POST` | `/api/backup` | Backup tasks.json ke file timestamp | 1 |
+| `GET` | `/api/backups` | List semua file backup di data/ | 1 |
+| `POST` | `/api/restore` | Restore data dari file backup tertentu | 1 |
+| `GET` | `/api/restore-log` | Ambil history log restore & backup | 1 |
 | `GET` | `/api/metadata` | Ambil metadata (title, versi, lastSynced) | 1 |
 | `PUT` | `/api/metadata` | Update metadata (title) | 1 |
 | `POST` | `/api/sync/commit` | Sync JSON → MySQL | 3 |
 
 ## JSON File Structure (`data/tasks.json`)
 
-Default kosong saat pertama kali install:
+Default kosong saat pertama kali install. History restore & backup disimpan terpisah di `data/restore-log.json`.
 
 ```json
 {
@@ -328,5 +333,6 @@ Proses commit (JSON → MySQL) menggunakan `seed-from-json.js` sebagai dasar:
 7. **Notification Panel**: klik bell btn → `openNotifPanel()` → collect semua `todos` dari semua `tasks` → filter `!done` → urut by due date → hitung `dayDiff(T, due)` → render tabel (No, To Do List, Tanggal, Sisa Hari, Status, Aksi). Toggle checkbox → `updateProgressFromTodos(task)` + `renderAll()` + `updateBellDot()`. Copy teks todo → `showToast()` navigator.clipboard. Klik teks todo → tutup panel notifikasi + `openModal(task)`.
 8. **Evidence Panel**: klik "+ Add Evidence" → `openEvidencePanel(taskId)` → sidepeek dari kiri dengan form Link + Keterangan. Render tabel (No, Tanggal, Link Evidence shortened 45 char, Keterangan, ✕ Hapus). CRUD via API. Kolom Tanggal menampilkan `created_at` dalam format `id-ID`.
 9. **Toast Notification**: `showToast(msg, type)` — popup di kanan bawah dengan animasi. Digunakan oleh backup (sukses/gagal), copy teks todo (sukses/gagal).
-10. **MysqlStorage cat resolution**: `getAll()` dan `getById()` melakukan query lookup `categories` untuk mengembalikan field `cat: slug` dari `category_id`, sehingga frontend mendapatkan data kompatibel dengan format JSON storage.
-11. **Title Edit**: Inline edit — klik teks judul di header → span diganti `<input>` → Enter/blur → `PUT /api/metadata { title }` → simpan ke metadata server. Escape untuk cancel. Icon ✏️ (28px) muncul saat hover.
+ 10. **MysqlStorage cat resolution**: `getAll()` dan `getById()` melakukan query lookup `categories` untuk mengembalikan field `cat: slug` dari `category_id`, sehingga frontend mendapatkan data kompatibel dengan format JSON storage.
+ 11. **Title Edit**: Inline edit — klik teks judul di header → span diganti `<input>` → Enter/blur → `PUT /api/metadata { title }` → simpan ke metadata server. Escape untuk cancel. Icon ✏️ (28px) muncul saat hover.
+ 12. **Backup Log**: Backup juga tercatat di `restore-log.json` dengan status `BackedUp` — history list menampilkan "Backed Up" dengan badge oranye di panel Restore.

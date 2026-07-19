@@ -102,6 +102,10 @@ STORAGE=mysql npm start         # Jalankan dengan MySQL
 | `POST` | `/api/tasks/:id/evidences` | Tambah evidence |
 | `PUT` | `/api/tasks/:id/evidences/:evId` | Update evidence |
 | `DELETE` | `/api/tasks/:id/evidences/:evId` | Hapus evidence |
+| `POST` | `/api/backup` | Backup tasks.json ke file timestamp |
+| `GET` | `/api/backups` | List semua file backup di data/ |
+| `POST` | `/api/restore` | Restore data dari file backup |
+| `GET` | `/api/restore-log` | Ambil history log restore & backup |
 | `POST` | `/api/sync/commit` | Sync JSON ke MySQL |
 | `GET` | `/api/metadata` | Ambil metadata (title, versi, lastSynced) |
 | `PUT` | `/api/metadata` | Update metadata (title) |
@@ -128,6 +132,7 @@ Lihat `ARCHITECTURE.md` untuk detail data model Task, Todo, dan schema MySQL.
 - Setiap todo memiliki field `due: Date` — date picker di sisi kiri input teks, range dibatasi oleh start-end task utama.
 - Helpers weekend: `isWeekend(d)`, `nextWeekday(d)`, `countWeekdays(a,b)` untuk menangani hari kerja.
 - File `frontend/index.html` harus tetap **satu file tunggal** (CSS & JS inline) — backend terpisah di `backend/server.js` dan `backend/src/`.
+- History restore & backup disimpan di file **terpisah** `data/restore-log.json`, bukan di `tasks.json` — menjaga data tugas tetap bersih. Backup otomatis tercatat dengan status `BackedUp` dan badge oranye di panel Restore.
 - Bootstrap Icons dimuat dari CDN (`bootstrap-icons.min.css`) untuk ikon copy di notifikasi.
 - MySQL mode menggunakan **soft delete** — task/todo/evidence tidak dihapus permanen, hanya di-set `deleted_at`.
 - Migration runner otomatis mendeteksi file SQL baru — cukup tambah file `V3__*.sql` di `backend/src/schema/migrations/`.
