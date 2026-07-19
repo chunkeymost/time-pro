@@ -75,10 +75,11 @@ Jangan gunakan skill ini jika pengguna secara eksplisit meminta file `.xlsx` (pa
 
 ## API Backend (Express + Dual Storage)
 
-Aplikasi memiliki backend Node.js dengan dua mode storage:
+Aplikasi memiliki backend Node.js dengan tiga mode storage:
 
 - **Default:** JSON file (`data/tasks.json`)
-- **Opsional:** MySQL 8+ (set `STORAGE=mysql` environment variable)
+- **Opsional:** MySQL 8+ (set `STORAGE=mysql`)
+- **Opsional:** PostgreSQL (set `STORAGE=pg`)
 
 ### Setup MySQL (jika menggunakan MySQL)
 
@@ -86,6 +87,14 @@ Aplikasi memiliki backend Node.js dengan dua mode storage:
 npm run db:migrate              # Buat tabel + seed kategori
 npm run db:seed                 # Import data JSON → MySQL
 STORAGE=mysql npm start         # Jalankan dengan MySQL
+```
+
+### Setup PostgreSQL (jika menggunakan PostgreSQL)
+
+```bash
+npm run db:migrate:pg           # Buat tabel + seed kategori
+npm run db:seed:pg              # Import data JSON → PostgreSQL
+STORAGE=pg npm start            # Jalankan dengan PostgreSQL
 ```
 
 ### Endpoints
@@ -120,9 +129,12 @@ Lihat `ARCHITECTURE.md` untuk detail data model Task, Todo, dan schema MySQL.
 |---------|--------|
 | `npm start` | Jalankan server (JSON mode) |
 | `npm run dev` | Jalankan dengan auto-restart |
-| `npm run db:migrate` | Jalankan migration database |
+| `npm run db:migrate` | Jalankan migration MySQL |
 | `npm run db:seed` | Import data JSON ke MySQL |
+| `npm run db:migrate:pg` | Jalankan migration PostgreSQL |
+| `npm run db:seed:pg` | Import data JSON ke PostgreSQL |
 | `STORAGE=mysql npm start` | Jalankan server dengan MySQL |
+| `STORAGE=pg npm start` | Jalankan server dengan PostgreSQL |
 
 ## Catatan teknis
 
@@ -134,8 +146,8 @@ Lihat `ARCHITECTURE.md` untuk detail data model Task, Todo, dan schema MySQL.
 - File `frontend/index.html` harus tetap **satu file tunggal** (CSS & JS inline) — backend terpisah di `backend/server.js` dan `backend/src/`.
 - History restore & backup disimpan di file **terpisah** `data/restore-log.json`, bukan di `tasks.json` — menjaga data tugas tetap bersih. Backup otomatis tercatat dengan status `BackedUp` dan badge oranye di panel Restore.
 - Bootstrap Icons dimuat dari CDN (`bootstrap-icons.min.css`) untuk ikon copy di notifikasi.
-- MySQL mode menggunakan **soft delete** — task/todo/evidence tidak dihapus permanen, hanya di-set `deleted_at`.
-- Migration runner otomatis mendeteksi file SQL baru — cukup tambah file `V3__*.sql` di `backend/src/schema/migrations/`.
+- MySQL & PostgreSQL mode menggunakan **soft delete** — task/todo/evidence tidak dihapus permanen, hanya di-set `deleted_at`.
+- Migration runner otomatis mendeteksi file SQL baru — cukup tambah file `V3__*.sql` di `backend/src/schema/migrations/` (MySQL) atau `backend/src/schema/pg/migrations/` (PostgreSQL).
 - Lihat `ARCHITECTURE.md` untuk arsitektur dan `PLAN.md` untuk rencana implementasi (keduanya di `know-me/`).
 - Lihat `BASE_DESIGN.md` di `know-me/` untuk panduan design system (font, warna, komponen, layout) — gunakan sebagai acuan konsistensi UI.
 - Judul proyek bersifat inline-editable dan persist di metadata server — jangan hardcode di HTML.

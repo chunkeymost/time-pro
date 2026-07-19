@@ -4,13 +4,18 @@ const path = require('path');
 const fs = require('fs');
 const JsonStorage = require('./src/storage/JsonStorage');
 const MysqlStorage = require('./src/storage/MysqlStorage');
+const PgStorage = require('./src/storage/PgStorage');
 const config = require('./src/config');
+const pgConfig = require('./src/config-pg');
 
 const app = express();
 
-const storage = process.env.STORAGE === 'mysql'
+const storageMode = process.env.STORAGE || 'json';
+const storage = storageMode === 'mysql'
   ? new MysqlStorage(config.mysql)
-  : new JsonStorage(config.dataPath);
+  : storageMode === 'pg'
+    ? new PgStorage(pgConfig.connectionString)
+    : new JsonStorage(config.dataPath);
 
 app.use(cors());
 app.use(express.json());
@@ -278,7 +283,7 @@ app.put('/api/metadata', async (req, res) => {
 /* ---------- Sync stub ---------- */
 
 app.post('/api/sync/commit', (req, res) => {
-  res.json({ message: 'Sync akan tersedia di Phase 2 setelah integrasi MySQL.' });
+  res.json({ message: 'Sync akan tersedia setelah integrasi database.' });
 });
 
 /* ---------- Start ---------- */

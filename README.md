@@ -1,6 +1,6 @@
 # Time Pro — Lini Waktu Proyek
 
-Project management timeline / Gantt chart interaktif dengan backend Node.js + dual storage (JSON default, MySQL opsional).
+Project management timeline / Gantt chart interaktif dengan backend Node.js + triple storage (JSON default, MySQL, PostgreSQL).
 
 ## Cara Menjalankan
 
@@ -18,6 +18,11 @@ npm start
 npm run db:migrate              # Buat tabel + seed kategori
 npm run db:seed                 # Import data JSON → MySQL
 STORAGE=mysql npm start
+
+# Mode PostgreSQL
+npm run db:migrate:pg           # Buat tabel + seed kategori
+npm run db:seed:pg              # Import data JSON → PostgreSQL
+STORAGE=pg npm start
 
 # Auto-reload (development)
 npm run dev
@@ -44,7 +49,7 @@ Aplikasi web ringan untuk memvisualisasikan, melacak, dan mengelola jadwal tugas
 - **🏁 Finish Flag** — Tugas selesai (100%) ditandai latar hijau + emoji 🏁 di sidebar
 - **📊 Jumlah Hari Pengerjaan** — Tampilan jumlah hari kerja pada setiap item daftar tugas
 - **Garis "Hari Ini"** — Penanda tanggal sekarang secara otomatis
-- **Dual Storage** — JSON file (default) atau MySQL (opsional via `STORAGE=mysql`)
+- **Triple Storage** — JSON file (default), MySQL (`STORAGE=mysql`), PostgreSQL (`STORAGE=pg`)
 - **Migration System** — Perubahan schema database terversioning dan repeatable
 - **Soft Delete** — Task/todo tidak hilang permanen, bisa di-restore (MySQL mode)
 - **Seed Data** — Import data dari JSON ke MySQL dengan guard double-import
@@ -54,15 +59,18 @@ Aplikasi web ringan untuk memvisualisasikan, melacak, dan mengelola jadwal tugas
 ## Arsitektur
 
 ```
-Browser (frontend/index.html)      ← Frontend
+Browser (frontend/index.html)        ← Frontend
       ↕ REST API (fetch / JSON)
 Node.js + Express (backend/server.js) ← Backend
       ↕
-backend/data/tasks.json            ← Mode default (JSON)
-MySQL Database                     ← Mode STORAGE=mysql
+backend/data/tasks.json              ← Mode default (JSON)
+MySQL Database                       ← Mode STORAGE=mysql
+PostgreSQL Database                  ← Mode STORAGE=pg
       ↕
-cd backend && npm run db:migrate   ← Migration runner
-cd backend && npm run db:seed      ← Import JSON → MySQL
+cd backend && npm run db:migrate     ← MySQL migration runner
+cd backend && npm run db:seed        ← Import JSON → MySQL
+cd backend && npm run db:migrate:pg  ← PostgreSQL migration runner
+cd backend && npm run db:seed:pg     ← Import JSON → PostgreSQL
 ```
 
 Lihat `know-me/ARCHITECTURE.md` untuk detail arsitektur.
@@ -96,6 +104,7 @@ Lihat `know-me/ARCHITECTURE.md` untuk detail arsitektur.
 | **Phase 1** | ✅ Selesai | JSON file storage via Node.js backend |
 | **Phase 2** | ✅ Selesai | MySQL storage engine + migration runner + seed |
 | **Phase 3** | ✅ Selesai | Sync mechanism (JSON ↔ MySQL) + metadata API |
+| **Phase 4** | ✅ Selesai | PostgreSQL storage engine + migration runner + seed |
 
 Lihat `know-me/PLAN.md` untuk detail rencana implementasi.
 
@@ -103,8 +112,8 @@ Lihat `know-me/PLAN.md` untuk detail rencana implementasi.
 
 - **Frontend:** Vanilla HTML5, CSS3, JavaScript (ES6+) — single file + Bootstrap Icons (CDN)
 - **Backend:** Node.js 20+, Express 4
-- **Database:** MySQL 8+ via `mysql2` (opsional)
-- **Migration:** Custom runner (file-based SQL versioning)
+- **Database:** MySQL 8+ via `mysql2` (opsional) atau PostgreSQL via `pg` (opsional)
+- **Migration:** Custom runner — MySQL (`src/schema/migrate.js`), PostgreSQL (`src/schema/pg/migrate.js`)
 - **Design System:** Dokumentasi di `know-me/BASE_DESIGN.md`
 
 ## Catatan
@@ -115,7 +124,8 @@ Lihat `know-me/PLAN.md` untuk detail rencana implementasi.
 - Bootstrap Icons dimuat dari CDN untuk ikon copy di notifikasi
 - Daftar tugas diurutkan ASC berdasarkan tanggal mulai
 - Sidebar diperluas `calc(350px + 7vw)` agar lebih lega
-- MySQL membutuhkan: `cd backend && npm run db:migrate` (buat tabel) lalu `cd backend && npm run db:seed` (import data) sebelum `STORAGE=mysql npm start`
+- MySQL: `cd backend && npm run db:migrate` (buat tabel) lalu `npm run db:seed` (import data) sebelum `STORAGE=mysql npm start`
+- PostgreSQL: `cd backend && npm run db:migrate:pg` (buat tabel) lalu `npm run db:seed:pg` (import data) sebelum `STORAGE=pg npm start`
 - Seed otomatis: jika ada kategori baru di JSON yang belum ada di DB, akan dibuat otomatis
 - Lihat `know-me/PLAN.md` untuk migration path lengkap
 - Lihat `know-me/BASE_DESIGN.md` untuk panduan design system dan konsistensi UI
