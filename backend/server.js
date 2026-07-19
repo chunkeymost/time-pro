@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const mysql = require('mysql2/promise');
 const JsonStorage = require('./src/storage/JsonStorage');
 const MysqlStorage = require('./src/storage/MysqlStorage');
 const config = require('./src/config');
@@ -281,9 +282,143 @@ app.post('/api/sync/commit', (req, res) => {
   res.json({ message: 'Sync akan tersedia di Phase 2 setelah integrasi MySQL.' });
 });
 
+/* ---------- Restore JSON upload to MySQL ---------- */
+
+app.post('/api/restore/upload', async (req, res) => {
+  if (process.env.STORAGE !== 'mysql') {
+    return res.status(400).json({ error: 'Restore upload hanya tersedia saat STORAGE=mysql' });
+  }
+
+  const { tasks, nextId, nextTodoId } = req.body;
+  if (!tasks || !Array.isArray(tasks)) {
+    return res.status(400).json({ error: 'Body harus berisi array tasks' });
+  }
+
+  const conn = await mysql.createConnection(config.mysql);
+  try {
+    const [catRows] = await conn.execute('SELECT COUNT(*) AS cnt FROM categories');
+    if (catRows[0].cnt === 0) {
+      return res.status(400).json({ error: 'Tabel categories kosong. Jalankan migrasi terlebih dahulu.' });
+    }
+
+    const [cats] = await conn.execute('SELECT id, slug FROM categories');
+    const catMap = {};
+    for (const c of cats) catMap[c.slug] = c.id;
+
+    await conn.beginTransaction();
+
+    let taskCount = 0;
+    let todoCount = 0;
+    let evidenceCount = 0;
+
+    for (const task of tasks) {
+      let catId = catMap[task.cat];
+      if (!catId) {
+        const catName = task.cat.charAt(0).toUpperCase() + task.cat.slice(1);
+        await conn.execute(
+          'INSERT IGNORE INTO categories (slug, name) VALUES (?, ?)',
+          [task.cat, catName]
+        );
+        const [newCat] = await conn.execute('SELECT id FROM categories WHERE slug = ?', [task.cat]);
+        if (newCat.length === 0) continue;
+        catMap[task.cat] = newCat[0].id;
+        catId = newCat[0].id;
+      }
+
+      const createdAt = task.createdAt
+        ? new Date(task.createdAt).toISOString().slice(0, 19).replace('T', ' ')
+        : new Date().toISOString().slice(0, 19).replace('T', ' ');
+      const updatedAt = task.updatedAt
+        ? new Date(task.updatedAt).toISOString().slice(0, 19).replace('T', ' ')
+        : createdAt;
+
+      await conn.execute(
+        `INSERT INTO tasks (id, name, start_date, end_date, category_id, assignee, progress, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           name = VALUES(name),
+           start_date = VALUES(start_date),
+           end_date = VALUES(end_date),
+           category_id = VALUES(category_id),
+           assignee = VALUES(assignee),
+           progress = VALUES(progress),
+           updated_at = VALUES(updated_at)`,
+        [
+          task.id, task.name, task.start, task.end, catId,
+          task.assignee || '', task.progress || 0, createdAt, updatedAt,
+        ]
+      );
+      taskCount++;
+
+      if (task.todos && task.todos.length > 0) {
+        for (const todo of task.todos) {
+          await conn.execute(
+            `INSERT INTO todos (id, task_id, text, done, due_date, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, NOW(), NOW())
+             ON DUPLICATE KEY UPDATE
+               text = VALUES(text),
+               done = VALUES(done),
+               due_date = VALUES(due_date),
+               updated_at = NOW()`,
+            [todo.id, task.id, todo.text, todo.done ? 1 : 0, todo.due || null]
+          );
+          todoCount++;
+        }
+      }
+
+      if (task.evidences && task.evidences.length > 0) {
+        for (const ev of task.evidences) {
+          const evCreatedAt = ev.created_at
+            ? new Date(ev.created_at).toISOString().slice(0, 19).replace('T', ' ')
+            : new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+          await conn.execute(
+            `INSERT INTO evidences (id, task_id, link, keterangan, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, NOW())
+             ON DUPLICATE KEY UPDATE
+               link = VALUES(link),
+               keterangan = VALUES(keterangan),
+               updated_at = NOW()`,
+            [ev.id, task.id, ev.link || '', ev.keterangan || '', evCreatedAt]
+          );
+          evidenceCount++;
+        }
+      }
+    }
+
+    await conn.execute(
+      "INSERT INTO app_metadata (`key`, `value`) VALUES ('json_seeded_at', NOW()) " +
+      "ON DUPLICATE KEY UPDATE `value` = NOW()"
+    );
+
+    await conn.commit();
+    res.json({ success: true, taskCount, todoCount, evidenceCount });
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ error: err.message });
+  } finally {
+    await conn.end();
+  }
+});
+
+/* ---------- Auto-migrate (MySQL only) ---------- */
+
+async function autoMigrate() {
+  if (process.env.STORAGE !== 'mysql') return;
+  try {
+    const { migrate } = require('./src/schema/migrate');
+    await migrate();
+    console.log('Auto-migration completed.');
+  } catch (err) {
+    console.error('Auto-migration failed:', err.message);
+  }
+}
+
 /* ---------- Start ---------- */
 
 const PORT = config.port;
-app.listen(PORT, () => {
-  console.log(`Time Pro API running at http://localhost:${PORT}`);
+autoMigrate().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Time Pro API running at http://localhost:${PORT}`);
+  });
 });
