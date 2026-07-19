@@ -105,6 +105,7 @@ STORAGE=mysql npm start         # Jalankan dengan MySQL
 | `POST` | `/api/backup` | Backup tasks.json ke file timestamp |
 | `GET` | `/api/backups` | List semua file backup di data/ |
 | `POST` | `/api/restore` | Restore data dari file backup |
+| `POST` | `/api/restore/upload` | Upload JSON data ke MySQL (khusus `STORAGE=mysql`) |
 | `GET` | `/api/restore-log` | Ambil history log restore & backup |
 | `POST` | `/api/sync/commit` | Sync JSON ke MySQL |
 | `GET` | `/api/metadata` | Ambil metadata (title, versi, lastSynced) |

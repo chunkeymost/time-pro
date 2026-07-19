@@ -5,25 +5,48 @@ Project management timeline / Gantt chart interaktif dengan backend Node.js + du
 ## Cara Menjalankan
 
 ```bash
-# Masuk ke folder backend
-cd backend
-
-# Install dependencies
+# Install dependencies (dari root)
 npm install
 
 # Mode JSON (default, tanpa MySQL)
-npm start
+cd backend && npm start
 
 # Mode MySQL
-npm run db:migrate              # Buat tabel + seed kategori
-npm run db:seed                 # Import data JSON → MySQL
-STORAGE=mysql npm start
+cd backend && npm run db:migrate    # Buat tabel + seed kategori
+cd backend && npm run db:seed       # Import data JSON → MySQL
+STORAGE=mysql npm start             # Jalankan dengan MySQL
 
 # Auto-reload (development)
-npm run dev
+cd backend && npm run dev
 ```
 
 Buka `http://localhost:3000` di browser.
+
+## Deploy ke Railway
+
+Proyek siap di-deploy ke Railway via Docker:
+
+```bash
+# Set environment variables di Railway:
+#   STORAGE=mysql
+#   MYSQL_URL=mysql://user:pass@host:3306/dbname
+
+# Railway akan otomatis build dari Dockerfile
+```
+
+### Environment Variables
+
+| Variable | Default | Deskripsi |
+|----------|---------|-----------|
+| `PORT` | `3000` | Port server |
+| `STORAGE` | — | Set `mysql` untuk MySQL mode |
+| `MYSQL_URL` | — | MySQL connection URL (Railway style, otomatis diparsing) |
+| `MYSQL_HOST` | `localhost` | MySQL host (fallback jika tanpa `MYSQL_URL`) |
+| `MYSQL_PORT` | `8889` | MySQL port |
+| `MYSQL_USER` | `root` | MySQL user |
+| `MYSQL_PASSWORD` | `root` | MySQL password |
+| `MYSQL_DATABASE` | `db_timepro` | MySQL database name |
+| `DATA_PATH` | `backend/data/tasks.json` | Path file JSON storage |
 
 ## Target Purpose
 
@@ -54,18 +77,29 @@ Aplikasi web ringan untuk memvisualisasikan, melacak, dan mengelola jadwal tugas
 ## Arsitektur
 
 ```
-Browser (frontend/index.html)      ← Frontend
+Browser (frontend/index.html)          ← Frontend (single-page)
       ↕ REST API (fetch / JSON)
-Node.js + Express (backend/server.js) ← Backend
+Node.js + Express (backend/server.js)  ← Backend
       ↕
-backend/data/tasks.json            ← Mode default (JSON)
-MySQL Database                     ← Mode STORAGE=mysql
+backend/data/tasks.json                ← Mode default (JSON)
+MySQL Database                         ← Mode STORAGE=mysql
       ↕
-cd backend && npm run db:migrate   ← Migration runner
-cd backend && npm run db:seed      ← Import JSON → MySQL
+backend/src/schema/migrate.js          ← Migration runner
+backend/src/seed-from-json.js          ← Import JSON → MySQL
+```
+
+**Deployment (Railway):**
+```
+Railway Container (Docker)
+  ↕ MYSQL_URL
+Railway MySQL Add-on
 ```
 
 Lihat `know-me/ARCHITECTURE.md` untuk detail arsitektur.
+
+### Auto-Migration
+
+Jalan otomatis saat `STORAGE=mysql` — `server.js` menjalankan `migrate()` pada startup untuk mengeksekusi migrasi yang pending.
 
 ## API
 
@@ -85,6 +119,7 @@ Lihat `know-me/ARCHITECTURE.md` untuk detail arsitektur.
 | `POST` | `/api/backup` | Backup tasks.json ke file timestamp |
 | `GET` | `/api/backups` | List semua file backup di data/ |
 | `POST` | `/api/restore` | Restore data dari file backup |
+| `POST` | `/api/restore/upload` | Upload JSON data ke MySQL (khusus `STORAGE=mysql`) |
 | `GET` | `/api/restore-log` | Ambil history log restore & backup |
 | `GET` | `/api/metadata` | Ambil metadata (title, versi, lastSynced) |
 | `PUT` | `/api/metadata` | Update metadata (title) |
@@ -105,6 +140,7 @@ Lihat `know-me/PLAN.md` untuk detail rencana implementasi.
 - **Backend:** Node.js 20+, Express 4
 - **Database:** MySQL 8+ via `mysql2` (opsional)
 - **Migration:** Custom runner (file-based SQL versioning)
+- **Deployment:** Railway via Docker (Dockerfile multi-stage)
 - **Design System:** Dokumentasi di `know-me/BASE_DESIGN.md`
 
 ## Catatan
@@ -115,7 +151,8 @@ Lihat `know-me/PLAN.md` untuk detail rencana implementasi.
 - Bootstrap Icons dimuat dari CDN untuk ikon copy di notifikasi
 - Daftar tugas diurutkan ASC berdasarkan tanggal mulai
 - Sidebar diperluas `calc(350px + 7vw)` agar lebih lega
-- MySQL membutuhkan: `cd backend && npm run db:migrate` (buat tabel) lalu `cd backend && npm run db:seed` (import data) sebelum `STORAGE=mysql npm start`
+- MySQL membutuhkan: `npm run db:migrate` (buat tabel) lalu `npm run db:seed` (import data) sebelum `STORAGE=mysql npm start`
+- Railway: `MYSQL_URL` otomatis diparsing oleh `config.js` — tidak perlu set `MYSQL_HOST` dll secara terpisah
 - Seed otomatis: jika ada kategori baru di JSON yang belum ada di DB, akan dibuat otomatis
 - Lihat `know-me/PLAN.md` untuk migration path lengkap
 - Lihat `know-me/BASE_DESIGN.md` untuk panduan design system dan konsistensi UI
