@@ -2,21 +2,24 @@
 
 ## Overview
 
-Time Pro adalah aplikasi project timeline / Gantt chart interaktif dengan arsitektur client-server dan dual storage:
+Time Pro adalah aplikasi project timeline / Gantt chart interaktif dengan arsitektur client-server dan triple storage:
 
 ```
-Browser (frontend/index.html)          ← Frontend: Vanilla HTML/CSS/JS
+Browser (frontend/index.html)                    ← Frontend: Vanilla HTML/CSS/JS
       ↕  fetch() / REST JSON
-Node.js Server (backend/server.js)      ← Backend API
+Node.js Server (backend/server.js)                ← Backend API
       ↕
-backend/data/tasks.json                 ← JSON File Storage (default)
-MySQL Database                          ← MySQL Storage (STORAGE=mysql)
+backend/data/tasks.json                           ← JSON File Storage (default)
+MySQL Database                                    ← MySQL Storage (STORAGE=mysql)
+PostgreSQL Database                               ← PostgreSQL Storage (STORAGE=pg)
       ↕
-backend/src/schema/migrate.js           ← Migration runner (DDL versioning)
-backend/src/seed-from-json.js           ← Import data JSON → MySQL (DML)
+backend/src/schema/migrate.js                     ← MySQL Migration runner
+backend/src/seed-from-json.js                     ← Import JSON → MySQL
+backend/src/schema/pg/migrate.js                  ← PostgreSQL Migration runner
+backend/src/seed-from-json-pg.js                  ← Import JSON → PostgreSQL
 ```
 
-Storage dipilih via environment variable `STORAGE=mysql` — default JSON.
+Storage dipilih via environment variable `STORAGE=mysql` atau `STORAGE=pg` — default JSON.
 
 ## Cara Menjalankan
 
@@ -35,6 +38,11 @@ npm run db:migrate              # Buat tabel + seed kategori
 npm run db:seed                 # Import data JSON → MySQL
 STORAGE=mysql npm start
 
+# Mode PostgreSQL
+npm run db:migrate:pg           # Buat tabel + seed kategori
+npm run db:seed:pg              # Import data JSON → PostgreSQL
+STORAGE=pg npm start
+
 # Auto-reload (development)
 npm run dev
 ```
@@ -49,8 +57,10 @@ Buka `http://localhost:3000` di browser.
 | Backend | Node.js 20+, Express 4 |
 | Storage (default) | JSON file (`data/tasks.json`) |
 | Storage (opsional) | MySQL 8+ via `mysql2` |
-| Migration | Custom runner (`src/schema/migrate.js`) |
-| Dependencies | `express`, `cors`, `mysql2` |
+| Storage (opsional) | PostgreSQL via `pg` (lihat `config-pg.js`) |
+| Migration (MySQL) | Custom runner (`src/schema/migrate.js`) |
+| Migration (PostgreSQL) | Custom runner (`src/schema/pg/migrate.js`) |
+| Dependencies | `express`, `cors`, `mysql2`, `pg` |
 
 ## Fitur Utama
 
@@ -83,17 +93,26 @@ time-pro/
 │   ├── package.json                # Dependencies + scripts
 │   ├── .gitignore                  # Ignore node_modules, data, lockfile
 │   ├── src/
-│   │   ├── config.js               # Konfigurasi path & database
+│   │   ├── config.js               # Konfigurasi path & MySQL
+│   │   ├── config-pg.js            # Konfigurasi PostgreSQL (connection string)
 │   │   ├── schema/
-│   │   │   ├── migrate.js          # Migration runner — execute pending SQL
-│   │   │   └── migrations/
-│   │   │       ├── V1__initial_schema.sql
-│   │   │       ├── V2__seed_categories.sql
-│   │   │       └── V3__create_evidences.sql
+│   │   │   ├── migrate.js          # MySQL migration runner
+│   │   │   ├── migrations/         # MySQL SQL files
+│   │   │   │   ├── V1__initial_schema.sql
+│   │   │   │   ├── V2__seed_categories.sql
+│   │   │   │   └── V3__create_evidences.sql
+│   │   │   └── pg/
+│   │   │       ├── migrate.js      # PostgreSQL migration runner
+│   │   │       └── migrations/     # PostgreSQL SQL files
+│   │   │           ├── V1__initial_schema.sql
+│   │   │           ├── V2__seed_categories.sql
+│   │   │           └── V3__create_evidences.sql
 │   │   ├── storage/
 │   │   │   ├── JsonStorage.js      # File-based storage (sync, default)
-│   │   │   └── MysqlStorage.js     # Database-based storage (async)
-│   │   └── seed-from-json.js       # Import data tasks.json → MySQL
+│   │   │   ├── MysqlStorage.js     # MySQL storage (async)
+│   │   │   └── PgStorage.js        # PostgreSQL storage (async)
+│   │   ├── seed-from-json.js       # Import tasks.json → MySQL
+│   │   └── seed-from-json-pg.js    # Import tasks.json → PostgreSQL
 │   └── data/
 │       ├── tasks.json              # Auto-created dengan seed data
   │   └── restore-log.json         # History log restore & backup (terpisah)
@@ -178,8 +197,8 @@ Foreign Key: `category_id` → `categories(id)`
 
 ## Storage Layer Abstraction
 
-Kedua storage (`JsonStorage` dan `MysqlStorage`) mengimplementasikan interface yang sama,
-dengan perbedaan: `JsonStorage` **sync**, `MysqlStorage` **async**.
+Ketiga storage (`JsonStorage`, `MysqlStorage`, `PgStorage`) mengimplementasikan interface yang sama,
+dengan perbedaan: `JsonStorage` **sync**, `MysqlStorage` dan `PgStorage` **async**.
 
 ```js
 getAll()                 → { tasks, nextId, nextTodoId, metadata }
@@ -199,12 +218,15 @@ updateMetadata(updates)  → { version, lastSynced, updatedAt, title }
 
 ```js
 // backend/server.js
-const storage = process.env.STORAGE === 'mysql'
+const storageMode = process.env.STORAGE || 'json';
+const storage = storageMode === 'mysql'
   ? new MysqlStorage(config.mysql)
-  : new JsonStorage(config.dataPath);
+  : storageMode === 'pg'
+    ? new PgStorage(pgConfig.connectionString)
+    : new JsonStorage(config.dataPath);
 ```
 
-## Migration Runner
+## Migration Runner (MySQL)
 
 File: `src/schema/migrate.js`
 
@@ -220,7 +242,21 @@ Cara kerja:
 npm run db:migrate
 ```
 
-## Seed from JSON
+## Migration Runner (PostgreSQL)
+
+File: `src/schema/pg/migrate.js`
+
+Cara kerja identik dengan MySQL runner, bedanya:
+1. Koneksi via `pg` Pool ke PostgreSQL
+2. Baca file `.sql` dari `src/schema/pg/migrations/`
+3. Syntax SQL menggunakan tipe PostgreSQL (`SERIAL`, `BOOLEAN`, `SMALLINT`, dll.)
+4. Placeholder `$1` alih-alih `?`
+
+```
+npm run db:migrate:pg
+```
+
+## Seed from JSON (MySQL)
 
 File: `src/seed-from-json.js`
 
@@ -239,6 +275,40 @@ Force re-import: `npm run db:seed -- --force`
 npm run db:seed              # Import (dengan guard) + sync evidence
 npm run db:seed -- --force   # Force re-import (hapus data lama)
 ```
+
+## Seed from JSON (PostgreSQL)
+
+File: `src/seed-from-json-pg.js`
+
+Mengimport data dari `data/tasks.json` ke PostgreSQL. Preserve ID asli dari JSON.
+
+Guard: mengecek `app_metadata.json_seeded_at`. Jika sudah pernah di-seed → skip.
+Force re-import: `npm run db:seed:pg -- --force`
+
+```
+npm run db:seed:pg              # Import (dengan guard)
+npm run db:seed:pg -- --force   # Force re-import (hapus data lama)
+```
+
+## Data Model (PostgreSQL)
+
+Mapping tipe MySQL → PostgreSQL:
+
+| MySQL | PostgreSQL |
+|-------|-----------|
+| `TINYINT UNSIGNED AUTO_INCREMENT` | `SMALLSERIAL` |
+| `INT UNSIGNED AUTO_INCREMENT` | `SERIAL` |
+| `TINYINT(1)` (boolean) | `BOOLEAN` |
+| `TINYINT UNSIGNED` (angka kecil) | `SMALLINT` |
+| `ENGINE=InnoDB CHARSET=utf8mb4` | *(dihapus)* |
+| `` `key` `` (backtick) | `"key"` atau tanpa quote |
+| `NOW()` | `NOW()` (sama) |
+| `INSERT ... ON DUPLICATE KEY UPDATE` | `INSERT ... ON CONFLICT (key) DO UPDATE SET` |
+| `result.insertId` | `result.rows[0].id` + `RETURNING id` |
+| Placeholder `?` | Placeholder `$1`, `$2` |
+| Soft delete `deleted_at TIMESTAMP` | Sama |
+
+Struktur tabel di PostgreSQL identik secara logis dengan MySQL. Lihat file SQL di `src/schema/pg/migrations/` untuk detail DDL.
 
 ## API Endpoints
 
@@ -333,6 +403,6 @@ Proses commit (JSON → MySQL) menggunakan `seed-from-json.js` sebagai dasar:
 7. **Notification Panel**: klik bell btn → `openNotifPanel()` → collect semua `todos` dari semua `tasks` → filter `!done` → urut by due date → hitung `dayDiff(T, due)` → render tabel (No, To Do List, Tanggal, Sisa Hari, Status, Aksi). Toggle checkbox → `updateProgressFromTodos(task)` + `renderAll()` + `updateBellDot()`. Copy teks todo → `showToast()` navigator.clipboard. Klik teks todo → tutup panel notifikasi + `openModal(task)`.
 8. **Evidence Panel**: klik "+ Add Evidence" → `openEvidencePanel(taskId)` → sidepeek dari kiri dengan form Link + Keterangan. Render tabel (No, Tanggal, Link Evidence shortened 45 char, Keterangan, ✕ Hapus). CRUD via API. Kolom Tanggal menampilkan `created_at` dalam format `id-ID`.
 9. **Toast Notification**: `showToast(msg, type)` — popup di kanan bawah dengan animasi. Digunakan oleh backup (sukses/gagal), copy teks todo (sukses/gagal).
- 10. **MysqlStorage cat resolution**: `getAll()` dan `getById()` melakukan query lookup `categories` untuk mengembalikan field `cat: slug` dari `category_id`, sehingga frontend mendapatkan data kompatibel dengan format JSON storage.
+ 10. **Storage cat resolution**: `getAll()` dan `getById()` pada `MysqlStorage` dan `PgStorage` melakukan query lookup `categories` untuk mengembalikan field `cat: slug` dari `category_id`, sehingga frontend mendapatkan data kompatibel dengan format JSON storage.
  11. **Title Edit**: Inline edit — klik teks judul di header → span diganti `<input>` → Enter/blur → `PUT /api/metadata { title }` → simpan ke metadata server. Escape untuk cancel. Icon ✏️ (28px) muncul saat hover.
  12. **Backup Log**: Backup juga tercatat di `restore-log.json` dengan status `BackedUp` — history list menampilkan "Backed Up" dengan badge oranye di panel Restore.
