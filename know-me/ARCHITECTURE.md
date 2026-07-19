@@ -69,6 +69,7 @@ Buka `http://localhost:3000` di browser.
 | **Finish Flag** | Tugas selesai (100%) ditandai latar hijau + emoji 🏁 di sidebar |
 | **Jumlah Hari Pengerjaan** | Tampilan jumlah hari kerja pada setiap item daftar tugas |
 | **Garis Hari Ini** | Penanda tanggal sekarang secara otomatis |
+| **Backup & Restore** | Backup data ke file timestamp (`POST /api/backup`), restore dari backup (`POST /api/restore`), history log restore terpisah di `restore-log.json` |
 | **Editable Project Title** | Judul proyek bisa diedit inline dengan klik — tersimpan via `PUT /api/metadata` |
 
 ## Directory Structure
@@ -94,7 +95,8 @@ time-pro/
 │   │   │   └── MysqlStorage.js     # Database-based storage (async)
 │   │   └── seed-from-json.js       # Import data tasks.json → MySQL
 │   └── data/
-│       └── tasks.json              # Auto-created dengan seed data
+│       ├── tasks.json              # Auto-created dengan seed data
+│       └── restore-log.json         # History log restore (terpisah)
 ├── know-me/
 │   ├── ARCHITECTURE.md
 │   ├── BASE_DESIGN.md
@@ -254,13 +256,16 @@ npm run db:seed -- --force   # Force re-import (hapus data lama)
 | `PUT` | `/api/tasks/:id/evidences/:evId` | Update evidence | 1 |
 | `DELETE` | `/api/tasks/:id/evidences/:evId` | Delete evidence (soft delete on MySQL) | 1 |
 | `POST` | `/api/backup` | Backup tasks.json ke file timestamp | 1 |
+| `GET` | `/api/backups` | List semua file backup di data/ | 1 |
+| `POST` | `/api/restore` | Restore data dari file backup tertentu | 1 |
+| `GET` | `/api/restore-log` | Ambil history log restore | 1 |
 | `GET` | `/api/metadata` | Ambil metadata (title, versi, lastSynced) | 1 |
 | `PUT` | `/api/metadata` | Update metadata (title) | 1 |
 | `POST` | `/api/sync/commit` | Sync JSON → MySQL | 3 |
 
 ## JSON File Structure (`data/tasks.json`)
 
-Default kosong saat pertama kali install:
+Default kosong saat pertama kali install. History restore disimpan terpisah di `data/restore-log.json`.
 
 ```json
 {

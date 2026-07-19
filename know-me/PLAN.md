@@ -41,6 +41,10 @@ DELETE /api/tasks/:id/todos/:todoId → Delete todo
 POST   /api/tasks/:id/evidences    → Add evidence
 PUT    /api/tasks/:id/evidences/:evId → Update evidence
 DELETE /api/tasks/:id/evidences/:evId → Delete evidence
+POST   /api/backup            → Backup tasks.json ke file timestamp
+GET    /api/backups           → List semua file backup
+POST   /api/restore           → Restore data dari backup
+GET    /api/restore-log       → History log restore
 POST   /api/sync/commit        → (stub, Phase 3)
 ```
 
@@ -334,6 +338,20 @@ Dokumentasi design system sebagai acuan konsistensi UI:
 - Component patterns: buttons, forms, tables, overlay, toast, confirm dialog
 - JavaScript conventions: IIFE, API helper, utility functions, keyboard shortcuts
 - File structure dan backend stack
+
+### 💾 Backup & Restore
+
+Fitur persistence, backup, dan restore data:
+
+- **Backup** — Tombol "KEPT ON IT" di header → konfirmasi → `POST /api/backup` → simpan salinan `tasks.json` ke file timestamp di `data/`
+- **Restore** — Tombol "RESTORE" di header → sidepeek panel → `GET /api/backups` → pilih file backup → konfirmasi → `POST /api/restore { filename }` → overwrite `tasks.json`
+- **Restore Log** — History restore disimpan terpisah di `data/restore-log.json` (bukan di `tasks.json`)
+- **Endpoint baru:**
+  - `GET /api/backups` — List semua file `task-*.json` di `data/`, diurutkan dari terbaru
+  - `POST /api/restore` — Baca file backup, overwrite `tasks.json`, catat log (Restored/Failed)
+  - `GET /api/restore-log` — Ambil array history restore dari `data/restore-log.json`
+- **History Log di UI** — Sidepeek restore panel menampilkan daftar history (status, filename, timestamp) setelah daftar file backup
+- **File terpisah** — `data/restore-log.json`: array `[{ status, filename, restoreAt }]` — tidak tercampur dengan data tugas
 
 ## How to Run
 

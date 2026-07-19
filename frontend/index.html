@@ -817,6 +817,125 @@
   .evidence-del-btn:hover{ color:var(--status-risk); }
   .evidence-empty{ padding:16px 4px; color:var(--ink-faint); font-size:12px; }
 
+  /* ---------- Restore Panel ---------- */
+  .restore-list{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    max-height:360px;
+    overflow-y:auto;
+  }
+  .restore-item{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:10px 12px;
+    border:1px solid var(--paper-line-strong);
+    border-radius:7px;
+    background:var(--surface);
+    transition:border-color .15s;
+  }
+  .restore-item:hover{ border-color:var(--gold); }
+  .restore-info{ display:flex; flex-direction:column; gap:2px; }
+  .restore-filename{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    color:var(--ink);
+    font-weight:500;
+  }
+  .restore-date{
+    font-size:11px;
+    color:var(--ink-soft);
+  }
+  .restore-btn{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:12px;
+    font-weight:600;
+    padding:7px 14px;
+    border-radius:6px;
+    border:1px solid var(--status-progress);
+    background:transparent;
+    color:var(--status-progress);
+    cursor:pointer;
+    transition:all .15s;
+    white-space:nowrap;
+  }
+  .restore-btn:hover{
+    background:var(--status-progress);
+    color:#fff;
+  }
+  .restore-loading, .restore-empty{
+    padding:24px 12px;
+    text-align:center;
+    color:var(--ink-soft);
+    font-size:13px;
+  }
+
+  /* ---------- Restore History ---------- */
+  .restore-history{
+    border-top:1px solid var(--paper-line-strong);
+    margin-top:14px;
+    padding-top:10px;
+  }
+  .restore-history-head{
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    padding:0 0 8px;
+  }
+  .restore-history-list{
+    max-height:180px;
+    overflow-y:auto;
+  }
+  .restore-history-item{
+    display:grid;
+    grid-template-columns:auto 1fr auto;
+    gap:2px 10px;
+    padding:6px 8px;
+    font-size:11px;
+    border-bottom:1px solid var(--paper-line);
+    align-items:center;
+  }
+  .restore-history-item:last-child{ border-bottom:none; }
+  .restore-history-status{
+    font-size:8.5px;
+    font-weight:700;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    padding:2px 6px;
+    border-radius:4px;
+    text-align:center;
+  }
+  .restore-history-status.Restored{
+    background:#E8F5E9;
+    color:var(--status-done);
+  }
+  .restore-history-status.Failed{
+    background:#FDEDEC;
+    color:var(--status-risk);
+  }
+  .restore-history-file{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    color:var(--ink);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .restore-history-date{
+    font-size:10px;
+    color:var(--ink-soft);
+
+  }
+  .restore-history-empty{
+    padding:12px 8px;
+    font-size:11px;
+    color:var(--ink-faint);
+    text-align:center;
+  }
+
   .empty-board{
     padding:60px 20px;
     text-align:center;
@@ -862,6 +981,7 @@
     </div>
     <div class="header-actions">
       <button class="btn btn-ghost" id="backup-btn">KEPT ON IT</button>
+      <button class="btn btn-ghost" id="restore-btn">RESTORE</button>
       <div class="view-toggle" id="view-toggle">
         <button data-view="week" class="active">MINGGU</button>
         <button data-view="month">BULAN</button>
@@ -1043,6 +1163,26 @@
   </div>
 </div>
 
+<!-- Restore panel -->
+<div class="overlay" id="restore-overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Restore Data</h2>
+      <button class="modal-close" id="restore-close-btn">&times;</button>
+    </div>
+    <div class="modal-sub">Pilih file backup yang akan direstore ke timeframe saat ini.</div>
+    <div class="restore-list" id="restore-list">
+      <div class="restore-loading">Memuat daftar backup...</div>
+    </div>
+    <div class="restore-history">
+      <div class="restore-history-head">History Log Restore</div>
+      <div class="restore-history-list" id="restore-history-list">
+        <div class="restore-history-empty">Belum ada aktivitas restore</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
   "use strict";
@@ -1095,6 +1235,7 @@
   let nextId = 1;
   let nextTodoId = 1;
   let lastUpdated = null;
+  let restoreLog = [];
   let editingTodoId = null;
   let selectedId = null;
   let view = "week"; // "week" | "month"
@@ -1181,6 +1322,12 @@
       nextTodoId = data.nextTodoId;
       lastUpdated = data.metadata?.updatedAt || null;
       if (data.metadata?.title) els.title.textContent = data.metadata.title;
+      try {
+        const logRes = await fetch('/api/restore-log');
+        const logData = await logRes.json();
+        restoreLog = logData.restoreLog || [];
+      } catch(_){ restoreLog = []; }
+      renderRestoreLog();
     } catch(e){
       console.error('Gagal memuat data:', e);
       alert('Gagal memuat data. Pastikan server API berjalan (node server.js).');
@@ -1466,6 +1613,26 @@
     els.range.textContent = `${fmt(min)} — ${fmt(max)} · ${tasks.length} tugas${updated}`;
   }
 
+  /* ---------------- Restore Log ---------------- */
+  function renderRestoreLog(){
+    const container = document.getElementById('restore-history-list');
+    if(!container) return;
+    if(!restoreLog || restoreLog.length === 0){
+      container.innerHTML = '<div class="restore-history-empty">Belum ada aktivitas restore</div>';
+      return;
+    }
+    container.innerHTML = restoreLog.map(e => {
+      const d = new Date(e.restoreAt);
+      const dateStr = d.toLocaleDateString('id-ID', { year:'numeric', month:'long', day:'numeric' }) + ', ' + 
+        String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+      return '<div class="restore-history-item">' +
+        '<div class="restore-history-status ' + e.status + '">' + e.status + '</div>' +
+        '<div class="restore-history-file">' + e.filename + '</div>' +
+        '<div class="restore-history-date">' + dateStr + '</div>' +
+        '</div>';
+    }).join('');
+  }
+
   /* ---------------- Master render ---------------- */
   function renderAll(scrollToToday){
     const range = computeRange();
@@ -1521,6 +1688,72 @@
       showToast('Backup gagal: '+e.message, 'error');
     } finally {
       btn.textContent = 'KEPT ON IT';
+      btn.disabled = false;
+    }
+  });
+
+  /* ---------------- Restore ---------------- */
+  const restoreOverlay = document.getElementById('restore-overlay');
+  const restoreList = document.getElementById('restore-list');
+
+  document.getElementById('restore-btn').addEventListener('click', async ()=>{
+    restoreOverlay.classList.add('open');
+    restoreList.innerHTML = '<div class="restore-loading">Memuat daftar backup...</div>';
+    try {
+      const res = await fetch('/api/backups');
+      const data = await res.json();
+      if (!data.backups || data.backups.length === 0) {
+        restoreList.innerHTML = '<div class="restore-empty">Tidak ada file backup ditemukan.</div>';
+        return;
+      }
+      restoreList.innerHTML = '';
+      data.backups.forEach(b => {
+        const item = document.createElement('div');
+        item.className = 'restore-item';
+        item.innerHTML = `
+          <div class="restore-info">
+            <span class="restore-filename">${b.filename}</span>
+            <span class="restore-date">${b.date || ''}</span>
+          </div>
+          <button class="restore-btn" data-file="${b.filename}">Restore</button>
+        `;
+        restoreList.appendChild(item);
+      });
+      renderRestoreLog();
+    } catch(e){
+      restoreList.innerHTML = '<div class="restore-empty">Gagal memuat daftar backup: ' + e.message + '</div>';
+    }
+  });
+
+  document.getElementById('restore-close-btn').addEventListener('click', ()=>{
+    restoreOverlay.classList.remove('open');
+  });
+
+  restoreOverlay.addEventListener('click', (e)=>{
+    if (e.target === restoreOverlay) restoreOverlay.classList.remove('open');
+  });
+
+  restoreList.addEventListener('click', async (e)=>{
+    const btn = e.target.closest('.restore-btn');
+    if (!btn) return;
+    const filename = btn.dataset.file;
+    await showConfirm('Yakin ingin me-restore data dari file <strong>' + filename + '</strong>?<br><br>Data tugas yang ada saat ini akan digantikan seluruhnya.', 'Ya, Restore', 'Batal', 'btn-primary');
+    btn.textContent = 'MERESTORE...';
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/restore', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ filename }) });
+      const data = await res.json();
+      if(data.success) {
+        showToast('Restore berhasil: ' + data.taskCount + ' tugas diimpor.');
+        restoreOverlay.classList.remove('open');
+        loadTasks();
+      } else {
+        showToast('Restore gagal: ' + (data.error || ''), 'error');
+      }
+    } catch(e){
+      showToast('Restore gagal: ' + e.message, 'error');
+    } finally {
+      btn.textContent = 'Restore';
       btn.disabled = false;
     }
   });

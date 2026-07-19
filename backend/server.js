@@ -94,6 +94,84 @@ app.post('/api/backup', async (req, res) => {
   }
 });
 
+/* ---------- Restore Log Helper ---------- */
+
+const restoreLogPath = path.join(path.dirname(config.dataPath), 'restore-log.json');
+
+function appendRestoreLog(status, filename) {
+  let log = [];
+  try {
+    if (fs.existsSync(restoreLogPath)) {
+      log = JSON.parse(fs.readFileSync(restoreLogPath, 'utf-8'));
+    }
+  } catch (_) { log = []; }
+  log.unshift({ status, filename, restoreAt: new Date().toISOString() });
+  fs.writeFileSync(restoreLogPath, JSON.stringify(log, null, 2), 'utf-8');
+}
+
+/* ---------- Backups ---------- */
+
+app.get('/api/backups', async (req, res) => {
+  const dataDir = path.dirname(config.dataPath);
+  try {
+    const files = fs.readdirSync(dataDir)
+      .filter(f => /^task-\d{8}-\d{6}\.json$/.test(f))
+      .map(f => {
+        const stat = fs.statSync(path.join(dataDir, f));
+        const match = f.match(/^task-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})\.json$/);
+        const date = match ? `${match[1]}-${match[2]}-${match[3]} ${match[4]}:${match[5]}:${match[6]}` : '';
+        return { filename: f, date, size: stat.size };
+      })
+      .sort((a, b) => b.date.localeCompare(a.date));
+    res.json({ backups: files });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/restore-log', async (req, res) => {
+  try {
+    if (!fs.existsSync(restoreLogPath)) {
+      return res.json({ restoreLog: [] });
+    }
+    const log = JSON.parse(fs.readFileSync(restoreLogPath, 'utf-8'));
+    res.json({ restoreLog: log });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/restore', async (req, res) => {
+  const { filename } = req.body;
+  if (!filename) return res.status(400).json({ error: 'filename is required' });
+  const dataDir = path.dirname(config.dataPath);
+  const srcPath = path.join(dataDir, filename);
+  const destPath = config.dataPath;
+  try {
+    if (!fs.existsSync(srcPath)) {
+      appendRestoreLog('Failed', filename);
+      return res.status(404).json({ error: 'File not found' });
+    }
+    const srcData = JSON.parse(fs.readFileSync(srcPath, 'utf-8'));
+    if (!srcData.tasks || !Array.isArray(srcData.tasks)) {
+      appendRestoreLog('Failed', filename);
+      return res.status(400).json({ error: 'Invalid backup file: no tasks array' });
+    }
+    const currentData = JSON.parse(fs.readFileSync(destPath, 'utf-8'));
+    currentData.tasks = srcData.tasks;
+    currentData.nextId = srcData.nextId || srcData.tasks.length + 1;
+    currentData.nextTodoId = srcData.nextTodoId || 1;
+    currentData.nextEvidenceId = srcData.nextEvidenceId || 1;
+    currentData.metadata.updatedAt = new Date().toISOString();
+    fs.writeFileSync(destPath, JSON.stringify(currentData, null, 2), 'utf-8');
+    appendRestoreLog('Restored', filename);
+    res.json({ success: true, taskCount: srcData.tasks.length });
+  } catch (err) {
+    appendRestoreLog('Failed', filename);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ---------- Todos ---------- */
 
 app.post('/api/tasks/:id/todos', async (req, res) => {
