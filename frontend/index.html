@@ -916,6 +916,10 @@
     background:#FDEDEC;
     color:var(--status-risk);
   }
+  .restore-history-status.BackedUp{
+    background:#FFF3E0;
+    color:#E67E22;
+  }
   .restore-history-file{
     font-family:'IBM Plex Mono', monospace;
     font-size:10.5px;
@@ -1175,7 +1179,7 @@
       <div class="restore-loading">Memuat daftar backup...</div>
     </div>
     <div class="restore-history">
-      <div class="restore-history-head">History Log Restore</div>
+      <div class="restore-history-head">History Log Restore &amp; Backup</div>
       <div class="restore-history-list" id="restore-history-list">
         <div class="restore-history-empty">Belum ada aktivitas restore</div>
       </div>
@@ -1621,12 +1625,13 @@
       container.innerHTML = '<div class="restore-history-empty">Belum ada aktivitas restore</div>';
       return;
     }
+    const statusDisplay = { 'Restored':'Restored', 'Failed':'Failed', 'BackedUp':'Backed Up' };
     container.innerHTML = restoreLog.map(e => {
       const d = new Date(e.restoreAt);
       const dateStr = d.toLocaleDateString('id-ID', { year:'numeric', month:'long', day:'numeric' }) + ', ' + 
         String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
       return '<div class="restore-history-item">' +
-        '<div class="restore-history-status ' + e.status + '">' + e.status + '</div>' +
+        '<div class="restore-history-status ' + e.status + '">' + (statusDisplay[e.status] || e.status) + '</div>' +
         '<div class="restore-history-file">' + e.filename + '</div>' +
         '<div class="restore-history-date">' + dateStr + '</div>' +
         '</div>';
@@ -1682,8 +1687,13 @@
     try {
       const res = await fetch('/api/backup', { method:'POST' });
       const data = await res.json();
-      if(data.success) showToast('Backup berhasil: '+data.file);
-      else showToast('Backup gagal', 'error');
+      if(data.success) {
+        showToast('Backup berhasil: '+data.file);
+        const logRes = await fetch('/api/restore-log');
+        const logData = await logRes.json();
+        restoreLog = logData.restoreLog || [];
+        renderRestoreLog();
+      } else showToast('Backup gagal', 'error');
     } catch(e){
       showToast('Backup gagal: '+e.message, 'error');
     } finally {

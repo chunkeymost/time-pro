@@ -88,6 +88,7 @@ app.post('/api/backup', async (req, res) => {
   const dest = path.join(dataDir, filename);
   try {
     fs.copyFileSync(config.dataPath, dest);
+    appendRestoreLog('BackedUp', filename);
     res.json({ success: true, file: filename });
   } catch (err) {
     res.status(500).json({ error: err.message });
