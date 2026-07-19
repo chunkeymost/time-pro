@@ -78,6 +78,7 @@ app.delete('/api/tasks/:id', async (req, res) => {
 
 app.post('/api/backup', async (req, res) => {
   const dataDir = path.dirname(config.dataPath);
+  ensureDataDir();
   const now = new Date();
   const y = now.getFullYear();
   const M = String(now.getMonth()+1).padStart(2,'0');
@@ -414,9 +415,20 @@ async function autoMigrate() {
   }
 }
 
+/* ---------- Ensure data directory ---------- */
+
+function ensureDataDir() {
+  const dir = path.dirname(config.dataPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+    console.log('Data directory created:', dir);
+  }
+}
+
 /* ---------- Start ---------- */
 
 const PORT = config.port;
+ensureDataDir();
 autoMigrate().then(() => {
   app.listen(PORT, () => {
     console.log(`Time Pro API running at http://localhost:${PORT}`);
