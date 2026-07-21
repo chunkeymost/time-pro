@@ -843,6 +843,21 @@
     transition:border-color .15s;
   }
   .restore-item:hover{ border-color:var(--gold); }
+  .restore-item.latest{ border-color:var(--status-done); background:rgba(63,143,99,0.06); }
+  .restore-item.latest .restore-filename{ color:var(--status-done); }
+  .restore-item.latest .restore-date{ color:var(--status-done); }
+  .restore-latest-badge{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:10px;
+    font-weight:700;
+    padding:3px 8px;
+    border-radius:4px;
+    background:var(--status-done);
+    color:#fff;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    white-space:nowrap;
+  }
   .restore-info{ display:flex; flex-direction:column; gap:2px; }
   .restore-filename{
     font-family:'IBM Plex Mono', monospace;
@@ -1726,15 +1741,19 @@
         return;
       }
       restoreList.innerHTML = '';
-      data.backups.forEach(b => {
+      data.backups.forEach((b, i) => {
+        const isLatest = i === 0;
         const item = document.createElement('div');
-        item.className = 'restore-item';
+        item.className = 'restore-item' + (isLatest ? ' latest' : '');
         item.innerHTML = `
           <div class="restore-info">
             <span class="restore-filename">${b.filename}</span>
             <span class="restore-date">${b.date || ''}</span>
           </div>
-          <button class="restore-btn" data-file="${b.filename}">Restore</button>
+          <div style="display:flex;align-items:center;gap:8px;">
+            ${isLatest ? '<span class="restore-latest-badge">Latest</span>' : ''}
+            <button class="restore-btn" data-file="${b.filename}">Restore</button>
+          </div>
         `;
         restoreList.appendChild(item);
       });
