@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Proyek Management | as System Analyst</title>
+<link rel="icon" type="image/svg+xml" href="kanban-fill.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -292,6 +293,12 @@
   .sidebar-row.done{ background:rgba(34,197,94,0.1); }
   .sidebar-row.done:hover{ background:rgba(34,197,94,0.16); }
   .sidebar-row.done.selected{ background:rgba(34,197,94,0.18); }
+  .sidebar-row.overdue{ background:rgba(181,72,47,0.1); }
+  .sidebar-row.overdue:hover{ background:rgba(181,72,47,0.16); }
+  .sidebar-row.overdue.selected{ background:rgba(181,72,47,0.18); }
+  .sidebar-row.overdue .name{ color:var(--status-risk); }
+  .sidebar-row.overdue .meta{ color:var(--status-risk); }
+  .overdue-flag{ flex-shrink:0; font-size:14px; color:var(--status-risk); }
   .sidebar-row-top{ display:flex; align-items:center; gap:6px; }
   .sidebar-row-top .name{ flex:1; min-width:0; }
   .done-flag{ flex-shrink:0; font-size:14px; }
@@ -1581,11 +1588,13 @@
     tasks.forEach(t=>{
       const row = document.createElement('div');
       const isDone = t.progress === 100;
-      row.className = 'sidebar-row' + (t.id===selectedId ? ' selected':'') + (isDone ? ' done':'');
+      const isOverdue = !isDone && t.end && t.end < today();
+      row.className = 'sidebar-row' + (t.id===selectedId ? ' selected':'') + (isDone ? ' done':'') + (isOverdue ? ' overdue':'');
       row.innerHTML = `
         <div class="sidebar-row-top">
           <span class="name">${escapeHtml(t.name)}</span>
           ${isDone ? '<span class="done-flag">🏁</span>' : ''}
+          ${isOverdue ? '<span class="overdue-flag"><i class="bi bi-bell-fill"></i></span>' : ''}
         </div>
         <span class="meta"><span class="tag-dot ${(CATS[t.cat] ?? CATS.lainnya).cls}"></span>${(CATS[t.cat] ?? CATS.lainnya).label} · ${t.progress}% · ${countWeekdays(t.start,t.end)} Hari Pengerjaan</span>
       `;
