@@ -760,12 +760,46 @@
   .overlay.open .evidence-modal{
     transform:translateX(0);
   }
+  /* Evidence type toggle */
+  .evidence-type-toggle{
+    display:flex;
+    gap:0;
+    margin-bottom:10px;
+    border-radius:7px;
+    overflow:hidden;
+    border:1px solid var(--paper-line-strong);
+  }
+  .evidence-type-option{
+    flex:1;
+    text-align:center;
+    cursor:pointer;
+  }
+  .evidence-type-option input{ display:none; }
+  .evidence-type-option span{
+    display:block;
+    padding:6px 12px;
+    font-size:12px;
+    font-weight:500;
+    color:var(--ink-faint);
+    background:var(--paper);
+    transition:all .15s;
+  }
+  .evidence-type-option:first-child span{ border-right:1px solid var(--paper-line-strong); }
+  .evidence-type-option input:checked + span{
+    color:var(--ink);
+    background:var(--gold-soft);
+  }
   .evidence-add{
     display:flex;
+    flex-direction:column;
     gap:8px;
     margin-bottom:14px;
   }
-  .evidence-add input{
+  .evidence-add-row{
+    display:flex;
+    gap:8px;
+  }
+  .evidence-add-row input{
     flex:1;
     padding:7px 10px;
     border:1px solid var(--paper-line-strong);
@@ -776,8 +810,23 @@
     background:var(--paper);
     outline:none;
   }
-  .evidence-add input:focus{ outline:2px solid var(--gold); outline-offset:1px; }
-  .evidence-add .btn{ font-size:12px; padding:7px 12px; white-space:nowrap; }
+  .evidence-add-row input:focus{ outline:2px solid var(--gold); outline-offset:1px; }
+  .evidence-add .btn{ font-size:12px; padding:7px 12px; white-space:nowrap; align-self:flex-end; }
+  .evidence-text-input{
+    width:100%;
+    padding:8px 10px;
+    border:1px solid var(--paper-line-strong);
+    border-radius:7px;
+    font-size:13px;
+    font-family:'Inter', sans-serif;
+    color:var(--ink);
+    background:var(--paper);
+    outline:none;
+    resize:vertical;
+    min-height:80px;
+    box-sizing:border-box;
+  }
+  .evidence-text-input:focus{ outline:2px solid var(--gold); outline-offset:1px; }
   .evidence-table{
     width:100%;
     border-collapse:collapse;
@@ -801,7 +850,8 @@
   }
   .evidence-num{ width:32px; }
   .evidence-date{ width:85px; }
-  .evidence-link{ width:38%; }
+  .evidence-text{ width:30%; word-wrap:break-word; overflow-wrap:break-word; }
+  .evidence-link{ width:25%; }
   .evidence-del{ width:28px; }
   .evidence-table tbody tr:hover{ background:var(--paper); }
   .evidence-link-text{
@@ -811,6 +861,11 @@
     text-decoration:none;
   }
   .evidence-link-text:hover{ text-decoration:underline; }
+  .evidence-text-cell{
+    word-wrap:break-word;
+    overflow-wrap:break-word;
+    max-width:0;
+  }
   .evidence-del-btn{
     background:none; border:none;
     color:var(--ink-faint);
@@ -1156,10 +1211,27 @@
       <h2>Daftar Evidence</h2>
       <button class="modal-close" id="evidence-close-btn">&times;</button>
     </div>
-    <div class="modal-sub" id="evidence-sub">Kumpulan link evidence tugas.</div>
+    <div class="modal-sub" id="evidence-sub">Kumpulan evidence tugas.</div>
+    <div class="evidence-type-toggle">
+      <label class="evidence-type-option">
+        <input type="radio" name="evidence-type" value="link" checked>
+        <span>Link</span>
+      </label>
+      <label class="evidence-type-option">
+        <input type="radio" name="evidence-type" value="text">
+        <span>Teks</span>
+      </label>
+    </div>
     <div class="evidence-add">
-      <input type="text" id="evidence-link-input" placeholder="Link Evidence (URL)...">
-      <input type="text" id="evidence-desc-input" placeholder="Keterangan...">
+      <div id="evidence-link-mode">
+        <div class="evidence-add-row">
+          <input type="text" id="evidence-link-input" placeholder="Link Evidence (URL)...">
+          <input type="text" id="evidence-desc-input" placeholder="Keterangan...">
+        </div>
+      </div>
+      <div id="evidence-text-mode" style="display:none;">
+        <textarea id="evidence-text-input" class="evidence-text-input" placeholder="Tulis teks evidence..." rows="4"></textarea>
+      </div>
       <button class="btn btn-ghost" id="evidence-add-btn">Tambah</button>
     </div>
     <table class="evidence-table">
@@ -1167,7 +1239,8 @@
         <tr>
           <th class="evidence-num">No.</th>
           <th class="evidence-date">Tanggal</th>
-          <th class="evidence-link">Link Evidence</th>
+          <th class="evidence-text">Evidence</th>
+          <th class="evidence-link">Link</th>
           <th>Keterangan</th>
           <th class="evidence-del"></th>
         </tr>
@@ -1304,8 +1377,12 @@
     evidenceOverlay: document.getElementById('evidence-overlay'),
     evidenceBody: document.getElementById('evidence-body'),
     evidenceSub: document.getElementById('evidence-sub'),
+    evidenceTypeRadios: document.querySelectorAll('input[name="evidence-type"]'),
+    evidenceLinkMode: document.getElementById('evidence-link-mode'),
+    evidenceTextMode: document.getElementById('evidence-text-mode'),
     evidenceLinkInput: document.getElementById('evidence-link-input'),
     evidenceDescInput: document.getElementById('evidence-desc-input'),
+    evidenceTextInput: document.getElementById('evidence-text-input'),
     evidenceAddBtn: document.getElementById('evidence-add-btn'),
   };
 
@@ -2005,8 +2082,31 @@
   /* ---------------- Evidence Panel ---------------- */
   let evidenceTaskId = null;
 
+  function truncateText(text, maxLen){
+    if(!text) return '';
+    return text.length > maxLen ? text.slice(0, maxLen) + '...' : text;
+  }
+
+  function switchEvidenceMode(mode){
+    if(mode === 'text'){
+      els.evidenceLinkMode.style.display = 'none';
+      els.evidenceTextMode.style.display = '';
+    } else {
+      els.evidenceLinkMode.style.display = '';
+      els.evidenceTextMode.style.display = 'none';
+    }
+  }
+
+  els.evidenceTypeRadios.forEach(radio => {
+    radio.addEventListener('change', function(){
+      if(this.checked) switchEvidenceMode(this.value);
+    });
+  });
+
   function openEvidencePanel(taskId){
     evidenceTaskId = taskId;
+    document.querySelector('input[name="evidence-type"][value="link"]').checked = true;
+    switchEvidenceMode('link');
     renderEvidences();
     els.evidenceOverlay.classList.add('open');
   }
@@ -2016,24 +2116,31 @@
     evidenceTaskId = null;
     els.evidenceLinkInput.value = '';
     els.evidenceDescInput.value = '';
+    els.evidenceTextInput.value = '';
   }
 
   function renderEvidences(){
     els.evidenceBody.innerHTML = '';
     const task = tasks.find(t => t.id === evidenceTaskId);
     if(!task || !task.evidences || task.evidences.length === 0){
-      els.evidenceBody.innerHTML = '<tr><td colspan="5" class="evidence-empty">Belum ada evidence.</td></tr>';
-      els.evidenceSub.textContent = 'Belum ada link evidence.';
+      els.evidenceBody.innerHTML = '<tr><td colspan="6" class="evidence-empty">Belum ada evidence.</td></tr>';
+      els.evidenceSub.textContent = 'Belum ada evidence.';
       return;
     }
-    els.evidenceSub.textContent = 'Kumpulan link evidence tugas.';
+    els.evidenceSub.textContent = 'Daftar evidence tugas.';
     task.evidences.forEach((ev, i) => {
       const tr = document.createElement('tr');
+      const isText = (ev.type === 'text');
+      const evText = isText ? escapeHtml(ev.keterangan || '') : '-';
+      const evLink = !isText && ev.link ? '<a href="'+escapeHtml(ev.link)+'" target="_blank" class="evidence-link-text" title="'+escapeHtml(ev.link)+'">'+escapeHtml(shortenUrl(ev.link))+'</a>' : '-';
+      const evKet = !isText ? escapeHtml(ev.keterangan || '') : '-';
+      const evTextDisplay = isText ? '<span class="evidence-text-cell" title="'+escapeHtml(ev.keterangan || '')+'">'+escapeHtml(truncateText(ev.keterangan, 100))+'</span>' : '-';
       tr.innerHTML = `
         <td class="evidence-num">${i+1}</td>
         <td class="evidence-date">${ev.created_at ? new Date(ev.created_at).toLocaleDateString('id-ID') : '-'}</td>
-        <td class="evidence-link"><a href="${escapeHtml(ev.link)}" target="_blank" class="evidence-link-text" title="${escapeHtml(ev.link)}">${escapeHtml(shortenUrl(ev.link))}</a></td>
-        <td>${escapeHtml(ev.keterangan || '')}</td>
+        <td class="evidence-text">${evTextDisplay}</td>
+        <td class="evidence-link">${evLink}</td>
+        <td>${evKet}</td>
         <td class="evidence-del"><button class="evidence-del-btn" data-ev-id="${ev.id}">&times;</button></td>
       `;
       tr.querySelector('.evidence-del-btn').addEventListener('click', async function(){
@@ -2049,17 +2156,26 @@
   els.evidenceAddBtn.addEventListener('click', async ()=>{
     const task = tasks.find(t => t.id === evidenceTaskId);
     if(!task) return;
-    const link = els.evidenceLinkInput.value.trim();
-    if(!link){ alert('Link evidence harus diisi.'); return; }
-    const keterangan = els.evidenceDescInput.value.trim();
+    const type = document.querySelector('input[name="evidence-type"]:checked').value;
+    let link = '', keterangan = '';
+    if(type === 'link'){
+      link = els.evidenceLinkInput.value.trim();
+      if(!link){ alert('Link evidence harus diisi.'); return; }
+      keterangan = els.evidenceDescInput.value.trim();
+    } else {
+      keterangan = els.evidenceTextInput.value.trim();
+      if(!keterangan){ alert('Teks evidence harus diisi.'); return; }
+    }
     try {
-      const result = await api.post('/api/tasks/'+task.id+'/evidences', { link, keterangan });
+      const result = await api.post('/api/tasks/'+task.id+'/evidences', { type, link, keterangan });
       if(!task.evidences) task.evidences = [];
       task.evidences.push(result.evidence);
       els.evidenceLinkInput.value = '';
       els.evidenceDescInput.value = '';
+      els.evidenceTextInput.value = '';
       renderEvidences();
-      els.evidenceLinkInput.focus();
+      if(type === 'link') els.evidenceLinkInput.focus();
+      else els.evidenceTextInput.focus();
     } catch(e){ console.error('Failed to add evidence:', e); }
   });
 
@@ -2068,6 +2184,9 @@
   });
   els.evidenceDescInput.addEventListener('keydown', (e)=>{
     if(e.key==='Enter') els.evidenceAddBtn.click();
+  });
+  els.evidenceTextInput.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter' && e.ctrlKey) els.evidenceAddBtn.click();
   });
 
   els.todoAddBtn.addEventListener('click', async ()=>{

@@ -217,9 +217,10 @@ app.delete('/api/tasks/:id/todos/:todoId', async (req, res) => {
 app.post('/api/tasks/:id/evidences', async (req, res) => {
   try {
     const taskId = parseInt(req.params.id, 10);
-    const { link, keterangan } = req.body;
-    if (!link) return res.status(400).json({ error: 'link is required' });
-    const ev = await storage.addEvidence(taskId, { link, keterangan: keterangan || '' });
+    const { type, link, keterangan } = req.body;
+    const evType = type || 'link';
+    if (!['link', 'text'].includes(evType)) return res.status(400).json({ error: 'type must be link or text' });
+    const ev = await storage.addEvidence(taskId, { type: evType, link: link || '', keterangan: keterangan || '' });
     if (!ev) return res.status(404).json({ error: 'Task not found' });
     res.status(201).json({ evidence: ev });
   } catch (err) {

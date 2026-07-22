@@ -1,7 +1,7 @@
 const path = require('path');
 
 module.exports = {
-  port: 3000,
+  port: 3030,
   dataPath: path.join(__dirname, '..', 'data', 'tasks.json'),
   mysql: {
     host: 'localhost',
