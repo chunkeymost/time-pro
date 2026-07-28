@@ -1026,7 +1026,7 @@
     font-family:'Space Grotesk', sans-serif;
     font-size:14px;
     font-weight:600;
-    color:var(--gold);
+    color:#000;
     margin-bottom:8px;
     letter-spacing:.02em;
   }
@@ -1042,10 +1042,10 @@
     font-weight:600;
     letter-spacing:.06em;
     text-transform:uppercase;
-    color:var(--ink-faint);
+    color:#fff;
+    background:#000;
     padding:5px 6px;
-    border-bottom:1px solid var(--paper-line);
-    background:var(--paper);
+    border-bottom:1px solid #000;
   }
   .report-table tbody td{
     padding:6px;
@@ -1061,7 +1061,7 @@
   }
   .report-task-meta{
     font-size:11px;
-    color:var(--ink-soft);
+    color:#000;
     font-family:'IBM Plex Mono', monospace;
   }
   .report-progress{
@@ -1094,11 +1094,11 @@
     border-color:var(--status-done);
     color:#fff;
   }
-  .report-todo-text.done{ text-decoration:line-through; color:var(--ink-faint); }
+  .report-todo-text.done{ text-decoration:line-through; color:#888; }
   .report-todo-due{
     font-family:'IBM Plex Mono', monospace;
     font-size:11px;
-    color:var(--ink-soft);
+    color:#000;
     white-space:nowrap;
   }
   .report-evidence-item{
@@ -1109,7 +1109,8 @@
     font-size:12px;
   }
   .report-evidence-item img{
-    width:50px; height:35px;
+    max-width:400px;
+    border-radius:4px;
     object-fit:cover;
     border-radius:4px;
     border:1px solid var(--paper-line-strong);
@@ -1117,23 +1118,23 @@
   }
   .report-evidence-item img:hover{ opacity:.75; }
   .report-evidence-item a{
-    color:var(--status-progress);
+    color:#2F6BA3;
     text-decoration:none;
     word-break:break-all;
   }
   .report-evidence-item a:hover{ text-decoration:underline; }
   .report-evidence-text{
-    color:var(--ink-soft);
+    color:#000;
     font-style:italic;
   }
   .report-empty{
     text-align:center;
     padding:24px 12px;
-    color:var(--ink-faint);
+    color:#000;
     font-size:13px;
   }
   .report-overdue{
-    color:var(--status-risk);
+    color:#e53935;
     font-weight:600;
   }
   .report-summary{
@@ -1153,7 +1154,7 @@
   }
   .report-summary-icon{
     font-size:18px;
-    color:var(--gold);
+    color:#000;
     margin-bottom:4px;
   }
   .report-summary-data{
@@ -1165,20 +1166,71 @@
     font-family:'Space Grotesk',sans-serif;
     font-size:22px;
     font-weight:700;
-    color:var(--ink);
+    color:#000;
     line-height:1.2;
   }
   .report-summary-label{
     font-size:11px;
-    color:var(--ink-faint);
+    color:#000;
     letter-spacing:.03em;
     text-transform:uppercase;
   }
   .report-summary-stat{
     margin-top:4px;
     font-size:11px;
-    color:var(--ink-soft);
+    color:#000;
     font-family:'IBM Plex Mono',monospace;
+  }
+
+  /* ---------- Report Dark Mode ---------- */
+  [data-theme="dark"] #report-printable,
+  [data-theme="dark"] #report-printable *{
+    color:#fff !important;
+  }
+  [data-theme="dark"] .report-table thead th{
+    background:#333 !important;
+  }
+  [data-theme="dark"] .report-evidence-item a{
+    color:#74B9FF !important;
+  }
+  [data-theme="dark"] .report-overdue{
+    color:#ef5350 !important;
+  }
+  [data-theme="dark"] .report-todo-text.done{
+    color:#aaa !important;
+  }
+  [data-theme="dark"] .report-table tbody td{
+    border-bottom-color:#444 !important;
+  }
+  [data-theme="dark"] .report-section{
+    border-bottom-color:#444 !important;
+  }
+  [data-theme="dark"] .report-summary-card{
+    background:#333 !important;
+    border-color:#444 !important;
+  }
+
+  /* ---------- Report Print Light Override ---------- */
+  .report-print-light,
+  .report-print-light *{
+    color:#000 !important;
+  }
+  .report-print-light .report-table thead th{
+    background:#000 !important;
+    color:#fff !important;
+  }
+  .report-print-light .report-evidence-item a{
+    color:#2F6BA3 !important;
+  }
+  .report-print-light .report-overdue{
+    color:#e53935 !important;
+  }
+  .report-print-light .report-todo-text.done{
+    color:#888 !important;
+  }
+  .report-print-light .report-summary-card{
+    background:var(--paper) !important;
+    border-color:var(--paper-line) !important;
   }
 
   /* ---------- Image Preview Lightbox ---------- */
@@ -2923,7 +2975,7 @@
     });
 
     if(filtered.length === 0){
-      els.reportContent.innerHTML = '<div class="report-empty"><i class="bi bi-inbox" style="font-size:32px;display:block;margin-bottom:8px;color:var(--ink-faint);"></i>Tidak ada tugas dalam periode ini.</div>';
+      els.reportContent.innerHTML = '<div class="report-empty"><i class="bi bi-inbox" style="font-size:32px;display:block;margin-bottom:8px;color:#000;"></i>Tidak ada tugas dalam periode ini.</div>';
       return;
     }
 
@@ -2938,23 +2990,23 @@
         task.todos.forEach(todo => {
           totalTodos++;
           if(todo.done) doneTodos++;
-          if(todo.due && !todo.done && todo.due < startDate) overdueTodos++;
+          if(todo.due && !todo.done && todo.due < today()) overdueTodos++;
         });
       } else {
-        actualProgress = task.progress || 0;
+        actualProgress = 0;
       }
       totalProgress += actualProgress;
       if(actualProgress >= 100) doneTasks++;
     });
     const avgProgress = filtered.length > 0 ? Math.round(totalProgress / filtered.length) : 0;
 
-    let html = '<div id="report-printable" style="font-family:Inter,sans-serif;color:var(--ink);">';
-    html += '<div style="text-align:center;margin-bottom:16px;"><div style="font-family:Space Grotesk,sans-serif;font-size:18px;font-weight:700;color:var(--ink);">LAPORAN TUGAS</div><div style="font-size:12px;color:var(--ink-soft);font-family:IBM Plex Mono,monospace;">Periode: ' + rangeStr + '</div></div>';
+    let html = '<div id="report-printable" style="font-family:Inter,sans-serif;color:#000;">';
+    html += '<div style="text-align:center;margin-bottom:16px;"><div style="font-family:Space Grotesk,sans-serif;font-size:18px;font-weight:700;color:#000;">LAPORAN TUGAS</div><div style="font-size:12px;color:#000;font-family:IBM Plex Mono,monospace;">Periode: ' + rangeStr + '</div></div>';
 
     html += '<div class="report-summary">';
     html += '<div class="report-summary-card"><div class="report-summary-icon"><i class="bi bi-clipboard-check"></i></div><div class="report-summary-data"><span class="report-summary-num">' + filtered.length + '</span><span class="report-summary-label">Tugas Utama</span></div><div class="report-summary-stat">' + doneTasks + '/' + filtered.length + ' Selesai</div></div>';
     html += '<div class="report-summary-card"><div class="report-summary-icon"><i class="bi bi-list-check"></i></div><div class="report-summary-data"><span class="report-summary-num">' + totalTodos + '</span><span class="report-summary-label">Sub Tugas</span></div><div class="report-summary-stat">' + doneTodos + '/' + totalTodos + ' Selesai</div></div>';
-    html += '<div class="report-summary-card"><div class="report-summary-icon" style="' + (overdueTodos > 0 ? 'color:var(--status-risk);' : '') + '"><i class="bi bi-exclamation-triangle"></i></div><div class="report-summary-data"><span class="report-summary-num" style="' + (overdueTodos > 0 ? 'color:var(--status-risk);' : '') + '">' + overdueTodos + '</span><span class="report-summary-label">Overdue</span></div><div class="report-summary-stat">' + (overdueTodos > 0 ? 'Ada keterlambatan' : 'No Overdue') + '</div></div>';
+    html += '<div class="report-summary-card"><div class="report-summary-icon" style="' + (overdueTodos > 0 ? 'color:#e53935;' : '') + '"><i class="bi bi-exclamation-triangle"></i></div><div class="report-summary-data"><span class="report-summary-num" style="' + (overdueTodos > 0 ? 'color:#e53935;' : '') + '">' + overdueTodos + '</span><span class="report-summary-label">Overdue</span></div><div class="report-summary-stat">' + (overdueTodos > 0 ? 'Ada keterlambatan' : 'No Overdue') + '</div></div>';
     html += '<div class="report-summary-card"><div class="report-summary-icon"><i class="bi bi-graph-up"></i></div><div class="report-summary-data"><span class="report-summary-num">' + avgProgress + '%</span><span class="report-summary-label">Progres Rata-rata</span></div><div class="report-summary-stat">Dari ' + filtered.length + ' tugas</div></div>';
     html += '</div>';
 
@@ -2967,16 +3019,16 @@
         const taskDone = task.todos.filter(t => t.done).length;
         actualProgress = Math.round((taskDone / task.todos.length) * 100);
       } else {
-        actualProgress = task.progress || 0;
+        actualProgress = 0;
       }
-      const progressColor = actualProgress >= 100 ? 'var(--status-done)' : actualProgress > 0 ? 'var(--status-progress)' : 'var(--ink-faint)';
-      html += '<div style="margin:6px 0 10px;"><span class="report-progress" style="background:' + progressColor + '22;color:' + progressColor + ';">Progres: ' + actualProgress + '%</span></div>';
+      const progressColor = actualProgress >= 100 ? 'var(--status-done)' : actualProgress > 0 ? 'var(--status-progress)' : '#000';
+      html += '<div style="margin:6px 0 10px;"><span class="report-progress" style="background:' + progressColor + '22;color:#000;">Progres: ' + actualProgress + '%</span></div>';
 
       if(task.todos && task.todos.length > 0){
-        html += '<div class="report-section-title" style="font-size:12px;color:var(--ink-soft);margin-bottom:4px;"><i class="bi bi-list-check"></i> Sub Tugas (' + task.todos.length + ')</div>';
+        html += '<div class="report-section-title" style="font-size:12px;color:#000;margin-bottom:4px;"><i class="bi bi-list-check"></i> Sub Tugas (' + task.todos.length + ')</div>';
         html += '<table class="report-table"><thead><tr><th style="width:30px;">No.</th><th>Tugas</th><th style="width:100px;">Due Date</th><th style="width:80px;">Status</th></tr></thead><tbody>';
         task.todos.forEach((todo, ti) => {
-          const isOverdue = todo.due && !todo.done && todo.due < startDate;
+          const isOverdue = todo.due && !todo.done && todo.due < today();
           html += '<tr>';
           html += '<td>' + (ti+1) + '</td>';
           html += '<td><span class="report-todo-text' + (todo.done ? ' done' : '') + '">' + escapeHtml(todo.text) + '</span></td>';
@@ -2986,11 +3038,11 @@
         });
         html += '</tbody></table>';
       } else {
-        html += '<div style="font-size:12px;color:var(--ink-faint);padding:4px 0;">Tidak ada sub tugas.</div>';
+        html += '<div style="font-size:12px;color:#000;padding:4px 0;">Tidak ada sub tugas.</div>';
       }
 
       if(task.evidences && task.evidences.length > 0){
-        html += '<div class="report-section-title" style="font-size:12px;color:var(--ink-soft);margin-top:10px;margin-bottom:4px;"><i class="bi bi-paperclip"></i> Evidence (' + task.evidences.length + ')</div>';
+        html += '<div class="report-section-title" style="font-size:12px;color:#000;margin-top:10px;margin-bottom:4px;"><i class="bi bi-paperclip"></i> Evidence (' + task.evidences.length + ')</div>';
         task.evidences.forEach(ev => {
           html += '<div class="report-evidence-item">';
           const isLink = ev.type === 'link' || (!ev.type && ev.link && ev.link !== 'None' && ev.link !== 'null');
@@ -3036,6 +3088,11 @@
       alert('Library PDF belum dimuat. Silakan coba lagi.');
       return;
     }
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    if(currentTheme === 'dark'){
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+    el.classList.add('report-print-light');
     const opt = {
       margin:       [10, 10, 10, 10],
       filename:     'laporan-tugas.pdf',
@@ -3043,7 +3100,17 @@
       html2canvas:  { scale:2, useCORS:true },
       jsPDF:        { unit:'mm', format:'a4', orientation:'portrait' }
     };
-    html2pdf().set(opt).from(el).save();
+    html2pdf().set(opt).from(el).save().then(()=>{
+      el.classList.remove('report-print-light');
+      if(currentTheme === 'dark'){
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    }).catch(()=>{
+      el.classList.remove('report-print-light');
+      if(currentTheme === 'dark'){
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    });
   });
 
   /* ---------------- Init ---------------- */
