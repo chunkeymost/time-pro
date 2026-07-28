@@ -317,7 +317,6 @@
     border-radius:var(--radius);
     background:var(--surface);
     box-shadow:var(--shadow);
-    overflow:hidden;
   }
 
   /* Sidebar */
@@ -327,6 +326,9 @@
     flex-direction:column;
   }
   .sidebar-head{
+    position:sticky;
+    top:0;
+    z-index:3;
     height:56px;
     display:flex;
     align-items:center;
@@ -389,17 +391,34 @@
   }
   
   /* Timeline */
+  .timeline-group{
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+    min-height:0;
+  }
   .timeline-wrap{
     overflow-x:auto;
+    overflow-y:hidden;
     position:relative;
+    min-width:0;
   }
   .timeline-inner{ position:relative; }
 
   .ruler{
+    position:sticky;
+    top:0;
+    z-index:3;
     height:56px;
-    position:relative;
+    overflow:hidden;
+    flex-shrink:0;
     border-bottom:1px solid var(--paper-line-strong);
-    background:
+    background:var(--surface);
+  }
+  .ruler-scroll{
+    position:relative;
+    height:56px;
+    background-image:
       repeating-linear-gradient(90deg, transparent 0, transparent calc(var(--day-w) - 1px), var(--paper-line) calc(var(--day-w) - 1px), var(--paper-line) var(--day-w));
   }
   .ruler-month{
@@ -1226,10 +1245,14 @@
       <div class="sidebar-head">Daftar Tugas</div>
       <div class="sidebar-list" id="sidebar-list"></div>
     </aside>
-    <div class="timeline-wrap" id="timeline-wrap">
-      <div class="timeline-inner" id="timeline-inner">
-        <div class="ruler" id="ruler"></div>
-        <div class="rows" id="rows"></div>
+    <div class="timeline-group">
+      <div class="ruler" id="ruler">
+        <div class="ruler-scroll" id="ruler-scroll"></div>
+      </div>
+      <div class="timeline-wrap" id="timeline-wrap">
+        <div class="timeline-inner" id="timeline-inner">
+          <div class="rows" id="rows"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -1661,8 +1684,10 @@
     const totalDays = dayDiff(range.start, range.end)+1;
     els.timelineInner.style.setProperty('--day-w', dayWidth+'px');
     els.timelineInner.style.width = (totalDays*dayWidth)+'px';
-    els.ruler.innerHTML = '';
-    els.ruler.style.width = (totalDays*dayWidth)+'px';
+    els.ruler.style.setProperty('--day-w', dayWidth+'px');
+    const rs = document.getElementById('ruler-scroll');
+    rs.innerHTML = '';
+    rs.style.width = (totalDays*dayWidth)+'px';
 
     let lastMonth = null;
     for(let i=0;i<totalDays;i++){
@@ -1674,7 +1699,7 @@
         label.className='ruler-month';
         label.style.left = x+'px';
         label.textContent = `${MONTHS_ID[d.getMonth()]} ${d.getFullYear()}`;
-        els.ruler.appendChild(label);
+        rs.appendChild(label);
       }
 
       if(view==='week' && dayWidth>=28){
@@ -1683,19 +1708,19 @@
         dayLbl.className = 'ruler-day' + (isWeekend?' weekend':'');
         dayLbl.style.left = x+'px';
         dayLbl.textContent = d.getDate();
-        els.ruler.appendChild(dayLbl);
+        rs.appendChild(dayLbl);
       } else if(d.getDay()===1) {
         const dayLbl = document.createElement('div');
         dayLbl.className = 'ruler-day';
         dayLbl.style.left = x+'px';
         dayLbl.textContent = d.getDate()+' '+MONTHS_ID[d.getMonth()];
-        els.ruler.appendChild(dayLbl);
+        rs.appendChild(dayLbl);
       }
 
       const tick = document.createElement('div');
       tick.className='ruler-tick';
       tick.style.left = x+'px';
-      els.ruler.appendChild(tick);
+      rs.appendChild(tick);
     }
   }
 
@@ -1914,6 +1939,12 @@
   function scrollToTodayLine(range){
     const offset = dayDiff(range.start, T)*dayWidth;
     els.timelineWrap.scrollLeft = Math.max(offset - 200, 0);
+    syncRulerScroll();
+  }
+
+  function syncRulerScroll(){
+    const rs = document.getElementById('ruler-scroll');
+    if(rs) rs.style.transform = `translateX(${-els.timelineWrap.scrollLeft}px)`;
   }
 
   /* ---------------- View toggle ---------------- */
@@ -2601,6 +2632,8 @@
   });
 
   initTheme();
+
+  els.timelineWrap.addEventListener('scroll', syncRulerScroll);
 
   /* ---------------- Init ---------------- */
   loadTasks();
