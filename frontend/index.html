@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22><path fill=%22%231B3350%22 d=%22M2.5 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2zm5 2h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1m-5 1a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1zm9-1h1a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1%22/></svg>">
 <style>
   :root{
@@ -683,7 +684,6 @@
     display:flex;
     justify-content:space-between;
     align-items:center;
-    margin-top:20px;
     gap:10px;
   }
   .link-danger{
@@ -1012,6 +1012,132 @@
     font-style:italic;
   }
 
+  /* ---------- Report Modal ---------- */
+  .report-modal{
+    width:60%;
+    max-width:800px;
+  }
+  .report-section{
+    margin-bottom:20px;
+    padding-bottom:16px;
+    border-bottom:1px dashed var(--paper-line-strong);
+  }
+  .report-section:last-child{ border-bottom:none; }
+  .report-section-title{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:14px;
+    font-weight:600;
+    color:var(--gold);
+    margin-bottom:8px;
+    letter-spacing:.02em;
+  }
+  .report-table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:12.5px;
+    margin-bottom:6px;
+  }
+  .report-table thead th{
+    text-align:left;
+    font-size:10px;
+    font-weight:600;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    padding:5px 6px;
+    border-bottom:1px solid var(--paper-line);
+    background:var(--paper);
+  }
+  .report-table tbody td{
+    padding:6px;
+    border-bottom:1px solid var(--paper-line);
+    vertical-align:top;
+  }
+  .report-table tbody tr:hover{ background:var(--paper); }
+  .report-task-name{
+    font-weight:600;
+    color:var(--ink);
+    font-size:13px;
+    margin-bottom:2px;
+  }
+  .report-task-meta{
+    font-size:11px;
+    color:var(--ink-soft);
+    font-family:'IBM Plex Mono', monospace;
+  }
+  .report-progress{
+    display:inline-block;
+    padding:2px 8px;
+    border-radius:10px;
+    font-size:11px;
+    font-weight:600;
+    font-family:'IBM Plex Mono', monospace;
+  }
+  .report-todo-item{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:4px 0;
+    font-size:12.5px;
+  }
+  .report-todo-check{
+    width:14px; height:14px;
+    border:2px solid var(--paper-line-strong);
+    border-radius:3px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    flex-shrink:0;
+    font-size:10px;
+  }
+  .report-todo-check.checked{
+    background:var(--status-done);
+    border-color:var(--status-done);
+    color:#fff;
+  }
+  .report-todo-text.done{ text-decoration:line-through; color:var(--ink-faint); }
+  .report-todo-due{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    color:var(--ink-soft);
+    white-space:nowrap;
+  }
+  .report-evidence-item{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:3px 0;
+    font-size:12px;
+  }
+  .report-evidence-item img{
+    width:50px; height:35px;
+    object-fit:cover;
+    border-radius:4px;
+    border:1px solid var(--paper-line-strong);
+    cursor:pointer;
+  }
+  .report-evidence-item img:hover{ opacity:.75; }
+  .report-evidence-item a{
+    color:var(--status-progress);
+    text-decoration:none;
+    word-break:break-all;
+  }
+  .report-evidence-item a:hover{ text-decoration:underline; }
+  .report-evidence-text{
+    color:var(--ink-soft);
+    font-style:italic;
+  }
+  .report-empty{
+    text-align:center;
+    padding:24px 12px;
+    color:var(--ink-faint);
+    font-size:13px;
+  }
+  .report-overdue{
+    color:var(--status-risk);
+    font-weight:600;
+  }
+
   /* ---------- Image Preview Lightbox ---------- */
   .img-preview-overlay{
     position:fixed; inset:0;
@@ -1247,6 +1373,7 @@
       </div>
       <button class="btn btn-primary" id="add-task-btn">+ TUGAS BARU</button>
       <button class="btn btn-ghost" id="today-btn">KE HARI INI</button>
+      <button class="btn btn-ghost" id="report-btn"><i class="bi bi-journal-text"></i> BUAT REPORT</button>
       <button class="bell-btn" id="bell-btn">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -1441,6 +1568,35 @@
   </div>
 </div>
 
+<!-- Report modal -->
+<div class="overlay" id="report-overlay">
+  <div class="modal report-modal">
+    <div class="modal-head">
+      <h2><i class="bi bi-journal-text"></i> RINGKASAN LAPORAN</h2>
+      <button class="modal-close" id="report-close-btn">&times;</button>
+    </div>
+    <div class="modal-sub">Pilih periode tanggal untuk melihat ringkasan tugas.</div>
+
+    <div class="row-2">
+      <div class="field">
+        <label for="r-start">Tanggal Mulai</label>
+        <input type="date" id="r-start">
+      </div>
+      <div class="field">
+        <label for="r-end">Tanggal Selesai</label>
+        <input type="date" id="r-end">
+      </div>
+    </div>
+
+    <div id="report-content"></div>
+
+    <div class="modal-actions" style="justify-content:flex-end;">
+      <button class="btn btn-primary" id="report-generate-btn"><i class="bi bi-funnel"></i> TAMPILKAN</button>
+      <button class="btn btn-primary" id="export-pdf-btn"><i class="bi bi-file-earmark-pdf"></i> Export PDF</button>
+    </div>
+  </div>
+</div>
+
 <!-- Image preview lightbox -->
 <div class="img-preview-overlay" id="img-preview-overlay">
   <div class="img-preview-container">
@@ -1588,6 +1744,10 @@
     evidenceAddBtn: document.getElementById('evidence-add-btn'),
     imgPreviewOverlay: document.getElementById('img-preview-overlay'),
     imgPreviewImg: document.getElementById('img-preview-img'),
+    reportOverlay: document.getElementById('report-overlay'),
+    reportContent: document.getElementById('report-content'),
+    rStart: document.getElementById('r-start'),
+    rEnd: document.getElementById('r-end'),
   };
 
   /* ---------------- API helper ---------------- */
@@ -2665,6 +2825,131 @@
     scrollArea.addEventListener('scroll', updateScrollShadow);
     updateScrollShadow();
   }
+
+  /* ---------------- Report ---------------- */
+  function openReportModal(){
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const midMonth = new Date(now.getFullYear(), now.getMonth(), 15);
+    els.rStart.value = fmt(firstDay);
+    els.rEnd.value = fmt(midMonth);
+    els.reportContent.innerHTML = '';
+    els.reportOverlay.classList.add('open');
+  }
+
+  function closeReportModal(){
+    els.reportOverlay.classList.remove('open');
+  }
+
+  document.getElementById('report-btn').addEventListener('click', openReportModal);
+  document.getElementById('report-close-btn').addEventListener('click', closeReportModal);
+  els.reportOverlay.addEventListener('click', (e)=>{
+    if(e.target === els.reportOverlay) closeReportModal();
+  });
+
+  function generateReport(){
+    const startDate = parseDate(els.rStart.value);
+    const endDate = parseDate(els.rEnd.value);
+    if(!startDate || !endDate){
+      alert('Mohon isi tanggal mulai dan selesai.');
+      return;
+    }
+    if(startDate > endDate){
+      alert('Tanggal mulai harus sebelum tanggal selesai.');
+      return;
+    }
+
+    const filtered = tasks.filter(t => {
+      if(!t.start) return false;
+      return t.start >= startDate && t.start <= endDate;
+    });
+
+    if(filtered.length === 0){
+      els.reportContent.innerHTML = '<div class="report-empty"><i class="bi bi-inbox" style="font-size:32px;display:block;margin-bottom:8px;color:var(--ink-faint);"></i>Tidak ada tugas dalam periode ini.</div>';
+      return;
+    }
+
+    const rangeStr = els.rStart.value.split('-').reverse().join(' ') + ' — ' + els.rEnd.value.split('-').reverse().join(' ');
+    let html = '<div id="report-printable" style="font-family:Inter,sans-serif;color:var(--ink);">';
+    html += '<div style="text-align:center;margin-bottom:16px;"><div style="font-family:Space Grotesk,sans-serif;font-size:18px;font-weight:700;color:var(--ink);">LAPORAN TUGAS</div><div style="font-size:12px;color:var(--ink-soft);font-family:IBM Plex Mono,monospace;">Periode: ' + rangeStr + '</div><div style="font-size:11px;color:var(--ink-faint);margin-top:2px;">Total: ' + filtered.length + ' tugas</div></div>';
+
+    filtered.forEach((task, idx) => {
+      html += '<div class="report-section">';
+      html += '<div class="report-section-title"><i class="bi bi-folder"></i> ' + (idx+1) + '. ' + escapeHtml(task.name) + '</div>';
+      html += '<div class="report-task-meta">Kategori: ' + escapeHtml(task.cat || '-') + ' &bull; Assignee: ' + escapeHtml(task.assignee || '-') + ' &bull; Mulai: ' + fmt(task.start) + ' &bull; Selesai: ' + fmt(task.end) + '</div>';
+      const progressColor = task.progress >= 100 ? 'var(--status-done)' : task.progress > 0 ? 'var(--status-progress)' : 'var(--ink-faint)';
+      html += '<div style="margin:6px 0 10px;"><span class="report-progress" style="background:' + progressColor + '22;color:' + progressColor + ';">Progres: ' + task.progress + '%</span></div>';
+
+      if(task.todos && task.todos.length > 0){
+        html += '<div class="report-section-title" style="font-size:12px;color:var(--ink-soft);margin-bottom:4px;"><i class="bi bi-list-check"></i> Sub Tugas (' + task.todos.length + ')</div>';
+        html += '<table class="report-table"><thead><tr><th style="width:30px;">No.</th><th>Tugas</th><th style="width:100px;">Due Date</th><th style="width:80px;">Status</th></tr></thead><tbody>';
+        task.todos.forEach((todo, ti) => {
+          const isOverdue = todo.due && !todo.done && todo.due < startDate;
+          html += '<tr>';
+          html += '<td>' + (ti+1) + '</td>';
+          html += '<td><span class="report-todo-text' + (todo.done ? ' done' : '') + '">' + escapeHtml(todo.text) + '</span></td>';
+          html += '<td class="report-todo-due' + (isOverdue ? ' report-overdue' : '') + '">' + (todo.due ? fmt(todo.due) : '—') + '</td>';
+          html += '<td><span class="report-todo-check' + (todo.done ? ' checked' : '') + '">' + (todo.done ? '<i class="bi bi-check"></i>' : '') + '</span></td>';
+          html += '</tr>';
+        });
+        html += '</tbody></table>';
+      } else {
+        html += '<div style="font-size:12px;color:var(--ink-faint);padding:4px 0;">Tidak ada sub tugas.</div>';
+      }
+
+      if(task.evidences && task.evidences.length > 0){
+        html += '<div class="report-section-title" style="font-size:12px;color:var(--ink-soft);margin-top:10px;margin-bottom:4px;"><i class="bi bi-paperclip"></i> Evidence (' + task.evidences.length + ')</div>';
+        task.evidences.forEach(ev => {
+          html += '<div class="report-evidence-item">';
+          if(ev.type === 'image'){
+            const imgSrc = '/' + ev.link;
+            html += '<img src="' + escapeHtml(imgSrc) + '" data-preview="' + escapeHtml(imgSrc) + '" class="report-evidence-img" alt="Evidence">';
+            html += '<span>' + escapeHtml(ev.keterangan || 'Gambar') + '</span>';
+          } else if(ev.type === 'link'){
+            html += '<i class="bi bi-link-45deg"></i>';
+            html += '<a href="' + escapeHtml(ev.link) + '" target="_blank" title="' + escapeHtml(ev.link) + '">' + escapeHtml(ev.keterangan || ev.link) + '</a>';
+          } else {
+            html += '<i class="bi bi-fonts"></i>';
+            html += '<span class="report-evidence-text">' + escapeHtml(ev.keterangan || '-') + '</span>';
+          }
+          html += '</div>';
+        });
+      }
+
+      html += '</div>';
+    });
+
+    html += '</div>';
+    els.reportContent.innerHTML = html;
+  }
+
+  document.getElementById('report-generate-btn').addEventListener('click', generateReport);
+
+  els.reportContent.addEventListener('click', (e)=>{
+    if(e.target.classList.contains('report-evidence-img')){
+      openImagePreview(e.target.dataset.preview);
+    }
+  });
+
+  document.getElementById('export-pdf-btn').addEventListener('click', ()=>{
+    const el = document.getElementById('report-printable');
+    if(!el){
+      alert('Mohon generate report terlebih dahulu.');
+      return;
+    }
+    if(typeof html2pdf === 'undefined'){
+      alert('Library PDF belum dimuat. Silakan coba lagi.');
+      return;
+    }
+    const opt = {
+      margin:       [10, 10, 10, 10],
+      filename:     'laporan-tugas.pdf',
+      image:        { type:'jpeg', quality:0.98 },
+      html2canvas:  { scale:2, useCORS:true },
+      jsPDF:        { unit:'mm', format:'a4', orientation:'portrait' }
+    };
+    html2pdf().set(opt).from(el).save();
+  });
 
   /* ---------------- Init ---------------- */
   loadTasks();
