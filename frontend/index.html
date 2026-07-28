@@ -2979,7 +2979,7 @@
       return;
     }
 
-    const rangeStr = els.rStart.value.split('-').reverse().join(' ') + ' — ' + els.rEnd.value.split('-').reverse().join(' ');
+    const rangeStr = els.rStart.value.split('-').reverse().join('/') + ' — ' + els.rEnd.value.split('-').reverse().join('/');
 
     let totalTodos = 0, doneTodos = 0, overdueTodos = 0, totalProgress = 0, doneTasks = 0;
     filtered.forEach(task => {
