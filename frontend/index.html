@@ -1136,6 +1136,50 @@
     color:var(--status-risk);
     font-weight:600;
   }
+  .report-summary{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:10px;
+    margin-bottom:20px;
+    padding-bottom:16px;
+    border-bottom:1px dashed var(--paper-line-strong);
+  }
+  .report-summary-card{
+    background:var(--paper);
+    border-radius:8px;
+    padding:12px;
+    text-align:center;
+    border:1px solid var(--paper-line);
+  }
+  .report-summary-icon{
+    font-size:18px;
+    color:var(--gold);
+    margin-bottom:4px;
+  }
+  .report-summary-data{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+  .report-summary-num{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:22px;
+    font-weight:700;
+    color:var(--ink);
+    line-height:1.2;
+  }
+  .report-summary-label{
+    font-size:11px;
+    color:var(--ink-faint);
+    letter-spacing:.03em;
+    text-transform:uppercase;
+  }
+  .report-summary-stat{
+    margin-top:4px;
+    font-size:11px;
+    color:var(--ink-soft);
+    font-family:'IBM Plex Mono',monospace;
+  }
 
   /* ---------- Image Preview Lightbox ---------- */
   .img-preview-overlay{
@@ -2271,6 +2315,7 @@
     }
     renderTodos(task);
     updateProgressSlider(task);
+    updateProgressFromTodos(task);
     els.overlay.classList.add('open');
     els.fName.focus();
   }
@@ -2883,15 +2928,49 @@
     }
 
     const rangeStr = els.rStart.value.split('-').reverse().join(' ') + ' — ' + els.rEnd.value.split('-').reverse().join(' ');
+
+    let totalTodos = 0, doneTodos = 0, overdueTodos = 0, totalProgress = 0, doneTasks = 0;
+    filtered.forEach(task => {
+      let actualProgress;
+      if(task.todos && task.todos.length > 0){
+        const taskDone = task.todos.filter(t => t.done).length;
+        actualProgress = Math.round((taskDone / task.todos.length) * 100);
+        task.todos.forEach(todo => {
+          totalTodos++;
+          if(todo.done) doneTodos++;
+          if(todo.due && !todo.done && todo.due < startDate) overdueTodos++;
+        });
+      } else {
+        actualProgress = task.progress || 0;
+      }
+      totalProgress += actualProgress;
+      if(actualProgress >= 100) doneTasks++;
+    });
+    const avgProgress = filtered.length > 0 ? Math.round(totalProgress / filtered.length) : 0;
+
     let html = '<div id="report-printable" style="font-family:Inter,sans-serif;color:var(--ink);">';
-    html += '<div style="text-align:center;margin-bottom:16px;"><div style="font-family:Space Grotesk,sans-serif;font-size:18px;font-weight:700;color:var(--ink);">LAPORAN TUGAS</div><div style="font-size:12px;color:var(--ink-soft);font-family:IBM Plex Mono,monospace;">Periode: ' + rangeStr + '</div><div style="font-size:11px;color:var(--ink-faint);margin-top:2px;">Total: ' + filtered.length + ' tugas</div></div>';
+    html += '<div style="text-align:center;margin-bottom:16px;"><div style="font-family:Space Grotesk,sans-serif;font-size:18px;font-weight:700;color:var(--ink);">LAPORAN TUGAS</div><div style="font-size:12px;color:var(--ink-soft);font-family:IBM Plex Mono,monospace;">Periode: ' + rangeStr + '</div></div>';
+
+    html += '<div class="report-summary">';
+    html += '<div class="report-summary-card"><div class="report-summary-icon"><i class="bi bi-clipboard-check"></i></div><div class="report-summary-data"><span class="report-summary-num">' + filtered.length + '</span><span class="report-summary-label">Tugas Utama</span></div><div class="report-summary-stat">' + doneTasks + '/' + filtered.length + ' Selesai</div></div>';
+    html += '<div class="report-summary-card"><div class="report-summary-icon"><i class="bi bi-list-check"></i></div><div class="report-summary-data"><span class="report-summary-num">' + totalTodos + '</span><span class="report-summary-label">Sub Tugas</span></div><div class="report-summary-stat">' + doneTodos + '/' + totalTodos + ' Selesai</div></div>';
+    html += '<div class="report-summary-card"><div class="report-summary-icon" style="' + (overdueTodos > 0 ? 'color:var(--status-risk);' : '') + '"><i class="bi bi-exclamation-triangle"></i></div><div class="report-summary-data"><span class="report-summary-num" style="' + (overdueTodos > 0 ? 'color:var(--status-risk);' : '') + '">' + overdueTodos + '</span><span class="report-summary-label">Overdue</span></div><div class="report-summary-stat">' + (overdueTodos > 0 ? 'Ada keterlambatan' : 'No Overdue') + '</div></div>';
+    html += '<div class="report-summary-card"><div class="report-summary-icon"><i class="bi bi-graph-up"></i></div><div class="report-summary-data"><span class="report-summary-num">' + avgProgress + '%</span><span class="report-summary-label">Progres Rata-rata</span></div><div class="report-summary-stat">Dari ' + filtered.length + ' tugas</div></div>';
+    html += '</div>';
 
     filtered.forEach((task, idx) => {
       html += '<div class="report-section">';
       html += '<div class="report-section-title"><i class="bi bi-folder"></i> ' + (idx+1) + '. ' + escapeHtml(task.name) + '</div>';
       html += '<div class="report-task-meta">Kategori: ' + escapeHtml(task.cat || '-') + ' &bull; Assignee: ' + escapeHtml(task.assignee || '-') + ' &bull; Mulai: ' + fmt(task.start) + ' &bull; Selesai: ' + fmt(task.end) + '</div>';
-      const progressColor = task.progress >= 100 ? 'var(--status-done)' : task.progress > 0 ? 'var(--status-progress)' : 'var(--ink-faint)';
-      html += '<div style="margin:6px 0 10px;"><span class="report-progress" style="background:' + progressColor + '22;color:' + progressColor + ';">Progres: ' + task.progress + '%</span></div>';
+      let actualProgress;
+      if(task.todos && task.todos.length > 0){
+        const taskDone = task.todos.filter(t => t.done).length;
+        actualProgress = Math.round((taskDone / task.todos.length) * 100);
+      } else {
+        actualProgress = task.progress || 0;
+      }
+      const progressColor = actualProgress >= 100 ? 'var(--status-done)' : actualProgress > 0 ? 'var(--status-progress)' : 'var(--ink-faint)';
+      html += '<div style="margin:6px 0 10px;"><span class="report-progress" style="background:' + progressColor + '22;color:' + progressColor + ';">Progres: ' + actualProgress + '%</span></div>';
 
       if(task.todos && task.todos.length > 0){
         html += '<div class="report-section-title" style="font-size:12px;color:var(--ink-soft);margin-bottom:4px;"><i class="bi bi-list-check"></i> Sub Tugas (' + task.todos.length + ')</div>';
@@ -2914,13 +2993,16 @@
         html += '<div class="report-section-title" style="font-size:12px;color:var(--ink-soft);margin-top:10px;margin-bottom:4px;"><i class="bi bi-paperclip"></i> Evidence (' + task.evidences.length + ')</div>';
         task.evidences.forEach(ev => {
           html += '<div class="report-evidence-item">';
-          if(ev.type === 'image'){
+          const isLink = ev.type === 'link' || (!ev.type && ev.link && ev.link !== 'None' && ev.link !== 'null');
+          const isImage = ev.type === 'image';
+          if(isImage){
             const imgSrc = '/' + ev.link;
             html += '<img src="' + escapeHtml(imgSrc) + '" data-preview="' + escapeHtml(imgSrc) + '" class="report-evidence-img" alt="Evidence">';
             html += '<span>' + escapeHtml(ev.keterangan || 'Gambar') + '</span>';
-          } else if(ev.type === 'link'){
+          } else if(isLink){
             html += '<i class="bi bi-link-45deg"></i>';
-            html += '<a href="' + escapeHtml(ev.link) + '" target="_blank" title="' + escapeHtml(ev.link) + '">' + escapeHtml(ev.keterangan || ev.link) + '</a>';
+            html += '<span>' + escapeHtml(ev.keterangan || '') + '</span>';
+            html += ' <a href="' + escapeHtml(ev.link) + '" target="_blank" title="' + escapeHtml(ev.link) + '">' + escapeHtml(ev.link) + '</a>';
           } else {
             html += '<i class="bi bi-fonts"></i>';
             html += '<span class="report-evidence-text">' + escapeHtml(ev.keterangan || '-') + '</span>';
