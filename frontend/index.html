@@ -2444,7 +2444,7 @@
   }
 
   function updateProgressFromTodos(task){
-    if(!task.todos || task.todos.length===0) return;
+    if(!task || !task.todos || task.todos.length===0) return;
     const done = task.todos.filter(t=>t.done).length;
     task.progress = Math.round((done / task.todos.length) * 100);
     els.fProgress.value = task.progress;
