@@ -2938,11 +2938,11 @@
 
   /* ---------------- Report ---------------- */
   function openReportModal(){
-    const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    const midMonth = new Date(now.getFullYear(), now.getMonth(), 15);
-    els.rStart.value = fmt(firstDay);
-    els.rEnd.value = fmt(midMonth);
+    const todayDate = new Date();
+    const weekAgo = new Date(todayDate);
+    weekAgo.setDate(todayDate.getDate() - 7);
+    els.rStart.value = fmt(weekAgo);
+    els.rEnd.value = fmt(todayDate);
     els.reportContent.innerHTML = '';
     els.reportOverlay.classList.add('open');
   }
@@ -3093,9 +3093,11 @@
       document.documentElement.setAttribute('data-theme', 'light');
     }
     el.classList.add('report-print-light');
+    const fmtFile = (val) => val.split('-').reverse().join('');
+    const fileName = 'report-' + fmtFile(els.rStart.value) + '-' + fmtFile(els.rEnd.value) + '.pdf';
     const opt = {
       margin:       [10, 10, 10, 10],
-      filename:     'laporan-tugas.pdf',
+      filename:     fileName,
       image:        { type:'jpeg', quality:0.98 },
       html2canvas:  { scale:2, useCORS:true },
       jsPDF:        { unit:'mm', format:'a4', orientation:'portrait' }
