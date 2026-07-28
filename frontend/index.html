@@ -266,6 +266,7 @@
   [data-theme="dark"] .restore-history-status.Restored{ background:rgba(63,143,99,0.2); }
   [data-theme="dark"] .restore-history-status.Failed{ background:rgba(181,72,47,0.2); }
   [data-theme="dark"] .restore-history-status.BackedUp{ background:rgba(201,154,59,0.2); color:var(--gold); }
+  [data-theme="dark"] .scroll-area::before{ background:linear-gradient(to bottom, rgba(0,0,0,.55) 0%, transparent 100%); }
 
   /* ---------- Scroll Area ---------- */
   .scroll-area{
@@ -273,7 +274,23 @@
     min-height:0;
     overflow-y:auto;
     padding-bottom:clamp(12px,3.5vw,28px);
+    position:relative;
   }
+  .scroll-area::before{
+    content:'';
+    position:sticky;
+    display:block;
+    left:0; right:0;
+    height:24px;
+    pointer-events:none;
+    z-index:4;
+    opacity:0;
+    transition:opacity .25s ease;
+    flex-shrink:0;
+    top:0;
+    background:linear-gradient(to bottom, rgba(27,51,80,.3) 0%, transparent 100%);
+  }
+  .scroll-area.scrolled-top::before{ opacity:1; }
 
   /* ---------- Legend ---------- */
   .legend{
@@ -1237,9 +1254,9 @@
     </div>
   </header>
 
-  <div class="scroll-area">
   <div class="legend" id="legend"></div>
 
+  <div class="scroll-area">
   <div class="board" id="board">
     <aside class="sidebar">
       <div class="sidebar-head">Daftar Tugas</div>
@@ -2634,6 +2651,17 @@
   initTheme();
 
   els.timelineWrap.addEventListener('scroll', syncRulerScroll);
+
+  /* ---------- Scroll Area Shadow ---------- */
+  const scrollArea = document.querySelector('.scroll-area');
+  if(scrollArea){
+    function updateScrollShadow(){
+      const {scrollTop} = scrollArea;
+      scrollArea.classList.toggle('scrolled-top', scrollTop > 4);
+    }
+    scrollArea.addEventListener('scroll', updateScrollShadow);
+    updateScrollShadow();
+  }
 
   /* ---------------- Init ---------------- */
   loadTasks();
