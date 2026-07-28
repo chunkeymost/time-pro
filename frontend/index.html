@@ -784,7 +784,7 @@
     background:var(--paper);
     transition:all .15s;
   }
-  .evidence-type-option:first-child span{ border-right:1px solid var(--paper-line-strong); }
+  .evidence-type-option:not(:last-child) span{ border-right:1px solid var(--paper-line-strong); }
   .evidence-type-option input:checked + span{
     color:var(--ink);
     background:var(--gold-soft);
@@ -811,6 +811,30 @@
     outline:none;
   }
   .evidence-add-row input:focus{ outline:2px solid var(--gold); outline-offset:1px; }
+  .evidence-add-row input[type=file]{
+    padding:6px 10px;
+    font-size:12px;
+    font-family:'Inter', sans-serif;
+    color:var(--ink);
+    background:var(--paper);
+    border:1px solid var(--paper-line-strong);
+    border-radius:7px;
+    cursor:pointer;
+  }
+  .evidence-add-row input[type=file]::file-selector-button{
+    padding:4px 12px;
+    border-radius:5px;
+    border:1px solid var(--paper-line-strong);
+    background:var(--surface);
+    color:var(--ink);
+    font-family:'Inter', sans-serif;
+    font-size:11px;
+    cursor:pointer;
+    margin-right:8px;
+  }
+  .evidence-add-row input[type=file]::file-selector-button:hover{
+    background:var(--paper);
+  }
   .evidence-add .btn{ font-size:12px; padding:7px 12px; white-space:nowrap; align-self:flex-end; }
   .evidence-text-input{
     width:100%;
@@ -878,6 +902,65 @@
   .evidence-table tbody tr:hover .evidence-del-btn{ opacity:1; }
   .evidence-del-btn:hover{ color:var(--status-risk); }
   .evidence-empty{ padding:16px 4px; color:var(--ink-faint); font-size:12px; }
+  .evidence-img-thumb{
+    width:60px; height:40px;
+    object-fit:cover;
+    border-radius:4px;
+    cursor:pointer;
+    border:1px solid var(--paper-line-strong);
+    transition:opacity .15s;
+    vertical-align:middle;
+  }
+  .evidence-img-thumb:hover{ opacity:.75; }
+  .evidence-img-placeholder{
+    color:var(--ink-faint);
+    font-size:11px;
+    font-style:italic;
+  }
+
+  /* ---------- Image Preview Lightbox ---------- */
+  .img-preview-overlay{
+    position:fixed; inset:0;
+    background:rgba(0,0,0,.85);
+    z-index:100;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    cursor:pointer;
+  }
+  .img-preview-overlay.open{ display:flex; }
+  .img-preview-container{
+    position:relative;
+    max-width:90vw;
+    max-height:90vh;
+    cursor:default;
+  }
+  .img-preview-container img{
+    max-width:100%;
+    max-height:90vh;
+    border-radius:8px;
+    box-shadow:0 8px 40px rgba(0,0,0,.5);
+    display:block;
+  }
+  .img-preview-close{
+    position:absolute;
+    top:-12px; right:-12px;
+    width:32px; height:32px;
+    border-radius:50%;
+    background:var(--surface);
+    border:none;
+    font-size:20px;
+    line-height:1;
+    color:var(--ink);
+    cursor:pointer;
+    box-shadow:0 2px 8px rgba(0,0,0,.3);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition:transform .12s;
+  }
+  .img-preview-close:hover{ transform:scale(1.1); }
 
   /* ---------- Restore Panel ---------- */
   .restore-list{
@@ -1221,6 +1304,10 @@
         <input type="radio" name="evidence-type" value="text">
         <span>Teks</span>
       </label>
+      <label class="evidence-type-option">
+        <input type="radio" name="evidence-type" value="image">
+        <span>Gambar</span>
+      </label>
     </div>
     <div class="evidence-add">
       <div id="evidence-link-mode">
@@ -1231,6 +1318,12 @@
       </div>
       <div id="evidence-text-mode" style="display:none;">
         <textarea id="evidence-text-input" class="evidence-text-input" placeholder="Tulis teks evidence..." rows="4"></textarea>
+      </div>
+      <div id="evidence-image-mode" style="display:none;">
+        <div class="evidence-add-row">
+          <input type="file" id="evidence-file-input" accept="image/*">
+          <input type="text" id="evidence-image-ket-input" placeholder="Keterangan...">
+        </div>
       </div>
       <button class="btn btn-ghost" id="evidence-add-btn">Tambah</button>
     </div>
@@ -1247,6 +1340,14 @@
       </thead>
       <tbody id="evidence-body"></tbody>
     </table>
+  </div>
+</div>
+
+<!-- Image preview lightbox -->
+<div class="img-preview-overlay" id="img-preview-overlay">
+  <div class="img-preview-container">
+    <button class="img-preview-close" id="img-preview-close">&times;</button>
+    <img id="img-preview-img" src="" alt="Preview">
   </div>
 </div>
 
@@ -1383,7 +1484,12 @@
     evidenceLinkInput: document.getElementById('evidence-link-input'),
     evidenceDescInput: document.getElementById('evidence-desc-input'),
     evidenceTextInput: document.getElementById('evidence-text-input'),
+    evidenceImageMode: document.getElementById('evidence-image-mode'),
+    evidenceFileInput: document.getElementById('evidence-file-input'),
+    evidenceImageKetInput: document.getElementById('evidence-image-ket-input'),
     evidenceAddBtn: document.getElementById('evidence-add-btn'),
+    imgPreviewOverlay: document.getElementById('img-preview-overlay'),
+    imgPreviewImg: document.getElementById('img-preview-img'),
   };
 
   /* ---------------- API helper ---------------- */
@@ -2088,12 +2194,15 @@
   }
 
   function switchEvidenceMode(mode){
+    els.evidenceLinkMode.style.display = 'none';
+    els.evidenceTextMode.style.display = 'none';
+    els.evidenceImageMode.style.display = 'none';
     if(mode === 'text'){
-      els.evidenceLinkMode.style.display = 'none';
       els.evidenceTextMode.style.display = '';
+    } else if(mode === 'image'){
+      els.evidenceImageMode.style.display = '';
     } else {
       els.evidenceLinkMode.style.display = '';
-      els.evidenceTextMode.style.display = 'none';
     }
   }
 
@@ -2117,6 +2226,8 @@
     els.evidenceLinkInput.value = '';
     els.evidenceDescInput.value = '';
     els.evidenceTextInput.value = '';
+    els.evidenceFileInput.value = '';
+    els.evidenceImageKetInput.value = '';
   }
 
   function renderEvidences(){
@@ -2131,15 +2242,27 @@
     task.evidences.forEach((ev, i) => {
       const tr = document.createElement('tr');
       const isText = (ev.type === 'text');
-      const evText = isText ? escapeHtml(ev.keterangan || '') : '-';
-      const evLink = !isText && ev.link ? '<a href="'+escapeHtml(ev.link)+'" target="_blank" class="evidence-link-text" title="'+escapeHtml(ev.link)+'">'+escapeHtml(shortenUrl(ev.link))+'</a>' : '-';
-      const evKet = !isText ? escapeHtml(ev.keterangan || '') : '-';
-      const evTextDisplay = isText ? '<span class="evidence-text-cell" title="'+escapeHtml(ev.keterangan || '')+'">'+escapeHtml(truncateText(ev.keterangan, 100))+'</span>' : '-';
+      const isImage = (ev.type === 'image');
+      let evTextDisplay, evLinkDisplay, evKet;
+      if(isImage){
+        const imgSrc = '/' + ev.link;
+        evTextDisplay = '<img src="'+escapeHtml(imgSrc)+'" class="evidence-img-thumb" data-preview="'+escapeHtml(imgSrc)+'" title="Klik untuk preview">';
+        evLinkDisplay = '<span class="evidence-img-placeholder">Gambar</span>';
+        evKet = escapeHtml(ev.keterangan || '');
+      } else if(isText){
+        evTextDisplay = '<span class="evidence-text-cell" title="'+escapeHtml(ev.keterangan || '')+'">'+escapeHtml(truncateText(ev.keterangan, 100))+'</span>';
+        evLinkDisplay = '-';
+        evKet = '-';
+      } else {
+        evTextDisplay = '-';
+        evLinkDisplay = ev.link ? '<a href="'+escapeHtml(ev.link)+'" target="_blank" class="evidence-link-text" title="'+escapeHtml(ev.link)+'">'+escapeHtml(shortenUrl(ev.link))+'</a>' : '-';
+        evKet = escapeHtml(ev.keterangan || '');
+      }
       tr.innerHTML = `
         <td class="evidence-num">${i+1}</td>
         <td class="evidence-date">${ev.created_at ? new Date(ev.created_at).toLocaleDateString('id-ID') : '-'}</td>
         <td class="evidence-text">${evTextDisplay}</td>
-        <td class="evidence-link">${evLink}</td>
+        <td class="evidence-link">${evLinkDisplay}</td>
         <td>${evKet}</td>
         <td class="evidence-del"><button class="evidence-del-btn" data-ev-id="${ev.id}">&times;</button></td>
       `;
@@ -2149,14 +2272,39 @@
         task.evidences = task.evidences.filter(e => e.id !== evId);
         renderEvidences();
       });
+      if(isImage){
+        tr.querySelector('.evidence-img-thumb').addEventListener('click', function(){
+          openImagePreview(this.dataset.preview);
+        });
+      }
       els.evidenceBody.appendChild(tr);
     });
+  }
+
+  async function uploadImageEvidence(task){
+    const file = els.evidenceFileInput.files[0];
+    if(!file){ alert('File gambar harus dipilih.'); return; }
+    const keterangan = els.evidenceImageKetInput.value.trim();
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('keterangan', keterangan);
+    try {
+      const r = await fetch('/api/tasks/'+task.id+'/evidences/image', { method:'POST', body: formData });
+      if(!r.ok){ const e = await r.json(); alert(e.error || 'Gagal upload gambar'); return; }
+      const result = await r.json();
+      if(!task.evidences) task.evidences = [];
+      task.evidences.push(result.evidence);
+      els.evidenceFileInput.value = '';
+      els.evidenceImageKetInput.value = '';
+      renderEvidences();
+    } catch(e){ console.error('Failed to upload image evidence:', e); alert('Gagal upload gambar'); }
   }
 
   els.evidenceAddBtn.addEventListener('click', async ()=>{
     const task = tasks.find(t => t.id === evidenceTaskId);
     if(!task) return;
     const type = document.querySelector('input[name="evidence-type"]:checked').value;
+    if(type === 'image'){ uploadImageEvidence(task); return; }
     let link = '', keterangan = '';
     if(type === 'link'){
       link = els.evidenceLinkInput.value.trim();
@@ -2188,6 +2336,23 @@
   els.evidenceTextInput.addEventListener('keydown', (e)=>{
     if(e.key==='Enter' && e.ctrlKey) els.evidenceAddBtn.click();
   });
+  els.evidenceImageKetInput.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter') els.evidenceAddBtn.click();
+  });
+
+  /* ---------------- Image Preview Lightbox ---------------- */
+  function openImagePreview(src){
+    els.imgPreviewImg.src = src;
+    els.imgPreviewOverlay.classList.add('open');
+  }
+  function closeImagePreview(){
+    els.imgPreviewOverlay.classList.remove('open');
+    els.imgPreviewImg.src = '';
+  }
+  els.imgPreviewOverlay.addEventListener('click', function(e){
+    if(e.target === els.imgPreviewOverlay) closeImagePreview();
+  });
+  document.getElementById('img-preview-close').addEventListener('click', closeImagePreview);
 
   els.todoAddBtn.addEventListener('click', async ()=>{
     const t = tasks.find(x=>x.id===editingId);
@@ -2305,6 +2470,7 @@
     if(e.key==='Escape' && els.overlay.classList.contains('open')) closeModal();
     if(e.key==='Escape' && els.notifOverlay.classList.contains('open')) els.notifOverlay.classList.remove('open');
     if(e.key==='Escape' && els.evidenceOverlay.classList.contains('open')) closeEvidencePanel();
+    if(e.key==='Escape' && els.imgPreviewOverlay.classList.contains('open')) closeImagePreview();
   });
 
   /* ---------------- Inline Title Edit ---------------- */

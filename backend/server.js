@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
+const multer = require('multer');
 const JsonStorage = require('./src/storage/JsonStorage');
 const MysqlStorage = require('./src/storage/MysqlStorage');
 const config = require('./src/config');
@@ -16,6 +18,32 @@ app.use(cors());
 app.use(express.json());
 
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
+
+/* ---------- File Upload (Evidence Images) ---------- */
+
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+const multerStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const name = crypto.randomBytes(12).toString('hex') + ext;
+    cb(null, name);
+  },
+});
+const upload = multer({
+  storage: multerStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!allowed.includes(ext)) return cb(new Error('Format file tidak didukung. Gunakan: ' + allowed.join(', ')), false);
+    cb(null, true);
+  },
+});
+
+app.use('/uploads', express.static(uploadDir));
 
 /* ---------- Tasks ---------- */
 
@@ -240,12 +268,40 @@ app.put('/api/tasks/:id/evidences/:evId', async (req, res) => {
   }
 });
 
+app.post('/api/tasks/:id/evidences/image', (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (err) {
+      const message = err.message === 'Format file tidak didukung. Gunakan: .jpg, .jpeg, .png, .gif, .webp, .bmp, .svg'
+        ? err.message : 'Gagal upload gambar: ' + err.message;
+      return res.status(400).json({ error: message });
+    }
+    next();
+  });
+}, async (req, res) => {
+  try {
+    const taskId = parseInt(req.params.id, 10);
+    if (!req.file) return res.status(400).json({ error: 'File gambar harus diisi.' });
+    const keterangan = req.body.keterangan || '';
+    const ev = await storage.addEvidence(taskId, { type: 'image', link: 'uploads/' + req.file.filename, keterangan });
+    if (!ev) return res.status(404).json({ error: 'Task not found' });
+    res.status(201).json({ evidence: ev });
+  } catch (err) {
+    res.status(400).json({ error: 'Gagal upload gambar: ' + err.message });
+  }
+});
+
 app.delete('/api/tasks/:id/evidences/:evId', async (req, res) => {
   try {
     const taskId = parseInt(req.params.id, 10);
     const evId = parseInt(req.params.evId, 10);
+    const task = await storage.getById(taskId);
+    const ev = task?.evidences?.find(e => e.id === evId);
     const ok = await storage.deleteEvidence(taskId, evId);
     if (!ok) return res.status(404).json({ error: 'Task or Evidence not found' });
+    if (ev && ev.type === 'image' && ev.link) {
+      const filePath = path.join(__dirname, ev.link);
+      fs.unlink(filePath, () => {});
+    }
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
