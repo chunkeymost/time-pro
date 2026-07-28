@@ -4,10 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Proyek Management | as System Analyst</title>
+<link rel="icon" type="image/svg+xml" href="kanban-fill.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22><path fill=%22%231B3350%22 d=%22M2.5 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2zm5 2h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1m-5 1a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1zm9-1h1a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1%22/></svg>">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
   :root{
     --paper:#F6F8FB;
@@ -29,9 +30,28 @@
     --shadow:0 1px 2px rgba(27,51,80,.06), 0 6px 16px rgba(27,51,80,.07);
     --radius:0px;
   }
+  [data-theme="dark"]{
+    --paper:#1a1a2e;
+    --paper-line:#2a2a3e;
+    --paper-line-strong:#3a3a4e;
+    --paper-grid:rgba(255,255,255,0.04);
+    --ink:#e8e8f0;
+    --ink-soft:#a8a8b8;
+    --ink-faint:#787888;
+    --surface:#242438;
+    --gold:#e2b84d;
+    --gold-soft:#3a3020;
+    --status-done:#4CAF50;
+    --status-progress:#42a5f5;
+    --status-planned:#90a4ae;
+    --status-risk:#ef5350;
+    --cut-line:#ef5350;
+    --sky:#4fc3f7;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 6px 16px rgba(0,0,0,.4);
+  }
 
   *{box-sizing:border-box;}
-  html,body{height:100%;}
+  html,body{height:100%; overflow:hidden;}
   body{
     margin:0;
     background:
@@ -48,9 +68,12 @@
 
   /* ---------- App shell ---------- */
   .app{
+    height:100vh;
+    display:flex;
+    flex-direction:column;
     max-width:100%;
     margin:0 auto;
-    padding:clamp(12px,3.5vw,28px) clamp(12px,3.5vw,28px) 60px;
+    padding:clamp(12px,3.5vw,28px) clamp(12px,3.5vw,28px) 0;
   }
 
   /* ---------- Header ---------- */
@@ -62,7 +85,11 @@
     flex-wrap:wrap;
     padding-bottom:20px;
     margin-bottom:22px;
-    position:relative;
+    position:sticky;
+    top:0;
+    z-index:10;
+    background:transparent;
+    flex-shrink:0;
   }
   .title-block{display:flex; flex-direction:column; gap:6px; min-width:280px;}
   .title-row{display:flex; align-items:center; gap:6px;}
@@ -201,16 +228,83 @@
     color:var(--paper);
     box-shadow:var(--shadow);
   }
-  .btn-primary:hover{ background:#142842; }
+  .btn-primary:hover{ background:#142842; color:#fff; }
   .btn-ghost{
     background:var(--surface);
     border:1px solid var(--paper-line-strong);
     color:var(--ink);
   }
   .btn-ghost:hover{ border-color:var(--ink-soft); }
+  .btn-report{
+    background:#3F8F63;
+    color:#fff;
+    border:1px solid #3F8F63;
+    font-size:12.5px;
+    font-weight:600;
+    font-family:'Space Grotesk', sans-serif;
+    padding:10px 16px;
+    border-radius:7px;
+    cursor:pointer;
+    transition:background .15s;
+  }
+  .btn-report:hover{ background:#2d7a50; }
   #backup-btn{ background:#E67E22; border-color:#E67E22; color:#fff; }
   #backup-btn:hover{ background:#D35400; border-color:#D35400; }
   #backup-btn:disabled{ background:#CCC; border-color:#CCC; color:#999; cursor:not-allowed; opacity:0.6; }
+
+  .theme-toggle{
+    font-size:18px;
+    padding:8px 12px;
+    line-height:1;
+  }
+
+  [data-theme="dark"] .btn-primary{
+    background:var(--ink);
+    color:var(--paper);
+  }
+  [data-theme="dark"] .btn-primary:hover{ background:#2a3a50; color:#fff; }
+  [data-theme="dark"] .btn-ghost{
+    background:var(--surface);
+    border-color:var(--paper-line-strong);
+    color:var(--ink);
+  }
+  [data-theme="dark"] .btn-ghost:hover{ border-color:var(--ink-soft); }
+  [data-theme="dark"] .view-toggle button{ background:var(--surface); color:var(--ink-soft); }
+  [data-theme="dark"] .view-toggle button.active{ background:var(--ink); color:var(--paper); }
+  [data-theme="dark"] .view-toggle{ border-color:var(--ink); }
+  [data-theme="dark"] .view-toggle button+button{ border-color:var(--ink); }
+  [data-theme="dark"] .bell-btn:hover{ background:var(--paper); color:var(--ink); }
+  [data-theme="dark"] .toast{ color:#fff; }
+  [data-theme="dark"] .overlay.open{ background:rgba(0,0,0,.55); }
+  [data-theme="dark"] .confirm-overlay{ background:rgba(0,0,0,.6); }
+  [data-theme="dark"] .restore-history-status.Restored{ background:rgba(63,143,99,0.2); }
+  [data-theme="dark"] .restore-history-status.Failed{ background:rgba(181,72,47,0.2); }
+  [data-theme="dark"] .restore-history-status.BackedUp{ background:rgba(201,154,59,0.2); color:var(--gold); }
+  [data-theme="dark"] .scroll-area::before{ background:linear-gradient(to bottom, rgba(0,0,0,.55) 0%, transparent 100%); }
+
+  /* ---------- Scroll Area ---------- */
+  .scroll-area{
+    flex:1;
+    min-height:0;
+    overflow-y:auto;
+    padding-bottom:clamp(12px,3.5vw,28px);
+    position:relative;
+  }
+  .scroll-area::before{
+    content:'';
+    position:sticky;
+    display:block;
+    left:0; right:0;
+    height:24px;
+    pointer-events:none;
+    z-index:4;
+    opacity:0;
+    transition:opacity .25s ease;
+    flex-shrink:0;
+    top:0;
+    background:linear-gradient(to bottom, rgba(27,51,80,.3) 0%, transparent 100%);
+  }
+  .scroll-area.scrolled-top::before{ opacity:1; }
 
   /* ---------- Legend ---------- */
   .legend{
@@ -250,11 +344,11 @@
   .board{
     display:grid;
     grid-template-columns:calc(350px + 7vw) 1fr;
-    border:1px solid var(--paper-line-strong);
+    border:0.1px solid var(--paper-line-strong);
     border-radius:var(--radius);
     background:var(--surface);
     box-shadow:var(--shadow);
-    overflow:hidden;
+    margin-top: -20px;
   }
 
   /* Sidebar */
@@ -264,6 +358,9 @@
     flex-direction:column;
   }
   .sidebar-head{
+    position:sticky;
+    top:0;
+    z-index:3;
     height:56px;
     display:flex;
     align-items:center;
@@ -292,6 +389,12 @@
   .sidebar-row.done{ background:rgba(34,197,94,0.1); }
   .sidebar-row.done:hover{ background:rgba(34,197,94,0.16); }
   .sidebar-row.done.selected{ background:rgba(34,197,94,0.18); }
+  .sidebar-row.overdue{ background:rgba(181,72,47,0.1); }
+  .sidebar-row.overdue:hover{ background:rgba(181,72,47,0.16); }
+  .sidebar-row.overdue.selected{ background:rgba(181,72,47,0.18); }
+  .sidebar-row.overdue .name{ color:var(--status-risk); }
+  .sidebar-row.overdue .meta{ color:var(--status-risk); }
+  .overdue-flag{ flex-shrink:0; font-size:14px; color:var(--status-risk); }
   .sidebar-row-top{ display:flex; align-items:center; gap:6px; }
   .sidebar-row-top .name{ flex:1; min-width:0; }
   .done-flag{ flex-shrink:0; font-size:14px; }
@@ -318,27 +421,36 @@
     color:var(--ink-faint);
     line-height:1.5;
   }
-  .sidebar-add{
-    border-top:1px solid var(--paper-line-strong);
-    padding:12px 14px;
-  }
-  .sidebar-add button{
-    width:100%;
-    justify-content:center;
-  }
-
+  
   /* Timeline */
+  .timeline-group{
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+    min-height:0;
+  }
   .timeline-wrap{
     overflow-x:auto;
+    overflow-y:hidden;
     position:relative;
+    min-width:0;
   }
   .timeline-inner{ position:relative; }
 
   .ruler{
+    position:sticky;
+    top:0;
+    z-index:3;
     height:56px;
-    position:relative;
+    overflow:hidden;
+    flex-shrink:0;
     border-bottom:1px solid var(--paper-line-strong);
-    background:
+    background:var(--surface);
+  }
+  .ruler-scroll{
+    position:relative;
+    height:56px;
+    background-image:
       repeating-linear-gradient(90deg, transparent 0, transparent calc(var(--day-w) - 1px), var(--paper-line) calc(var(--day-w) - 1px), var(--paper-line) var(--day-w));
   }
   .ruler-month{
@@ -392,7 +504,7 @@
     top:0; bottom:0;
     width:2px;
     background:var(--cut-line);
-    z-index:5;
+    z-index:2;
     pointer-events:none;
   }
   .today-line::before{
@@ -405,8 +517,9 @@
     letter-spacing:.08em;
     color:var(--cut-line);
     white-space:nowrap;
-    margin-top: 47px;
+    margin-top: 48px;
   }
+  [data-theme="dark"] .today-line::before{ color:#fff; }
   .today-line::after{
     content:'';
     position:absolute;
@@ -440,8 +553,8 @@
     position:relative;
     padding:0 10px;
     font-size:12px;
-    font-weight:600;
-    color:#fff;
+    font-weight:700;
+    color:#000;
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
@@ -453,7 +566,7 @@
     padding-right:10px;
     font-family:'IBM Plex Mono', monospace;
     font-size:10.5px;
-    color:rgba(255,255,255,.85);
+    color:#000;
     pointer-events:none;
   }
   .handle{
@@ -583,7 +696,6 @@
     display:flex;
     justify-content:space-between;
     align-items:center;
-    margin-top:20px;
     gap:10px;
   }
   .link-danger{
@@ -754,12 +866,46 @@
   .overlay.open .evidence-modal{
     transform:translateX(0);
   }
+  /* Evidence type toggle */
+  .evidence-type-toggle{
+    display:flex;
+    gap:0;
+    margin-bottom:10px;
+    border-radius:7px;
+    overflow:hidden;
+    border:1px solid var(--paper-line-strong);
+  }
+  .evidence-type-option{
+    flex:1;
+    text-align:center;
+    cursor:pointer;
+  }
+  .evidence-type-option input{ display:none; }
+  .evidence-type-option span{
+    display:block;
+    padding:6px 12px;
+    font-size:12px;
+    font-weight:500;
+    color:var(--ink-faint);
+    background:var(--paper);
+    transition:all .15s;
+  }
+  .evidence-type-option:not(:last-child) span{ border-right:1px solid var(--paper-line-strong); }
+  .evidence-type-option input:checked + span{
+    color:var(--ink);
+    background:var(--gold-soft);
+  }
   .evidence-add{
     display:flex;
+    flex-direction:column;
     gap:8px;
     margin-bottom:14px;
   }
-  .evidence-add input{
+  .evidence-add-row{
+    display:flex;
+    gap:8px;
+  }
+  .evidence-add-row input{
     flex:1;
     padding:7px 10px;
     border:1px solid var(--paper-line-strong);
@@ -770,8 +916,47 @@
     background:var(--paper);
     outline:none;
   }
-  .evidence-add input:focus{ outline:2px solid var(--gold); outline-offset:1px; }
-  .evidence-add .btn{ font-size:12px; padding:7px 12px; white-space:nowrap; }
+  .evidence-add-row input:focus{ outline:2px solid var(--gold); outline-offset:1px; }
+  .evidence-add-row input[type=file]{
+    padding:6px 10px;
+    font-size:12px;
+    font-family:'Inter', sans-serif;
+    color:var(--ink);
+    background:var(--paper);
+    border:1px solid var(--paper-line-strong);
+    border-radius:7px;
+    cursor:pointer;
+  }
+  .evidence-add-row input[type=file]::file-selector-button{
+    padding:4px 12px;
+    border-radius:5px;
+    border:1px solid var(--paper-line-strong);
+    background:var(--surface);
+    color:var(--ink);
+    font-family:'Inter', sans-serif;
+    font-size:11px;
+    cursor:pointer;
+    margin-right:8px;
+  }
+  .evidence-add-row input[type=file]::file-selector-button:hover{
+    background:var(--paper);
+  }
+  .evidence-add .btn{ font-size:12px; padding:7px 12px; white-space:nowrap; align-self:flex-end; }
+  .evidence-text-input{
+    width:100%;
+    padding:8px 10px;
+    border:1px solid var(--paper-line-strong);
+    border-radius:7px;
+    font-size:13px;
+    font-family:'Inter', sans-serif;
+    color:var(--ink);
+    background:var(--paper);
+    outline:none;
+    resize:vertical;
+    min-height:80px;
+    box-sizing:border-box;
+  }
+  .evidence-text-input:focus{ outline:2px solid var(--gold); outline-offset:1px; }
   .evidence-table{
     width:100%;
     border-collapse:collapse;
@@ -795,7 +980,8 @@
   }
   .evidence-num{ width:32px; }
   .evidence-date{ width:85px; }
-  .evidence-link{ width:38%; }
+  .evidence-text{ width:30%; word-wrap:break-word; overflow-wrap:break-word; }
+  .evidence-link{ width:25%; }
   .evidence-del{ width:28px; }
   .evidence-table tbody tr:hover{ background:var(--paper); }
   .evidence-link-text{
@@ -805,6 +991,11 @@
     text-decoration:none;
   }
   .evidence-link-text:hover{ text-decoration:underline; }
+  .evidence-text-cell{
+    word-wrap:break-word;
+    overflow-wrap:break-word;
+    max-width:0;
+  }
   .evidence-del-btn{
     background:none; border:none;
     color:var(--ink-faint);
@@ -817,6 +1008,287 @@
   .evidence-table tbody tr:hover .evidence-del-btn{ opacity:1; }
   .evidence-del-btn:hover{ color:var(--status-risk); }
   .evidence-empty{ padding:16px 4px; color:var(--ink-faint); font-size:12px; }
+  .evidence-img-thumb{
+    width:60px; height:40px;
+    object-fit:cover;
+    border-radius:4px;
+    cursor:pointer;
+    border:1px solid var(--paper-line-strong);
+    transition:opacity .15s;
+    vertical-align:middle;
+  }
+  .evidence-img-thumb:hover{ opacity:.75; }
+  .evidence-img-placeholder{
+    color:var(--ink-faint);
+    font-size:11px;
+    font-style:italic;
+  }
+
+  /* ---------- Report Modal ---------- */
+  .report-modal{
+    width:60%;
+    max-width:800px;
+  }
+  .report-section{
+    margin-bottom:20px;
+    padding-bottom:16px;
+    border-bottom:1px dashed var(--paper-line-strong);
+  }
+  .report-section:last-child{ border-bottom:none; }
+  .report-section-title{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:14px;
+    font-weight:600;
+    color:#000;
+    margin-bottom:8px;
+    letter-spacing:.02em;
+  }
+  .report-table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:12.5px;
+    margin-bottom:6px;
+  }
+  .report-table thead th{
+    text-align:left;
+    font-size:10px;
+    font-weight:600;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:#fff;
+    background:#000;
+    padding:5px 6px;
+    border-bottom:1px solid #000;
+  }
+  .report-table tbody td{
+    padding:6px;
+    border-bottom:1px solid var(--paper-line);
+    vertical-align:top;
+  }
+  .report-table tbody tr:hover{ background:var(--paper); }
+  .report-task-name{
+    font-weight:600;
+    color:var(--ink);
+    font-size:13px;
+    margin-bottom:2px;
+  }
+  .report-task-meta{
+    font-size:11px;
+    color:#000;
+    font-family:'IBM Plex Mono', monospace;
+  }
+  .report-progress{
+    display:inline-block;
+    padding:2px 8px;
+    border-radius:10px;
+    font-size:11px;
+    font-weight:600;
+    font-family:'IBM Plex Mono', monospace;
+  }
+  .report-todo-item{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:4px 0;
+    font-size:12.5px;
+  }
+  .report-todo-check{
+    width:14px; height:14px;
+    border:2px solid var(--paper-line-strong);
+    border-radius:3px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    flex-shrink:0;
+    font-size:10px;
+  }
+  .report-todo-check.checked{
+    background:var(--status-done);
+    border-color:var(--status-done);
+    color:#fff;
+  }
+  .report-todo-text.done{ text-decoration:line-through; color:#888; }
+  .report-todo-due{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    color:#000;
+    white-space:nowrap;
+  }
+  .report-evidence-item{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:3px 0;
+    font-size:12px;
+  }
+  .report-evidence-item img{
+    max-width:400px;
+    border-radius:4px;
+    object-fit:cover;
+    border-radius:4px;
+    border:1px solid var(--paper-line-strong);
+    cursor:pointer;
+  }
+  .report-evidence-item img:hover{ opacity:.75; }
+  .report-evidence-item a{
+    color:#2F6BA3;
+    text-decoration:none;
+    word-break:break-all;
+  }
+  .report-evidence-item a:hover{ text-decoration:underline; }
+  .report-evidence-text{
+    color:#000;
+    font-style:italic;
+  }
+  .report-empty{
+    text-align:center;
+    padding:24px 12px;
+    color:#000;
+    font-size:13px;
+  }
+  .report-overdue{
+    color:#e53935;
+    font-weight:600;
+  }
+  .report-summary{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:10px;
+    margin-bottom:20px;
+    padding-bottom:16px;
+    border-bottom:1px dashed var(--paper-line-strong);
+  }
+  .report-summary-card{
+    background:var(--paper);
+    border-radius:8px;
+    padding:12px;
+    text-align:center;
+    border:1px solid var(--paper-line);
+  }
+  .report-summary-icon{
+    font-size:18px;
+    color:#000;
+    margin-bottom:4px;
+  }
+  .report-summary-data{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+  .report-summary-num{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:22px;
+    font-weight:700;
+    color:#000;
+    line-height:1.2;
+  }
+  .report-summary-label{
+    font-size:11px;
+    color:#000;
+    letter-spacing:.03em;
+    text-transform:uppercase;
+  }
+  .report-summary-stat{
+    margin-top:4px;
+    font-size:11px;
+    color:#000;
+    font-family:'IBM Plex Mono',monospace;
+  }
+
+  /* ---------- Report Dark Mode ---------- */
+  [data-theme="dark"] #report-printable,
+  [data-theme="dark"] #report-printable *{
+    color:#fff !important;
+  }
+  [data-theme="dark"] .report-table thead th{
+    background:#333 !important;
+  }
+  [data-theme="dark"] .report-evidence-item a{
+    color:#74B9FF !important;
+  }
+  [data-theme="dark"] .report-overdue{
+    color:#ef5350 !important;
+  }
+  [data-theme="dark"] .report-todo-text.done{
+    color:#aaa !important;
+  }
+  [data-theme="dark"] .report-table tbody td{
+    border-bottom-color:#444 !important;
+  }
+  [data-theme="dark"] .report-section{
+    border-bottom-color:#444 !important;
+  }
+  [data-theme="dark"] .report-summary-card{
+    background:#333 !important;
+    border-color:#444 !important;
+  }
+
+  /* ---------- Report Print Light Override ---------- */
+  .report-print-light,
+  .report-print-light *{
+    color:#000 !important;
+  }
+  .report-print-light .report-table thead th{
+    background:#000 !important;
+    color:#fff !important;
+  }
+  .report-print-light .report-evidence-item a{
+    color:#2F6BA3 !important;
+  }
+  .report-print-light .report-overdue{
+    color:#e53935 !important;
+  }
+  .report-print-light .report-todo-text.done{
+    color:#888 !important;
+  }
+  .report-print-light .report-summary-card{
+    background:var(--paper) !important;
+    border-color:var(--paper-line) !important;
+  }
+
+  /* ---------- Image Preview Lightbox ---------- */
+  .img-preview-overlay{
+    position:fixed; inset:0;
+    background:rgba(0,0,0,.85);
+    z-index:100;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    cursor:pointer;
+  }
+  .img-preview-overlay.open{ display:flex; }
+  .img-preview-container{
+    position:relative;
+    max-width:90vw;
+    max-height:90vh;
+    cursor:default;
+  }
+  .img-preview-container img{
+    max-width:100%;
+    max-height:90vh;
+    border-radius:8px;
+    box-shadow:0 8px 40px rgba(0,0,0,.5);
+    display:block;
+  }
+  .img-preview-close{
+    position:absolute;
+    top:-12px; right:-12px;
+    width:32px; height:32px;
+    border-radius:50%;
+    background:var(--surface);
+    border:none;
+    font-size:20px;
+    line-height:1;
+    color:var(--ink);
+    cursor:pointer;
+    box-shadow:0 2px 8px rgba(0,0,0,.3);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition:transform .12s;
+  }
+  .img-preview-close:hover{ transform:scale(1.1); }
 
   /* ---------- Restore Panel ---------- */
   .restore-list{
@@ -837,6 +1309,21 @@
     transition:border-color .15s;
   }
   .restore-item:hover{ border-color:var(--gold); }
+  .restore-item.latest{ border-color:var(--status-done); background:rgba(63,143,99,0.06); }
+  .restore-item.latest .restore-filename{ color:var(--status-done); }
+  .restore-item.latest .restore-date{ color:var(--status-done); }
+  .restore-latest-badge{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:10px;
+    font-weight:700;
+    padding:3px 8px;
+    border-radius:4px;
+    background:var(--status-done);
+    color:#fff;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    white-space:nowrap;
+  }
   .restore-info{ display:flex; flex-direction:column; gap:2px; }
   .restore-filename{
     font-family:'IBM Plex Mono', monospace;
@@ -985,6 +1472,7 @@
       <span class="project-sub" id="project-range">—</span>
     </div>
     <div class="header-actions">
+      <button class="btn btn-ghost theme-toggle" id="theme-toggle" title="Toggle Dark Mode"><i class="bi bi-moon-fill"></i></button>
       <button class="btn btn-ghost" id="backup-btn">KEPT ON IT</button>
       <button class="btn btn-ghost" id="restore-btn">RESTORE</button>
       <div class="view-toggle" id="view-toggle">
@@ -993,6 +1481,7 @@
       </div>
       <button class="btn btn-primary" id="add-task-btn">+ TUGAS BARU</button>
       <button class="btn btn-ghost" id="today-btn">KE HARI INI</button>
+      <button class="btn btn-report" id="report-btn"><i class="bi bi-journal-text"></i> BUAT REPORT</button>
       <button class="bell-btn" id="bell-btn">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -1005,20 +1494,23 @@
 
   <div class="legend" id="legend"></div>
 
+  <div class="scroll-area">
   <div class="board" id="board">
     <aside class="sidebar">
       <div class="sidebar-head">Daftar Tugas</div>
       <div class="sidebar-list" id="sidebar-list"></div>
-      <div class="sidebar-add">
-        <button class="btn btn-ghost" id="add-task-btn-2">+ Tambah Tugas</button>
-      </div>
     </aside>
-    <div class="timeline-wrap" id="timeline-wrap">
-      <div class="timeline-inner" id="timeline-inner">
-        <div class="ruler" id="ruler"></div>
-        <div class="rows" id="rows"></div>
+    <div class="timeline-group">
+      <div class="ruler" id="ruler">
+        <div class="ruler-scroll" id="ruler-scroll"></div>
+      </div>
+      <div class="timeline-wrap" id="timeline-wrap">
+        <div class="timeline-inner" id="timeline-inner">
+          <div class="rows" id="rows"></div>
+        </div>
       </div>
     </div>
+  </div>
   </div>
 
   <div class="toast-container" id="toast-container"></div>
@@ -1135,10 +1627,37 @@
       <h2>Daftar Evidence</h2>
       <button class="modal-close" id="evidence-close-btn">&times;</button>
     </div>
-    <div class="modal-sub" id="evidence-sub">Kumpulan link evidence tugas.</div>
+    <div class="modal-sub" id="evidence-sub">Kumpulan evidence tugas.</div>
+    <div class="evidence-type-toggle">
+      <label class="evidence-type-option">
+        <input type="radio" name="evidence-type" value="link" checked>
+        <span>Link</span>
+      </label>
+      <label class="evidence-type-option">
+        <input type="radio" name="evidence-type" value="text">
+        <span>Teks</span>
+      </label>
+      <label class="evidence-type-option">
+        <input type="radio" name="evidence-type" value="image">
+        <span>Gambar</span>
+      </label>
+    </div>
     <div class="evidence-add">
-      <input type="text" id="evidence-link-input" placeholder="Link Evidence (URL)...">
-      <input type="text" id="evidence-desc-input" placeholder="Keterangan...">
+      <div id="evidence-link-mode">
+        <div class="evidence-add-row">
+          <input type="text" id="evidence-link-input" placeholder="Link Evidence (URL)...">
+          <input type="text" id="evidence-desc-input" placeholder="Keterangan...">
+        </div>
+      </div>
+      <div id="evidence-text-mode" style="display:none;">
+        <textarea id="evidence-text-input" class="evidence-text-input" placeholder="Tulis teks evidence..." rows="4"></textarea>
+      </div>
+      <div id="evidence-image-mode" style="display:none;">
+        <div class="evidence-add-row">
+          <input type="file" id="evidence-file-input" accept="image/*">
+          <input type="text" id="evidence-image-ket-input" placeholder="Keterangan...">
+        </div>
+      </div>
       <button class="btn btn-ghost" id="evidence-add-btn">Tambah</button>
     </div>
     <table class="evidence-table">
@@ -1146,13 +1665,51 @@
         <tr>
           <th class="evidence-num">No.</th>
           <th class="evidence-date">Tanggal</th>
-          <th class="evidence-link">Link Evidence</th>
+          <th class="evidence-text">Evidence</th>
+          <th class="evidence-link">Link</th>
           <th>Keterangan</th>
           <th class="evidence-del"></th>
         </tr>
       </thead>
       <tbody id="evidence-body"></tbody>
     </table>
+  </div>
+</div>
+
+<!-- Report modal -->
+<div class="overlay" id="report-overlay">
+  <div class="modal report-modal">
+    <div class="modal-head">
+      <h2><i class="bi bi-journal-text"></i> RINGKASAN LAPORAN</h2>
+      <button class="modal-close" id="report-close-btn">&times;</button>
+    </div>
+    <div class="modal-sub">Pilih periode tanggal untuk melihat ringkasan tugas.</div>
+
+    <div class="row-2">
+      <div class="field">
+        <label for="r-start">Tanggal Mulai</label>
+        <input type="date" id="r-start">
+      </div>
+      <div class="field">
+        <label for="r-end">Tanggal Selesai</label>
+        <input type="date" id="r-end">
+      </div>
+    </div>
+
+    <div id="report-content"></div>
+
+    <div class="modal-actions" style="justify-content:flex-end;">
+      <button class="btn btn-primary" id="report-generate-btn"><i class="bi bi-funnel"></i> TAMPILKAN</button>
+      <button class="btn btn-primary" id="export-pdf-btn"><i class="bi bi-file-earmark-pdf"></i> Export PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- Image preview lightbox -->
+<div class="img-preview-overlay" id="img-preview-overlay">
+  <div class="img-preview-container">
+    <button class="img-preview-close" id="img-preview-close">&times;</button>
+    <img id="img-preview-img" src="" alt="Preview">
   </div>
 </div>
 
@@ -1283,9 +1840,22 @@
     evidenceOverlay: document.getElementById('evidence-overlay'),
     evidenceBody: document.getElementById('evidence-body'),
     evidenceSub: document.getElementById('evidence-sub'),
+    evidenceTypeRadios: document.querySelectorAll('input[name="evidence-type"]'),
+    evidenceLinkMode: document.getElementById('evidence-link-mode'),
+    evidenceTextMode: document.getElementById('evidence-text-mode'),
     evidenceLinkInput: document.getElementById('evidence-link-input'),
     evidenceDescInput: document.getElementById('evidence-desc-input'),
+    evidenceTextInput: document.getElementById('evidence-text-input'),
+    evidenceImageMode: document.getElementById('evidence-image-mode'),
+    evidenceFileInput: document.getElementById('evidence-file-input'),
+    evidenceImageKetInput: document.getElementById('evidence-image-ket-input'),
     evidenceAddBtn: document.getElementById('evidence-add-btn'),
+    imgPreviewOverlay: document.getElementById('img-preview-overlay'),
+    imgPreviewImg: document.getElementById('img-preview-img'),
+    reportOverlay: document.getElementById('report-overlay'),
+    reportContent: document.getElementById('report-content'),
+    rStart: document.getElementById('r-start'),
+    rEnd: document.getElementById('r-end'),
   };
 
   /* ---------------- API helper ---------------- */
@@ -1402,8 +1972,10 @@
     const totalDays = dayDiff(range.start, range.end)+1;
     els.timelineInner.style.setProperty('--day-w', dayWidth+'px');
     els.timelineInner.style.width = (totalDays*dayWidth)+'px';
-    els.ruler.innerHTML = '';
-    els.ruler.style.width = (totalDays*dayWidth)+'px';
+    els.ruler.style.setProperty('--day-w', dayWidth+'px');
+    const rs = document.getElementById('ruler-scroll');
+    rs.innerHTML = '';
+    rs.style.width = (totalDays*dayWidth)+'px';
 
     let lastMonth = null;
     for(let i=0;i<totalDays;i++){
@@ -1415,7 +1987,7 @@
         label.className='ruler-month';
         label.style.left = x+'px';
         label.textContent = `${MONTHS_ID[d.getMonth()]} ${d.getFullYear()}`;
-        els.ruler.appendChild(label);
+        rs.appendChild(label);
       }
 
       if(view==='week' && dayWidth>=28){
@@ -1424,19 +1996,19 @@
         dayLbl.className = 'ruler-day' + (isWeekend?' weekend':'');
         dayLbl.style.left = x+'px';
         dayLbl.textContent = d.getDate();
-        els.ruler.appendChild(dayLbl);
+        rs.appendChild(dayLbl);
       } else if(d.getDay()===1) {
         const dayLbl = document.createElement('div');
         dayLbl.className = 'ruler-day';
         dayLbl.style.left = x+'px';
         dayLbl.textContent = d.getDate()+' '+MONTHS_ID[d.getMonth()];
-        els.ruler.appendChild(dayLbl);
+        rs.appendChild(dayLbl);
       }
 
       const tick = document.createElement('div');
       tick.className='ruler-tick';
       tick.style.left = x+'px';
-      els.ruler.appendChild(tick);
+      rs.appendChild(tick);
     }
   }
 
@@ -1581,11 +2153,13 @@
     tasks.forEach(t=>{
       const row = document.createElement('div');
       const isDone = t.progress === 100;
-      row.className = 'sidebar-row' + (t.id===selectedId ? ' selected':'') + (isDone ? ' done':'');
+      const isOverdue = !isDone && t.end && t.end < today();
+      row.className = 'sidebar-row' + (t.id===selectedId ? ' selected':'') + (isDone ? ' done':'') + (isOverdue ? ' overdue':'');
       row.innerHTML = `
         <div class="sidebar-row-top">
           <span class="name">${escapeHtml(t.name)}</span>
           ${isDone ? '<span class="done-flag">🏁</span>' : ''}
+          ${isOverdue ? '<span class="overdue-flag"><i class="bi bi-bell-fill"></i></span>' : ''}
         </div>
         <span class="meta"><span class="tag-dot ${(CATS[t.cat] ?? CATS.lainnya).cls}"></span>${(CATS[t.cat] ?? CATS.lainnya).label} · ${t.progress}% · ${countWeekdays(t.start,t.end)} Hari Pengerjaan</span>
       `;
@@ -1653,6 +2227,12 @@
   function scrollToTodayLine(range){
     const offset = dayDiff(range.start, T)*dayWidth;
     els.timelineWrap.scrollLeft = Math.max(offset - 200, 0);
+    syncRulerScroll();
+  }
+
+  function syncRulerScroll(){
+    const rs = document.getElementById('ruler-scroll');
+    if(rs) rs.style.transform = `translateX(${-els.timelineWrap.scrollLeft}px)`;
   }
 
   /* ---------------- View toggle ---------------- */
@@ -1718,15 +2298,19 @@
         return;
       }
       restoreList.innerHTML = '';
-      data.backups.forEach(b => {
+      data.backups.forEach((b, i) => {
+        const isLatest = i === 0;
         const item = document.createElement('div');
-        item.className = 'restore-item';
+        item.className = 'restore-item' + (isLatest ? ' latest' : '');
         item.innerHTML = `
           <div class="restore-info">
             <span class="restore-filename">${b.filename}</span>
             <span class="restore-date">${b.date || ''}</span>
           </div>
-          <button class="restore-btn" data-file="${b.filename}">Restore</button>
+          <div style="display:flex;align-items:center;gap:8px;">
+            ${isLatest ? '<span class="restore-latest-badge">Latest</span>' : ''}
+            <button class="restore-btn" data-file="${b.filename}">Restore</button>
+          </div>
         `;
         restoreList.appendChild(item);
       });
@@ -1796,6 +2380,7 @@
     }
     renderTodos(task);
     updateProgressSlider(task);
+    updateProgressFromTodos(task);
     els.overlay.classList.add('open');
     els.fName.focus();
   }
@@ -1859,7 +2444,7 @@
   }
 
   function updateProgressFromTodos(task){
-    if(!task.todos || task.todos.length===0) return;
+    if(!task || !task.todos || task.todos.length===0) return;
     const done = task.todos.filter(t=>t.done).length;
     task.progress = Math.round((done / task.todos.length) * 100);
     els.fProgress.value = task.progress;
@@ -1978,8 +2563,34 @@
   /* ---------------- Evidence Panel ---------------- */
   let evidenceTaskId = null;
 
+  function truncateText(text, maxLen){
+    if(!text) return '';
+    return text.length > maxLen ? text.slice(0, maxLen) + '...' : text;
+  }
+
+  function switchEvidenceMode(mode){
+    els.evidenceLinkMode.style.display = 'none';
+    els.evidenceTextMode.style.display = 'none';
+    els.evidenceImageMode.style.display = 'none';
+    if(mode === 'text'){
+      els.evidenceTextMode.style.display = '';
+    } else if(mode === 'image'){
+      els.evidenceImageMode.style.display = '';
+    } else {
+      els.evidenceLinkMode.style.display = '';
+    }
+  }
+
+  els.evidenceTypeRadios.forEach(radio => {
+    radio.addEventListener('change', function(){
+      if(this.checked) switchEvidenceMode(this.value);
+    });
+  });
+
   function openEvidencePanel(taskId){
     evidenceTaskId = taskId;
+    document.querySelector('input[name="evidence-type"][value="link"]').checked = true;
+    switchEvidenceMode('link');
     renderEvidences();
     els.evidenceOverlay.classList.add('open');
   }
@@ -1989,24 +2600,45 @@
     evidenceTaskId = null;
     els.evidenceLinkInput.value = '';
     els.evidenceDescInput.value = '';
+    els.evidenceTextInput.value = '';
+    els.evidenceFileInput.value = '';
+    els.evidenceImageKetInput.value = '';
   }
 
   function renderEvidences(){
     els.evidenceBody.innerHTML = '';
     const task = tasks.find(t => t.id === evidenceTaskId);
     if(!task || !task.evidences || task.evidences.length === 0){
-      els.evidenceBody.innerHTML = '<tr><td colspan="5" class="evidence-empty">Belum ada evidence.</td></tr>';
-      els.evidenceSub.textContent = 'Belum ada link evidence.';
+      els.evidenceBody.innerHTML = '<tr><td colspan="6" class="evidence-empty">Belum ada evidence.</td></tr>';
+      els.evidenceSub.textContent = 'Belum ada evidence.';
       return;
     }
-    els.evidenceSub.textContent = 'Kumpulan link evidence tugas.';
+    els.evidenceSub.textContent = 'Daftar evidence tugas.';
     task.evidences.forEach((ev, i) => {
       const tr = document.createElement('tr');
+      const isText = (ev.type === 'text');
+      const isImage = (ev.type === 'image');
+      let evTextDisplay, evLinkDisplay, evKet;
+      if(isImage){
+        const imgSrc = '/' + ev.link;
+        evTextDisplay = '<img src="'+escapeHtml(imgSrc)+'" class="evidence-img-thumb" data-preview="'+escapeHtml(imgSrc)+'" title="Klik untuk preview">';
+        evLinkDisplay = '<span class="evidence-img-placeholder">Gambar</span>';
+        evKet = escapeHtml(ev.keterangan || '');
+      } else if(isText){
+        evTextDisplay = '<span class="evidence-text-cell" title="'+escapeHtml(ev.keterangan || '')+'">'+escapeHtml(truncateText(ev.keterangan, 100))+'</span>';
+        evLinkDisplay = '-';
+        evKet = '-';
+      } else {
+        evTextDisplay = '-';
+        evLinkDisplay = ev.link ? '<a href="'+escapeHtml(ev.link)+'" target="_blank" class="evidence-link-text" title="'+escapeHtml(ev.link)+'">'+escapeHtml(shortenUrl(ev.link))+'</a>' : '-';
+        evKet = escapeHtml(ev.keterangan || '');
+      }
       tr.innerHTML = `
         <td class="evidence-num">${i+1}</td>
         <td class="evidence-date">${ev.created_at ? new Date(ev.created_at).toLocaleDateString('id-ID') : '-'}</td>
-        <td class="evidence-link"><a href="${escapeHtml(ev.link)}" target="_blank" class="evidence-link-text" title="${escapeHtml(ev.link)}">${escapeHtml(shortenUrl(ev.link))}</a></td>
-        <td>${escapeHtml(ev.keterangan || '')}</td>
+        <td class="evidence-text">${evTextDisplay}</td>
+        <td class="evidence-link">${evLinkDisplay}</td>
+        <td>${evKet}</td>
         <td class="evidence-del"><button class="evidence-del-btn" data-ev-id="${ev.id}">&times;</button></td>
       `;
       tr.querySelector('.evidence-del-btn').addEventListener('click', async function(){
@@ -2015,24 +2647,58 @@
         task.evidences = task.evidences.filter(e => e.id !== evId);
         renderEvidences();
       });
+      if(isImage){
+        tr.querySelector('.evidence-img-thumb').addEventListener('click', function(){
+          openImagePreview(this.dataset.preview);
+        });
+      }
       els.evidenceBody.appendChild(tr);
     });
+  }
+
+  async function uploadImageEvidence(task){
+    const file = els.evidenceFileInput.files[0];
+    if(!file){ alert('File gambar harus dipilih.'); return; }
+    const keterangan = els.evidenceImageKetInput.value.trim();
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('keterangan', keterangan);
+    try {
+      const r = await fetch('/api/tasks/'+task.id+'/evidences/image', { method:'POST', body: formData });
+      if(!r.ok){ const e = await r.json(); alert(e.error || 'Gagal upload gambar'); return; }
+      const result = await r.json();
+      if(!task.evidences) task.evidences = [];
+      task.evidences.push(result.evidence);
+      els.evidenceFileInput.value = '';
+      els.evidenceImageKetInput.value = '';
+      renderEvidences();
+    } catch(e){ console.error('Failed to upload image evidence:', e); alert('Gagal upload gambar'); }
   }
 
   els.evidenceAddBtn.addEventListener('click', async ()=>{
     const task = tasks.find(t => t.id === evidenceTaskId);
     if(!task) return;
-    const link = els.evidenceLinkInput.value.trim();
-    if(!link){ alert('Link evidence harus diisi.'); return; }
-    const keterangan = els.evidenceDescInput.value.trim();
+    const type = document.querySelector('input[name="evidence-type"]:checked').value;
+    if(type === 'image'){ uploadImageEvidence(task); return; }
+    let link = '', keterangan = '';
+    if(type === 'link'){
+      link = els.evidenceLinkInput.value.trim();
+      if(!link){ alert('Link evidence harus diisi.'); return; }
+      keterangan = els.evidenceDescInput.value.trim();
+    } else {
+      keterangan = els.evidenceTextInput.value.trim();
+      if(!keterangan){ alert('Teks evidence harus diisi.'); return; }
+    }
     try {
-      const result = await api.post('/api/tasks/'+task.id+'/evidences', { link, keterangan });
+      const result = await api.post('/api/tasks/'+task.id+'/evidences', { type, link, keterangan });
       if(!task.evidences) task.evidences = [];
       task.evidences.push(result.evidence);
       els.evidenceLinkInput.value = '';
       els.evidenceDescInput.value = '';
+      els.evidenceTextInput.value = '';
       renderEvidences();
-      els.evidenceLinkInput.focus();
+      if(type === 'link') els.evidenceLinkInput.focus();
+      else els.evidenceTextInput.focus();
     } catch(e){ console.error('Failed to add evidence:', e); }
   });
 
@@ -2042,6 +2708,26 @@
   els.evidenceDescInput.addEventListener('keydown', (e)=>{
     if(e.key==='Enter') els.evidenceAddBtn.click();
   });
+  els.evidenceTextInput.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter' && e.ctrlKey) els.evidenceAddBtn.click();
+  });
+  els.evidenceImageKetInput.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter') els.evidenceAddBtn.click();
+  });
+
+  /* ---------------- Image Preview Lightbox ---------------- */
+  function openImagePreview(src){
+    els.imgPreviewImg.src = src;
+    els.imgPreviewOverlay.classList.add('open');
+  }
+  function closeImagePreview(){
+    els.imgPreviewOverlay.classList.remove('open');
+    els.imgPreviewImg.src = '';
+  }
+  els.imgPreviewOverlay.addEventListener('click', function(e){
+    if(e.target === els.imgPreviewOverlay) closeImagePreview();
+  });
+  document.getElementById('img-preview-close').addEventListener('click', closeImagePreview);
 
   els.todoAddBtn.addEventListener('click', async ()=>{
     const t = tasks.find(x=>x.id===editingId);
@@ -2127,7 +2813,6 @@
   });
 
   document.getElementById('add-task-btn').addEventListener('click', ()=> openModal(null));
-  document.getElementById('add-task-btn-2').addEventListener('click', ()=> openModal(null));
 
   document.getElementById('evidence-btn').addEventListener('click', ()=>{
     if(editingId) openEvidencePanel(editingId);
@@ -2159,6 +2844,7 @@
     if(e.key==='Escape' && els.overlay.classList.contains('open')) closeModal();
     if(e.key==='Escape' && els.notifOverlay.classList.contains('open')) els.notifOverlay.classList.remove('open');
     if(e.key==='Escape' && els.evidenceOverlay.classList.contains('open')) closeEvidencePanel();
+    if(e.key==='Escape' && els.imgPreviewOverlay.classList.contains('open')) closeImagePreview();
   });
 
   /* ---------------- Inline Title Edit ---------------- */
@@ -2208,6 +2894,238 @@
     if(e.target.id === 'project-title' || e.target.id === 'title-edit-icon'){
       enableTitleEdit();
     }
+  });
+
+  /* ---------------- Theme ---------------- */
+  function setFavicon(){
+    const svg = `<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22><path fill=%22%23FFFFFF%22 d=%22M2.5 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2zm5 2h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1m-5 1a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1zm9-1h1a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1%22/></svg>`;
+    let link = document.querySelector('link[rel="icon"][type="image/svg+xml"]');
+    if(!link){
+      link = document.createElement('link');
+      link.rel = 'icon';
+      link.type = 'image/svg+xml';
+      document.head.appendChild(link);
+    }
+    link.href = 'data:image/svg+xml,' + svg;
+  }
+
+  function setTheme(theme){
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+    const btn = document.getElementById('theme-toggle');
+    if(btn) btn.innerHTML = theme === 'dark' ? '<i class="bi bi-sun-fill"></i>' : '<i class="bi bi-moon-fill"></i>';
+  }
+
+  function initTheme(){
+    const saved = localStorage.getItem('theme');
+    if(saved){ setTheme(saved); return; }
+    if(window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
+    else setTheme('light');
+  }
+
+  setFavicon();
+
+  document.getElementById('theme-toggle').addEventListener('click', function(){
+    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+  });
+
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e){
+    if(!localStorage.getItem('theme')) setTheme(e.matches ? 'dark' : 'light');
+  });
+
+  initTheme();
+
+  els.timelineWrap.addEventListener('scroll', syncRulerScroll);
+
+  /* ---------- Scroll Area Shadow ---------- */
+  const scrollArea = document.querySelector('.scroll-area');
+  if(scrollArea){
+    function updateScrollShadow(){
+      const {scrollTop} = scrollArea;
+      scrollArea.classList.toggle('scrolled-top', scrollTop > 4);
+    }
+    scrollArea.addEventListener('scroll', updateScrollShadow);
+    updateScrollShadow();
+  }
+
+  /* ---------------- Report ---------------- */
+  function openReportModal(){
+    const todayDate = new Date();
+    const weekAgo = new Date(todayDate);
+    weekAgo.setDate(todayDate.getDate() - 7);
+    els.rStart.value = fmt(weekAgo);
+    els.rEnd.value = fmt(todayDate);
+    els.reportContent.innerHTML = '';
+    els.reportOverlay.classList.add('open');
+  }
+
+  function closeReportModal(){
+    els.reportOverlay.classList.remove('open');
+  }
+
+  document.getElementById('report-btn').addEventListener('click', openReportModal);
+  document.getElementById('report-close-btn').addEventListener('click', closeReportModal);
+  els.reportOverlay.addEventListener('click', (e)=>{
+    if(e.target === els.reportOverlay) closeReportModal();
+  });
+
+  function generateReport(){
+    const startDate = parseDate(els.rStart.value);
+    const endDate = parseDate(els.rEnd.value);
+    if(!startDate || !endDate){
+      alert('Mohon isi tanggal mulai dan selesai.');
+      return;
+    }
+    if(startDate > endDate){
+      alert('Tanggal mulai harus sebelum tanggal selesai.');
+      return;
+    }
+
+    const filtered = tasks.filter(t => {
+      if(!t.start) return false;
+      return t.start >= startDate && t.start <= endDate;
+    });
+
+    if(filtered.length === 0){
+      els.reportContent.innerHTML = '<div class="report-empty"><i class="bi bi-inbox" style="font-size:32px;display:block;margin-bottom:8px;color:#000;"></i>Tidak ada tugas dalam periode ini.</div>';
+      return;
+    }
+
+    const rangeStr = els.rStart.value.split('-').reverse().join('/') + ' — ' + els.rEnd.value.split('-').reverse().join('/');
+
+    let totalTodos = 0, doneTodos = 0, overdueTodos = 0, totalProgress = 0, doneTasks = 0;
+    filtered.forEach(task => {
+      let actualProgress;
+      if(task.todos && task.todos.length > 0){
+        const taskDone = task.todos.filter(t => t.done).length;
+        actualProgress = Math.round((taskDone / task.todos.length) * 100);
+        task.todos.forEach(todo => {
+          totalTodos++;
+          if(todo.done) doneTodos++;
+          if(todo.due && !todo.done && todo.due < today()) overdueTodos++;
+        });
+      } else {
+        actualProgress = 0;
+      }
+      totalProgress += actualProgress;
+      if(actualProgress >= 100) doneTasks++;
+    });
+    const avgProgress = filtered.length > 0 ? Math.round(totalProgress / filtered.length) : 0;
+
+    let html = '<div id="report-printable" style="font-family:Inter,sans-serif;color:#000;">';
+    html += '<div style="text-align:center;margin-bottom:16px;"><div style="font-family:Space Grotesk,sans-serif;font-size:18px;font-weight:700;color:#000;">LAPORAN TUGAS</div><div style="font-size:12px;color:#000;font-family:IBM Plex Mono,monospace;">Periode: ' + rangeStr + '</div></div>';
+
+    html += '<div class="report-summary">';
+    html += '<div class="report-summary-card"><div class="report-summary-icon"><i class="bi bi-clipboard-check"></i></div><div class="report-summary-data"><span class="report-summary-num">' + filtered.length + '</span><span class="report-summary-label">Tugas Utama</span></div><div class="report-summary-stat">' + doneTasks + '/' + filtered.length + ' Selesai</div></div>';
+    html += '<div class="report-summary-card"><div class="report-summary-icon"><i class="bi bi-list-check"></i></div><div class="report-summary-data"><span class="report-summary-num">' + totalTodos + '</span><span class="report-summary-label">Sub Tugas</span></div><div class="report-summary-stat">' + doneTodos + '/' + totalTodos + ' Selesai</div></div>';
+    html += '<div class="report-summary-card"><div class="report-summary-icon" style="' + (overdueTodos > 0 ? 'color:#e53935;' : '') + '"><i class="bi bi-exclamation-triangle"></i></div><div class="report-summary-data"><span class="report-summary-num" style="' + (overdueTodos > 0 ? 'color:#e53935;' : '') + '">' + overdueTodos + '</span><span class="report-summary-label">Overdue</span></div><div class="report-summary-stat">' + (overdueTodos > 0 ? 'Ada keterlambatan' : 'No Overdue') + '</div></div>';
+    html += '<div class="report-summary-card"><div class="report-summary-icon"><i class="bi bi-graph-up"></i></div><div class="report-summary-data"><span class="report-summary-num">' + avgProgress + '%</span><span class="report-summary-label">Progres Rata-rata</span></div><div class="report-summary-stat">Dari ' + filtered.length + ' tugas</div></div>';
+    html += '</div>';
+
+    filtered.forEach((task, idx) => {
+      html += '<div class="report-section">';
+      html += '<div class="report-section-title"><i class="bi bi-folder"></i> ' + (idx+1) + '. ' + escapeHtml(task.name) + '</div>';
+      html += '<div class="report-task-meta">Kategori: ' + escapeHtml(task.cat || '-') + ' &bull; Assignee: ' + escapeHtml(task.assignee || '-') + ' &bull; Mulai: ' + fmt(task.start) + ' &bull; Selesai: ' + fmt(task.end) + '</div>';
+      let actualProgress;
+      if(task.todos && task.todos.length > 0){
+        const taskDone = task.todos.filter(t => t.done).length;
+        actualProgress = Math.round((taskDone / task.todos.length) * 100);
+      } else {
+        actualProgress = 0;
+      }
+      const progressColor = actualProgress >= 100 ? 'var(--status-done)' : actualProgress > 0 ? 'var(--status-progress)' : '#000';
+      html += '<div style="margin:6px 0 10px;"><span class="report-progress" style="background:' + progressColor + '22;color:#000;">Progres: ' + actualProgress + '%</span></div>';
+
+      if(task.todos && task.todos.length > 0){
+        html += '<div class="report-section-title" style="font-size:12px;color:#000;margin-bottom:4px;"><i class="bi bi-list-check"></i> Sub Tugas (' + task.todos.length + ')</div>';
+        html += '<table class="report-table"><thead><tr><th style="width:30px;">No.</th><th>Tugas</th><th style="width:100px;">Due Date</th><th style="width:80px;">Status</th></tr></thead><tbody>';
+        task.todos.forEach((todo, ti) => {
+          const isOverdue = todo.due && !todo.done && todo.due < today();
+          html += '<tr>';
+          html += '<td>' + (ti+1) + '</td>';
+          html += '<td><span class="report-todo-text' + (todo.done ? ' done' : '') + '">' + escapeHtml(todo.text) + '</span></td>';
+          html += '<td class="report-todo-due' + (isOverdue ? ' report-overdue' : '') + '">' + (todo.due ? fmt(todo.due) : '—') + '</td>';
+          html += '<td><span class="report-todo-check' + (todo.done ? ' checked' : '') + '">' + (todo.done ? '<i class="bi bi-check"></i>' : '') + '</span></td>';
+          html += '</tr>';
+        });
+        html += '</tbody></table>';
+      } else {
+        html += '<div style="font-size:12px;color:#000;padding:4px 0;">Tidak ada sub tugas.</div>';
+      }
+
+      if(task.evidences && task.evidences.length > 0){
+        html += '<div class="report-section-title" style="font-size:12px;color:#000;margin-top:10px;margin-bottom:4px;"><i class="bi bi-paperclip"></i> Evidence (' + task.evidences.length + ')</div>';
+        task.evidences.forEach(ev => {
+          html += '<div class="report-evidence-item">';
+          const isLink = ev.type === 'link' || (!ev.type && ev.link && ev.link !== 'None' && ev.link !== 'null');
+          const isImage = ev.type === 'image';
+          if(isImage){
+            const imgSrc = '/' + ev.link;
+            html += '<img src="' + escapeHtml(imgSrc) + '" data-preview="' + escapeHtml(imgSrc) + '" class="report-evidence-img" alt="Evidence">';
+            html += '<span>' + escapeHtml(ev.keterangan || 'Gambar') + '</span>';
+          } else if(isLink){
+            html += '<i class="bi bi-link-45deg"></i>';
+            html += '<span>' + escapeHtml(ev.keterangan || '') + '</span>';
+            html += ' <a href="' + escapeHtml(ev.link) + '" target="_blank" title="' + escapeHtml(ev.link) + '">' + escapeHtml(ev.link) + '</a>';
+          } else {
+            html += '<i class="bi bi-fonts"></i>';
+            html += '<span class="report-evidence-text">' + escapeHtml(ev.keterangan || '-') + '</span>';
+          }
+          html += '</div>';
+        });
+      }
+
+      html += '</div>';
+    });
+
+    html += '</div>';
+    els.reportContent.innerHTML = html;
+  }
+
+  document.getElementById('report-generate-btn').addEventListener('click', generateReport);
+
+  els.reportContent.addEventListener('click', (e)=>{
+    if(e.target.classList.contains('report-evidence-img')){
+      openImagePreview(e.target.dataset.preview);
+    }
+  });
+
+  document.getElementById('export-pdf-btn').addEventListener('click', ()=>{
+    const el = document.getElementById('report-printable');
+    if(!el){
+      alert('Mohon generate report terlebih dahulu.');
+      return;
+    }
+    if(typeof html2pdf === 'undefined'){
+      alert('Library PDF belum dimuat. Silakan coba lagi.');
+      return;
+    }
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    if(currentTheme === 'dark'){
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+    el.classList.add('report-print-light');
+    const fmtFile = (val) => val.split('-').reverse().join('');
+    const fileName = 'report-' + fmtFile(els.rStart.value) + '-' + fmtFile(els.rEnd.value) + '.pdf';
+    const opt = {
+      margin:       [10, 10, 10, 10],
+      filename:     fileName,
+      image:        { type:'jpeg', quality:0.98 },
+      html2canvas:  { scale:2, useCORS:true },
+      jsPDF:        { unit:'mm', format:'a4', orientation:'portrait' }
+    };
+    html2pdf().set(opt).from(el).save().then(()=>{
+      el.classList.remove('report-print-light');
+      if(currentTheme === 'dark'){
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    }).catch(()=>{
+      el.classList.remove('report-print-light');
+      if(currentTheme === 'dark'){
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    });
   });
 
   /* ---------------- Init ---------------- */

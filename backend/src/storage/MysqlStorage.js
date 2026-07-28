@@ -30,13 +30,14 @@ class MysqlStorage {
       }
 
       const [evidences] = await conn.execute(
-        'SELECT id, task_id, link, keterangan, created_at FROM evidences WHERE deleted_at IS NULL ORDER BY id'
+        'SELECT id, type, task_id, link, keterangan, created_at FROM evidences WHERE deleted_at IS NULL ORDER BY id'
       );
       const evidenceMap = {};
       for (const e of evidences) {
         if (!evidenceMap[e.task_id]) evidenceMap[e.task_id] = [];
         evidenceMap[e.task_id].push({
           id: e.id,
+          type: e.type,
           link: e.link,
           keterangan: e.keterangan,
           created_at: e.created_at ? e.created_at.toISOString() : null,
@@ -103,7 +104,7 @@ class MysqlStorage {
       );
 
       const [evidences] = await conn.execute(
-        'SELECT id, link, keterangan, created_at FROM evidences WHERE task_id = ? AND deleted_at IS NULL',
+        'SELECT id, type, link, keterangan, created_at FROM evidences WHERE task_id = ? AND deleted_at IS NULL',
         [id]
       );
 
@@ -124,6 +125,7 @@ class MysqlStorage {
         })),
         evidences: evidences.map(e => ({
           id: e.id,
+          type: e.type,
           link: e.link,
           keterangan: e.keterangan,
           created_at: e.created_at ? e.created_at.toISOString() : null,
@@ -272,13 +274,14 @@ class MysqlStorage {
     const conn = await this._getConnection();
     try {
       const [result] = await conn.execute(
-        'INSERT INTO evidences (task_id, link, keterangan) VALUES (?, ?, ?)',
-        [taskId, evData.link || '', evData.keterangan || '']
+        'INSERT INTO evidences (task_id, type, link, keterangan) VALUES (?, ?, ?, ?)',
+        [taskId, evData.type || 'link', evData.link || null, evData.keterangan || '']
       );
       const now = new Date().toISOString();
       return {
         id: result.insertId,
-        link: evData.link || '',
+        type: evData.type || 'link',
+        link: evData.link || null,
         keterangan: evData.keterangan || '',
         created_at: now,
       };
@@ -292,6 +295,7 @@ class MysqlStorage {
     try {
       const sets = [];
       const params = [];
+      if (evData.type !== undefined) { sets.push('type = ?'); params.push(evData.type); }
       if (evData.link !== undefined) { sets.push('link = ?'); params.push(evData.link); }
       if (evData.keterangan !== undefined) { sets.push('keterangan = ?'); params.push(evData.keterangan); }
 
@@ -306,6 +310,7 @@ class MysqlStorage {
 
       return {
         id: evId,
+        type: evData.type !== undefined ? evData.type : undefined,
         link: evData.link !== undefined ? evData.link : undefined,
         keterangan: evData.keterangan !== undefined ? evData.keterangan : undefined,
       };

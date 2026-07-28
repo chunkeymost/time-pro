@@ -156,7 +156,8 @@ class JsonStorage {
     if (!task.evidences) task.evidences = [];
     const ev = {
       id: data.nextEvidenceId || 1,
-      link: evData.link || '',
+      type: evData.type || 'link',
+      link: evData.link || null,
       keterangan: evData.keterangan || '',
       created_at: new Date().toISOString(),
     };
@@ -174,6 +175,7 @@ class JsonStorage {
     if (!task.evidences) return null;
     const ev = task.evidences.find(e => e.id === evId);
     if (!ev) return null;
+    if (evData.type !== undefined) ev.type = evData.type;
     if (evData.link !== undefined) ev.link = evData.link;
     if (evData.keterangan !== undefined) ev.keterangan = evData.keterangan;
     task.updatedAt = new Date().toISOString();

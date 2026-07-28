@@ -2,7 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const mysql = require('mysql2/promise');
+const crypto = require('crypto');
+const multer = require('multer');
 const JsonStorage = require('./src/storage/JsonStorage');
 const MysqlStorage = require('./src/storage/MysqlStorage');
 const config = require('./src/config');
@@ -17,6 +18,32 @@ app.use(cors());
 app.use(express.json());
 
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
+
+/* ---------- File Upload (Evidence Images) ---------- */
+
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+const multerStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const name = crypto.randomBytes(12).toString('hex') + ext;
+    cb(null, name);
+  },
+});
+const upload = multer({
+  storage: multerStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!allowed.includes(ext)) return cb(new Error('Format file tidak didukung. Gunakan: ' + allowed.join(', ')), false);
+    cb(null, true);
+  },
+});
+
+app.use('/uploads', express.static(uploadDir));
 
 /* ---------- Tasks ---------- */
 
@@ -78,7 +105,6 @@ app.delete('/api/tasks/:id', async (req, res) => {
 
 app.post('/api/backup', async (req, res) => {
   const dataDir = path.dirname(config.dataPath);
-  ensureDataDir();
   const now = new Date();
   const y = now.getFullYear();
   const M = String(now.getMonth()+1).padStart(2,'0');
@@ -219,9 +245,10 @@ app.delete('/api/tasks/:id/todos/:todoId', async (req, res) => {
 app.post('/api/tasks/:id/evidences', async (req, res) => {
   try {
     const taskId = parseInt(req.params.id, 10);
-    const { link, keterangan } = req.body;
-    if (!link) return res.status(400).json({ error: 'link is required' });
-    const ev = await storage.addEvidence(taskId, { link, keterangan: keterangan || '' });
+    const { type, link, keterangan } = req.body;
+    const evType = type || 'link';
+    if (!['link', 'text'].includes(evType)) return res.status(400).json({ error: 'type must be link or text' });
+    const ev = await storage.addEvidence(taskId, { type: evType, link: link || '', keterangan: keterangan || '' });
     if (!ev) return res.status(404).json({ error: 'Task not found' });
     res.status(201).json({ evidence: ev });
   } catch (err) {
@@ -241,12 +268,40 @@ app.put('/api/tasks/:id/evidences/:evId', async (req, res) => {
   }
 });
 
+app.post('/api/tasks/:id/evidences/image', (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (err) {
+      const message = err.message === 'Format file tidak didukung. Gunakan: .jpg, .jpeg, .png, .gif, .webp, .bmp, .svg'
+        ? err.message : 'Gagal upload gambar: ' + err.message;
+      return res.status(400).json({ error: message });
+    }
+    next();
+  });
+}, async (req, res) => {
+  try {
+    const taskId = parseInt(req.params.id, 10);
+    if (!req.file) return res.status(400).json({ error: 'File gambar harus diisi.' });
+    const keterangan = req.body.keterangan || '';
+    const ev = await storage.addEvidence(taskId, { type: 'image', link: 'uploads/' + req.file.filename, keterangan });
+    if (!ev) return res.status(404).json({ error: 'Task not found' });
+    res.status(201).json({ evidence: ev });
+  } catch (err) {
+    res.status(400).json({ error: 'Gagal upload gambar: ' + err.message });
+  }
+});
+
 app.delete('/api/tasks/:id/evidences/:evId', async (req, res) => {
   try {
     const taskId = parseInt(req.params.id, 10);
     const evId = parseInt(req.params.evId, 10);
+    const task = await storage.getById(taskId);
+    const ev = task?.evidences?.find(e => e.id === evId);
     const ok = await storage.deleteEvidence(taskId, evId);
     if (!ok) return res.status(404).json({ error: 'Task or Evidence not found' });
+    if (ev && ev.type === 'image' && ev.link) {
+      const filePath = path.join(__dirname, ev.link);
+      fs.unlink(filePath, () => {});
+    }
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -283,154 +338,9 @@ app.post('/api/sync/commit', (req, res) => {
   res.json({ message: 'Sync akan tersedia di Phase 2 setelah integrasi MySQL.' });
 });
 
-/* ---------- Restore JSON upload to MySQL ---------- */
-
-app.post('/api/restore/upload', async (req, res) => {
-  if (process.env.STORAGE !== 'mysql') {
-    return res.status(400).json({ error: 'Restore upload hanya tersedia saat STORAGE=mysql' });
-  }
-
-  const { tasks, nextId, nextTodoId } = req.body;
-  if (!tasks || !Array.isArray(tasks)) {
-    return res.status(400).json({ error: 'Body harus berisi array tasks' });
-  }
-
-  const conn = await mysql.createConnection(config.mysql);
-  try {
-    const [catRows] = await conn.execute('SELECT COUNT(*) AS cnt FROM categories');
-    if (catRows[0].cnt === 0) {
-      return res.status(400).json({ error: 'Tabel categories kosong. Jalankan migrasi terlebih dahulu.' });
-    }
-
-    const [cats] = await conn.execute('SELECT id, slug FROM categories');
-    const catMap = {};
-    for (const c of cats) catMap[c.slug] = c.id;
-
-    await conn.beginTransaction();
-
-    let taskCount = 0;
-    let todoCount = 0;
-    let evidenceCount = 0;
-
-    for (const task of tasks) {
-      let catId = catMap[task.cat];
-      if (!catId) {
-        const catName = task.cat.charAt(0).toUpperCase() + task.cat.slice(1);
-        await conn.execute(
-          'INSERT IGNORE INTO categories (slug, name) VALUES (?, ?)',
-          [task.cat, catName]
-        );
-        const [newCat] = await conn.execute('SELECT id FROM categories WHERE slug = ?', [task.cat]);
-        if (newCat.length === 0) continue;
-        catMap[task.cat] = newCat[0].id;
-        catId = newCat[0].id;
-      }
-
-      const createdAt = task.createdAt
-        ? new Date(task.createdAt).toISOString().slice(0, 19).replace('T', ' ')
-        : new Date().toISOString().slice(0, 19).replace('T', ' ');
-      const updatedAt = task.updatedAt
-        ? new Date(task.updatedAt).toISOString().slice(0, 19).replace('T', ' ')
-        : createdAt;
-
-      await conn.execute(
-        `INSERT INTO tasks (id, name, start_date, end_date, category_id, assignee, progress, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE
-           name = VALUES(name),
-           start_date = VALUES(start_date),
-           end_date = VALUES(end_date),
-           category_id = VALUES(category_id),
-           assignee = VALUES(assignee),
-           progress = VALUES(progress),
-           updated_at = VALUES(updated_at)`,
-        [
-          task.id, task.name, task.start, task.end, catId,
-          task.assignee || '', task.progress || 0, createdAt, updatedAt,
-        ]
-      );
-      taskCount++;
-
-      if (task.todos && task.todos.length > 0) {
-        for (const todo of task.todos) {
-          await conn.execute(
-            `INSERT INTO todos (id, task_id, text, done, due_date, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, NOW(), NOW())
-             ON DUPLICATE KEY UPDATE
-               text = VALUES(text),
-               done = VALUES(done),
-               due_date = VALUES(due_date),
-               updated_at = NOW()`,
-            [todo.id, task.id, todo.text, todo.done ? 1 : 0, todo.due || null]
-          );
-          todoCount++;
-        }
-      }
-
-      if (task.evidences && task.evidences.length > 0) {
-        for (const ev of task.evidences) {
-          const evCreatedAt = ev.created_at
-            ? new Date(ev.created_at).toISOString().slice(0, 19).replace('T', ' ')
-            : new Date().toISOString().slice(0, 19).replace('T', ' ');
-
-          await conn.execute(
-            `INSERT INTO evidences (id, task_id, link, keterangan, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, NOW())
-             ON DUPLICATE KEY UPDATE
-               link = VALUES(link),
-               keterangan = VALUES(keterangan),
-               updated_at = NOW()`,
-            [ev.id, task.id, ev.link || '', ev.keterangan || '', evCreatedAt]
-          );
-          evidenceCount++;
-        }
-      }
-    }
-
-    await conn.execute(
-      "INSERT INTO app_metadata (`key`, `value`) VALUES ('json_seeded_at', NOW()) " +
-      "ON DUPLICATE KEY UPDATE `value` = NOW()"
-    );
-
-    await conn.commit();
-    res.json({ success: true, taskCount, todoCount, evidenceCount });
-  } catch (err) {
-    await conn.rollback();
-    res.status(500).json({ error: err.message });
-  } finally {
-    await conn.end();
-  }
-});
-
-/* ---------- Auto-migrate (MySQL only) ---------- */
-
-async function autoMigrate() {
-  if (process.env.STORAGE !== 'mysql') return;
-  try {
-    const { migrate } = require('./src/schema/migrate');
-    await migrate();
-    console.log('Auto-migration completed.');
-  } catch (err) {
-    console.error('Auto-migration failed:', err.message);
-  }
-}
-
-/* ---------- Ensure data directory ---------- */
-
-function ensureDataDir() {
-  const dir = path.dirname(config.dataPath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-    console.log('Data directory created:', dir);
-  }
-}
-
 /* ---------- Start ---------- */
 
 const PORT = config.port;
-ensureDataDir();
-autoMigrate().then(() => {
-  app.listen(PORT, () => {
-    console.log(`Time Pro API running at http://localhost:${PORT}`);
-  });
+app.listen(PORT, () => {
+  console.log(`Time Pro API running at http://localhost:${PORT}`);
 });

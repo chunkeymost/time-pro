@@ -57,9 +57,9 @@ async function seedFromJson() {
               ? new Date(ev.created_at).toISOString().slice(0, 19).replace('T', ' ')
               : new Date().toISOString().slice(0, 19).replace('T', ' ');
             await conn.execute(
-              `INSERT IGNORE INTO evidences (id, task_id, link, keterangan, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, NOW())`,
-              [ev.id, task.id, ev.link || '', ev.keterangan || '', evCreatedAt]
+              `INSERT IGNORE INTO evidences (id, task_id, type, link, keterangan, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+              [ev.id, task.id, ev.type || 'link', ev.link || '', ev.keterangan || '', evCreatedAt]
             );
             syncCount++;
           }
@@ -166,15 +166,17 @@ async function seedFromJson() {
             : new Date().toISOString().slice(0, 19).replace('T', ' ');
 
           await conn.execute(
-            `INSERT INTO evidences (id, task_id, link, keterangan, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, NOW())
+            `INSERT INTO evidences (id, task_id, type, link, keterangan, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, NOW())
              ON DUPLICATE KEY UPDATE
+               type = VALUES(type),
                link = VALUES(link),
                keterangan = VALUES(keterangan),
                updated_at = NOW()`,
             [
               ev.id,
               task.id,
+              ev.type || 'link',
               ev.link || '',
               ev.keterangan || '',
               evCreatedAt,
