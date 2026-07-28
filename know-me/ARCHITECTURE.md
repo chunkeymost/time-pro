@@ -21,25 +21,42 @@ Storage dipilih via environment variable `STORAGE=mysql` — default JSON.
 ## Cara Menjalankan
 
 ```bash
-# Masuk ke folder backend
-cd backend
-
-# Install dependencies
+# Install dependencies (dari root)
 npm install
 
 # Mode JSON (default, tanpa MySQL)
-npm start
+cd backend && npm start
 
 # Mode MySQL
-npm run db:migrate              # Buat tabel + seed kategori
-npm run db:seed                 # Import data JSON → MySQL
-STORAGE=mysql npm start
+cd backend && npm run db:migrate    # Buat tabel + seed kategori
+cd backend && npm run db:seed       # Import data JSON → MySQL
+STORAGE=mysql npm start             # Jalankan dengan MySQL
 
 # Auto-reload (development)
-npm run dev
+cd backend && npm run dev
 ```
 
 Buka `http://localhost:3000` di browser.
+
+## Deploy ke Railway
+
+```bash
+# Railway build dari Dockerfile, set env:
+#   STORAGE=mysql
+#   MYSQL_URL=mysql://user:pass@host:3306/dbname
+```
+
+### Auto-Migration
+
+Server otomatis menjalankan migrasi saat startup dalam mode MySQL:
+
+```js
+async function autoMigrate() {
+  if (process.env.STORAGE !== 'mysql') return;
+  const { migrate } = require('./src/schema/migrate');
+  await migrate();
+}
+```
 
 ## Tech Stack
 
@@ -76,14 +93,17 @@ Buka `http://localhost:3000` di browser.
 
 ```
 time-pro/
+├── package.json                    # Root scripts (postinstall, start)
+├── railway.json                    # Railway deployment config
 ├── frontend/
 │   └── index.html                  # Frontend (single-page app)
 ├── backend/
+│   ├── Dockerfile                  # Docker build (Railway-ready)
 │   ├── server.js                   # Entry point + Express router + storage switching
 │   ├── package.json                # Dependencies + scripts
 │   ├── .gitignore                  # Ignore node_modules, data, lockfile
 │   ├── src/
-│   │   ├── config.js               # Konfigurasi path & database
+│   │   ├── config.js               # Konfigurasi path & database (mendukung MYSQL_URL)
 │   │   ├── schema/
 │   │   │   ├── migrate.js          # Migration runner — execute pending SQL
 │   │   │   └── migrations/
@@ -95,11 +115,12 @@ time-pro/
 │   │   │   └── MysqlStorage.js     # Database-based storage (async)
 │   │   └── seed-from-json.js       # Import data tasks.json → MySQL
 │   └── data/
-│       ├── tasks.json              # Auto-created dengan seed data
-  │   └── restore-log.json         # History log restore & backup (terpisah)
+│       ├── tasks.json              # Auto-created dengan seed data (tidak di-git)
+│       └── restore-log.json        # History log restore & backup (terpisah)
 ├── know-me/
 │   ├── ARCHITECTURE.md
 │   ├── BASE_DESIGN.md
+│   ├── DESIGN_BASE.md
 │   ├── PLAN.md
 │   └── SKILL.md
 └── README.md
@@ -159,6 +180,23 @@ Foreign Key: `category_id` → `categories(id)`
 | — | — | `evidences.deleted_at` TIMESTAMP NULL | Soft delete |
 | `createdAt` / `created_at` | — | `evidences.created_at` TIMESTAMP | Created timestamp (ditampilkan di kolom Tanggal evidence panel) |
 | `updatedAt` | — | `evidences.updated_at` TIMESTAMP | Updated timestamp |
+
+## Config (`config.js`)
+
+`config.js` mendukung dua cara koneksi MySQL:
+
+1. **`MYSQL_URL`** — Connection URL lengkap (Railway style), otomatis diparsing:
+   ```
+   mysql://user:password@host:3306/database
+   ```
+2. **Fallback env vars** — Jika `MYSQL_URL` tidak tersedia:
+   ```
+   MYSQL_HOST (default: localhost)
+   MYSQL_PORT (default: 8889)
+   MYSQL_USER (default: root)
+   MYSQL_PASSWORD (default: root)
+   MYSQL_DATABASE (default: db_timepro)
+   ```
 
 ### `app_metadata` — Key-value store untuk metadata aplikasi
 
@@ -258,6 +296,7 @@ npm run db:seed -- --force   # Force re-import (hapus data lama)
 | `POST` | `/api/backup` | Backup tasks.json ke file timestamp | 1 |
 | `GET` | `/api/backups` | List semua file backup di data/ | 1 |
 | `POST` | `/api/restore` | Restore data dari file backup tertentu | 1 |
+| `POST` | `/api/restore/upload` | Upload JSON data ke MySQL (khusus `STORAGE=mysql`) | 2 |
 | `GET` | `/api/restore-log` | Ambil history log restore & backup | 1 |
 | `GET` | `/api/metadata` | Ambil metadata (title, versi, lastSynced) | 1 |
 | `PUT` | `/api/metadata` | Update metadata (title) | 1 |
@@ -321,6 +360,32 @@ Proses commit (JSON → MySQL) menggunakan `seed-from-json.js` sebagai dasar:
 2. Untuk setiap task: `INSERT ... ON DUPLICATE KEY UPDATE`
 3. Hapus todos lama, insert ulang dari JSON
 4. Update `metadata.lastSynced` di JSON dan `app_metadata` di MySQL
+
+## Restore Upload to MySQL
+
+`POST /api/restore/upload` — endpoint khusus untuk mengupload data JSON ke MySQL saat mode `STORAGE=mysql`.
+
+Flow:
+1. Terima `{ tasks, nextId, nextTodoId }` dari body request
+2. Map `task.cat` → `categories.slug` → `category_id`
+3. Auto-create kategori baru jika slug belum ada
+4. Transaction: `INSERT ... ON DUPLICATE KEY UPDATE` untuk tasks, todos, evidences
+5. Catat `json_seeded_at` di `app_metadata`
+6. Rollback penuh jika gagal
+
+## Auto-Migration on Startup
+
+Server menjalankan `autoMigrate()` saat startup jika `STORAGE=mysql`:
+
+```js
+async function autoMigrate() {
+  if (process.env.STORAGE !== 'mysql') return;
+  const { migrate } = require('./src/schema/migrate');
+  await migrate();
+}
+```
+
+Memastikan semua migrasi pending tereksekusi sebelum server menerima koneksi.
 
 ## Frontend Data Flow
 

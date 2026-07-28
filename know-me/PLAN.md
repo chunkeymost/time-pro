@@ -44,6 +44,7 @@ DELETE /api/tasks/:id/evidences/:evId → Delete evidence
 POST   /api/backup            → Backup tasks.json ke file timestamp
 GET    /api/backups           → List semua file backup
 POST   /api/restore           → Restore data dari backup
+POST   /api/restore/upload     → Upload JSON ke MySQL (STORAGE=mysql only)
 GET    /api/restore-log       → History log restore
 POST   /api/sync/commit        → (stub, Phase 3)
 ```
@@ -357,22 +358,34 @@ Fitur persistence, backup, dan restore data:
 ## How to Run
 
 ```bash
-# Masuk ke folder backend
-cd backend
-
 # Install dependencies
 npm install
 
 # Phase 1: JSON Storage (default)
-npm start            # node server.js
+cd backend && npm start            # node server.js
 
 # Phase 2: MySQL Storage
-npm run db:migrate   # Buat tabel + seed kategori
-npm run db:seed      # Import data dari JSON ke MySQL
-STORAGE=mysql npm start   # Jalankan dengan MySQL
+cd backend && npm run db:migrate   # Buat tabel + seed kategori
+cd backend && npm run db:seed      # Import data dari JSON ke MySQL
+STORAGE=mysql npm start            # Jalankan dengan MySQL
 
 # Development mode (auto-restart on changes)
-npm run dev
+cd backend && npm run dev
 ```
 
 Buka `http://localhost:3000` di browser.
+
+## Deployment (Railway / Docker)
+
+Proyek dapat di-deploy ke Railway menggunakan Docker:
+
+```bash
+# railway.json mengarah ke backend/Dockerfile
+# Set environment variables:
+#   STORAGE=mysql
+#   MYSQL_URL=mysql://user:pass@host:3306/dbname
+```
+
+- `config.js` mendukung `MYSQL_URL` (Railway style) sebagai alternatif env vars individual
+- Server menjalankan auto-migration saat startup dalam mode MySQL
+- `backend/data/tasks.json` tidak di-track git (disimpan lokal)
