@@ -491,7 +491,7 @@
     top:0; bottom:0;
     width:2px;
     background:var(--cut-line);
-    z-index:5;
+    z-index:2;
     pointer-events:none;
   }
   .today-line::before{
@@ -504,8 +504,9 @@
     letter-spacing:.08em;
     color:var(--cut-line);
     white-space:nowrap;
-    margin-top: 47px;
+    margin-top: 48px;
   }
+  [data-theme="dark"] .today-line::before{ color:#fff; }
   .today-line::after{
     content:'';
     position:absolute;
