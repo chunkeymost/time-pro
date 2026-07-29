@@ -7,7 +7,7 @@ Tiga phase implementasi persistence pada aplikasi Time Pro.
 ```
 Phase 1: JSON File Storage  [COMPLETED]
 Phase 2: MySQL Storage      [COMPLETED]
-Phase 3: Sync (JSON ↔ MySQL) [COMPLETED]
+Phase 3: Sync (JSON ↔ MySQL) [PARTIAL STUB]
 ```
 
 ---
@@ -32,6 +32,7 @@ Mengganti penyimpanan data in-memory dengan persistent JSON file storage melalui
 
 ```
 GET    /api/tasks              → Get all data
+GET    /api/tasks/:id           → Get single task
 POST   /api/tasks              → Create task
 PUT    /api/tasks/:id          → Update task
 DELETE /api/tasks/:id          → Delete task + todos
@@ -40,13 +41,16 @@ PUT    /api/tasks/:id/todos/:todoId → Update todo
 DELETE /api/tasks/:id/todos/:todoId → Delete todo
 POST   /api/tasks/:id/evidences    → Add evidence
 PUT    /api/tasks/:id/evidences/:evId → Update evidence
+POST   /api/tasks/:id/evidences/image → Upload evidence image
 DELETE /api/tasks/:id/evidences/:evId → Delete evidence
+GET    /api/metadata           → Get metadata (title, lastSynced, etc.)
+PUT    /api/metadata           → Update metadata (title)
 POST   /api/backup            → Backup tasks.json ke file timestamp
 GET    /api/backups           → List semua file backup
 POST   /api/restore           → Restore data dari backup
 POST   /api/restore/upload     → Upload JSON ke MySQL (STORAGE=mysql only)
 GET    /api/restore-log       → History log restore
-POST   /api/sync/commit        → (stub, Phase 3)
+POST   /api/sync/commit        → (stub) Sync JSON → MySQL
 ```
 
 ---
@@ -63,6 +67,9 @@ Menambahkan MySQL sebagai storage engine alternatif (dapat dipilih via environme
 |------|---------|
 | `backend/src/schema/migrations/V1__initial_schema.sql` | DDL 5 tabel: categories, tasks, todos, app_metadata, schema_migrations |
 | `backend/src/schema/migrations/V2__seed_categories.sql` | Seed 6 kategori default |
+| `backend/src/schema/migrations/V3__create_evidences.sql` | Buat tabel evidences dengan soft delete |
+| `backend/src/schema/migrations/V4__update_evidences_add_type.sql` | Tambah kolom `type` ENUM('link','text') ke tabel evidences |
+| `backend/src/schema/migrations/V5__update_evidences_add_image_type.sql` | Perluas `type` ENUM('link','text','image'), support upload gambar evidence |
 | `backend/src/schema/migrate.js` | Migration runner — versioning & execute DDL |
 | `backend/src/storage/MysqlStorage.js` | Database-based storage dengan interface sama seperti JsonStorage |
 | `backend/src/seed-from-json.js` | Import data dari `backend/data/tasks.json` ke MySQL |
@@ -183,26 +190,23 @@ cd backend && STORAGE=mysql node server.js
 
 ---
 
-## Phase 3: Sync (JSON ↔ MySQL) ✅ COMPLETED
+## Phase 3: Sync (JSON ↔ MySQL) 🔄 PARTIAL STUB
 
 ### Goal
 
-Enable manual sync antara JSON file dan MySQL database — pengguna bisa "commit" data dari JSON ke MySQL.
+Enable manual sync antara JSON file dan MySQL — pengguna bisa "commit" data dari JSON ke MySQL.
 
 ### Tasks
 
-- [x] Buat `POST /api/sync/commit` — push semua data JSON ke MySQL
-  - Baca seluruh data dari `data/tasks.json`
-  - Begin transaction
-  - Untuk setiap task: `REPLACE INTO tasks (...) VALUES (...)`
-  - Hapus todos lama per task, insert ulang dari JSON
-  - Update `metadata.lastSynced` di JSON dan `app_metadata` di MySQL
-  - Commit transaction
-- [x] Buat `POST /api/sync/pull` — tarik data MySQL ke JSON (overwrite)
-- [x] Buat `GET /api/sync/status` — dapatkan timestamp sync terakhir
-- [x] Tambah tombol "Commit ke Database" di frontend (header-actions)
-- [x] Tambah indikator status sync (last synced timestamp)
-- [x] Tambah error handling untuk konflik data
+- [x] Buat `POST /api/sync/commit` — **stub** (placeholder response, bukan implementasi penuh)
+  - Endpoint mengembalikan pesan: `"Sync akan tersedia di Phase 2 setelah integrasi MySQL."` — **bukan** push data JSON ke MySQL
+- [ ] Buat `POST /api/sync/pull` — tarik data MySQL ke JSON (overwrite) — **belum diimplementasikan**
+- [ ] Buat `GET /api/sync/status` — dapatkan timestamp sync terakhir — **belum diimplementasikan**
+- [ ] Tambah tombol "Commit ke Database" di frontend (header-actions) — **belum diimplementasikan**
+- [ ] Tambah indikator status sync (last synced timestamp) — **belum diimplementasikan**
+- [ ] Tambah error handling untuk konflik data — **belum diimplementasikan**
+
+> **Catatan**: Phase 3 **tidak sepenuhnya selesai**. Hanya stub endpoint `POST /api/sync/commit` yang ada di `server.js`, mengembalikan pesan placeholder. Fitur sync pull, status, tombol commit, dan indikator belum diimplementasikan.
 
 ### Frontend Addition
 
@@ -215,11 +219,11 @@ Enable manual sync antara JSON file dan MySQL database — pengguna bisa "commit
 
 ### Sync Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/sync/commit` | Push JSON data to MySQL |
-| `POST` | `/api/sync/pull` | Pull MySQL data to JSON (overwrite) |
-| `GET` | `/api/sync/status` | Get last synced timestamp |
+| Method | Endpoint | Description | Status |
+|--------|----------|-------------|--------|
+| `POST` | `/api/sync/commit` | Sync JSON → MySQL | **Stub** — placeholder message only |
+| `POST` | `/api/sync/pull` | Pull MySQL data to JSON (overwrite) | Belum diimplementasikan |
+| `GET` | `/api/sync/status` | Get last synced timestamp | Belum diimplementasikan |
 
 ### Architecture
 
@@ -227,16 +231,33 @@ Enable manual sync antara JSON file dan MySQL database — pengguna bisa "commit
   JSON File                  MySQL
      |                         |
      |  POST /api/sync/commit  |
-     |------------------------>|  (upsert all tasks + todos)
-     |                         |
-     |  POST /api/sync/pull    |
-     |<------------------------|  (overwrite JSON from MySQL)
+     |------------------------>|  (stub — placeholder only)
      |                         |
 ```
 
 ---
 
 ## Frontend Enhancement (Completed)
+
+### 📊 Reporting (Ringo)
+
+Fitur ringkasan laporan tugas berdasarkan periode tanggal (client-side, tanpa endpoint backend):
+
+- Tombol **"Ringo"** di header → membuka modal laporan
+- Modal memungkinkan pemilihan tanggal mulai dan akhir
+- Ringkasan ditampilkan dalam beberapa section:
+  - **Summary**: total tugas, tugas selesai, progres, overdue, Hari ini, upcoming
+  - **Per Kategori**: breakdown tugas per kategori
+  - **Task Detail**: tabel tugas dengan progress bar dan status
+  - **Todo**: daftar todo yang terkait dengan tugas dalam periode (jika ada)
+  - **Evidence**: daftar evidence dengan link/image (jika ada)
+- **Export PDF** — tombol "Export PDF" di modal laporan menggunakan `window.print()` dengan CSS `@media print`
+  - Output PDF menggunakan format tanggal `YYYY-MM-DD` (pemisah `-`)
+  - Background hijau untuk tombol report
+  - Text semua elemen menjadi hitam dalam mode print termasuk label bold
+  - Tombol "Tambah tugas baru" dalam mode print memiliki aksi
+- Report memperhatikan mode gelap/terang — menyesuaikan warna sesuai tema
+- CSS khusus report ada di `<style>` dalam `index.html`
 
 ### 🔔 Bell Notification
 
@@ -257,14 +278,15 @@ Fitur evidence yang ditambahkan untuk melampirkan link bukti/dokumentasi ke tuga
 
 - Tombol **"+ Add Evidence"** di `modal-actions-right` (sejajar dengan Simpan)
 - Sidepeek dari **kiri** layar (`#evidence-overlay`) — terlihat bersamaan dengan modal task
-- Form input: `[Link URL] [Keterangan] [Tambah]`
-- Tabel evidence: No. | Tanggal | Link Evidence (shortened 45 char + tooltip) | Keterangan | ✕
+- Toggle tipe evidence (Link / Teks / Gambar) + form sesuai tipe:
+  - Link: `[Link URL] [Keterangan] [Tambah]`
+  - Teks: `[textarea bukti] [Keterangan] [Tambah]`
+  - Gambar: `[input file gambar] [Keterangan] [Tambah]`
+- Tabel evidence: No. | Tanggal | Evidence (shortened 45 char + tooltip untuk link; thumbnail untuk image; teks di-shorten untuk text) | Keterangan | ✕
 - Kolom **Tanggal** menampilkan `created_at` evidence format `id-ID`
 - Link evidence di-shorten dengan `shortenUrl(url, 45)` — full URL di `title` tooltip
 - CRUD via API: `POST/PUT/DELETE /api/tasks/:id/evidences/:evId`
-- Data persist di JSON (`task.evidences[]`) dan MySQL (`evidences` table via V3 migration)
-- Migration `V3__create_evidences.sql` — tabel `evidences` dengan soft delete
-- Seed otomatis: `seed-from-json.js` mengimpor evidence dari JSON ke MySQL (termasuk `created_at`)
+- Upload gambar: `POST /api/tasks/:id/evidences/image` — terima file via `multer` (`file` field)
 
 ### 🍞 Toast Notification
 

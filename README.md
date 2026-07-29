@@ -63,7 +63,7 @@ Aplikasi web ringan untuk memvisualisasikan, melacak, dan mengelola jadwal tugas
 - **To Do List** — Subtask checklist dengan due date; progress otomatis terhitung dari todo yang selesai
 - **🔔 Notifikasi Tugas** — Ikon lonceng dengan indikator merah berkedip jika ada todo pending; sidepeek menampilkan semua todo belum selesai dengan info sisa hari (Overdue jika lewat) + tombol copy teks
 - **🍞 Toast Notification** — Popup notifikasi sukses/gagal di pojok kanan bawah (copy teks, backup)
-- **📎 Evidence Panel** — Sidepeek dari kiri untuk lampiran link bukti tugas dengan tanggal dan shorten URL
+- **📎 Evidence Panel** — Sidepeek dari kiri untuk lampiran bukti tugas dengan 3 tipe (Link/Text/Gambar), thumbnail preview, dan shorten URL
 - **🏁 Finish Flag** — Tugas selesai (100%) ditandai latar hijau + emoji 🏁 di sidebar
 - **📊 Jumlah Hari Pengerjaan** — Tampilan jumlah hari kerja pada setiap item daftar tugas
 - **Garis "Hari Ini"** — Penanda tanggal sekarang secara otomatis
@@ -73,6 +73,7 @@ Aplikasi web ringan untuk memvisualisasikan, melacak, dan mengelola jadwal tugas
 - **Seed Data** — Import data dari JSON ke MySQL dengan guard double-import
 - **Backup & Restore** — Backup data ke file timestamp, restore dari backup, history log backup & restore terpisah
 - **Editable Project Title** — Judul proyek bisa diubah langsung via klik (inline edit) — tersimpan di metadata server
+- **📊 Reporting** — Ringkasan laporan tugas berdasarkan periode tanggal (client-side), dengan export PDF dan breakdown per kategori
 
 ## Arsitektur
 
@@ -114,6 +115,7 @@ Jalan otomatis saat `STORAGE=mysql` — `server.js` menjalankan `migrate()` pada
 | `PUT` | `/api/tasks/:id/todos/:todoId` | Update todo |
 | `DELETE` | `/api/tasks/:id/todos/:todoId` | Hapus todo |
 | `POST` | `/api/tasks/:id/evidences` | Tambah evidence |
+| `POST` | `/api/tasks/:id/evidences/image` | Upload gambar evidence |
 | `PUT` | `/api/tasks/:id/evidences/:evId` | Update evidence |
 | `DELETE` | `/api/tasks/:id/evidences/:evId` | Hapus evidence |
 | `POST` | `/api/backup` | Backup tasks.json ke file timestamp |
@@ -123,6 +125,9 @@ Jalan otomatis saat `STORAGE=mysql` — `server.js` menjalankan `migrate()` pada
 | `GET` | `/api/restore-log` | Ambil history log restore & backup |
 | `GET` | `/api/metadata` | Ambil metadata (title, versi, lastSynced) |
 | `PUT` | `/api/metadata` | Update metadata (title) |
+| `POST` | `/api/sync/commit` | Sync JSON ke MySQL (stub) |
+| `GET` | `/api/metadata` | Ambil metadata (title, versi, lastSynced) |
+| `PUT` | `/api/metadata` | Update metadata (title) |
 
 ## Rencana Pengembangan
 
@@ -130,7 +135,7 @@ Jalan otomatis saat `STORAGE=mysql` — `server.js` menjalankan `migrate()` pada
 |-------|--------|-----------|
 | **Phase 1** | ✅ Selesai | JSON file storage via Node.js backend |
 | **Phase 2** | ✅ Selesai | MySQL storage engine + migration runner + seed |
-| **Phase 3** | ✅ Selesai | Sync mechanism (JSON ↔ MySQL) + metadata API |
+| **Phase 3** | 🔄 Partial Stub | Sync mechanism (JSON ↔ MySQL) — stub endpoint only |
 
 Lihat `know-me/PLAN.md` untuk detail rencana implementasi.
 

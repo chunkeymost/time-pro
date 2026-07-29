@@ -29,7 +29,7 @@ Jangan gunakan skill ini jika pengguna secara eksplisit meminta file `.xlsx` (pa
    ```js
    { id:1, name:"Nama Tugas", start:addDays(T,-4), end:addDays(T,4), cat:"desain", assignee:"Nama", progress:60, todos:[], evidences:[] }
    ```
-    `T` adalah variabel hari ini (`today()`), gunakan `addDays(T, n)` untuk tanggal relatif, atau `new Date(2026,6,15)` (bulan berbasis 0) untuk tanggal absolut. Field `todos` adalah array `{ id, text, done, due }` — progress otomatis terhitung dari checklist ini jika ada isinya. Field `evidences` adalah array `{ id, link, keterangan, created_at }` untuk lampiran bukti tugas.
+    `T` adalah variabel hari ini (`today()`), gunakan `addDays(T, n)` untuk tanggal relatif, atau `new Date(2026,6,15)` (bulan berbasis 0) untuk tanggal absolut. Field `todos` adalah array `{ id, text, done, due }` — progress otomatis terhitung dari checklist ini jika ada isinya. Field `evidences` adalah array `{ id, type, link, keterangan, created_at }` untuk lampiran bukti tugas — `type` bisa `'link'`, `'text'`, atau `'image'`.
 4. **Judul proyek**: judul proyek bisa diedit langsung oleh pengguna di browser — klik teks judul di header (`#project-title`) atau icon ✏️ untuk mengedit, Enter untuk simpan (via `PUT /api/metadata`), Escape untuk batal. Default: `Timeframe as a System Analyst`.
 5. **Penyimpanan data** — semua data disimpan via backend ke `data/tasks.json` melalui REST API. Frontend menggunakan `fetch()` untuk setiap operasi CRUD.
 6. Simpan hasil akhir dan presentasikan ke pengguna.
@@ -44,7 +44,11 @@ Jangan gunakan skill ini jika pengguna secara eksplisit meminta file `.xlsx` (pa
 - **To Do List** — setiap task bisa memiliki subtask checklist. Tiap todo punya due date (date picker) yang mengacu pada rentang start-end task utama. Progress task otomatis dihitung dari persentase todo yang selesai (slider progres disabled saat ada todos). Klik teks todo untuk mengedit.
 - **🔔 Notifikasi Tugas** — Ikon lonceng di header dengan titik merah berkedip jika ada todo yang belum selesai. Klik ikon membuka sidepeek kanan (lebar 45%) yang menampilkan daftar todo **pending** dari semua tugas, dilengkapi kolom **Sisa Hari** (Overdue/Hari ini/N hari), **Aksi** (copy teks via Bootstrap Icons), dan checkbox yang bisa di-toggle langsung. Klik teks todo navigasi ke tugas utama dan menutup panel notifikasi. Copy todo menampilkan **Toast Notification** (sukses/gagal).
 - **Toast Notification** — Notifikasi popup kecil di pojok kanan bawah dengan animasi fade-in. Muncul saat backup sukses/gagal dan saat copy teks todo.
-- **📎 Evidence Panel** — Sidepeek dari **kiri** layar untuk melampirkan link bukti/dokumentasi ke tugas. Form input Link URL + Keterangan, tabel dengan kolom No., Tanggal, Link Evidence (shortened 45 char + tooltip), Keterangan, dan tombol hapus. CRUD via API. Kolom Tanggal menampilkan `created_at` evidence.
+- **📎 Evidence Panel** — Sidepeek dari **kiri** layar untuk melampirkan bukti ke tugas. Toggle tipe evidence (Link / Teks / Gambar):
+  - **Link**: input URL + Keterangan
+  - **Teks**: textarea teks + Keterangan
+  - **Gambar**: input file (max 10MB, `.jpg/.jpeg/.png/.gif/.webp/.bmp/.svg`) + Keterangan — file diupload ke `backend/uploads/`, link disimpan sebagai `uploads/<filename>`
+  - Tabel dengan kolom No., Tanggal, Evidence (tipe link:text di-shorten 45 char + tooltip; tipe image: thumbnail 60x40px + preview lightbox; tipe text: teks di-shorten), Keterangan, dan tombol hapus. CRUD via API. Kolom Tanggal menampilkan `created_at` evidence.
 - **🏁 Finish Flag** — Tugas dengan progress 100% mendapat latar hijau (`done` class) dan emoji 🏁 di sidebar.
 - **📊 Jumlah Hari Pengerjaan** — Sidebar menampilkan jumlah hari kerja (weekday count) setiap tugas.
 - **Tag shapes unik** — tiap kategori punya bentuk berbeda di legend (segitiga, lingkaran, segi lima, kotak, belah ketupat, bintang).
@@ -93,6 +97,7 @@ STORAGE=mysql npm start         # Jalankan dengan MySQL
 | Method | Endpoint | Deskripsi |
 |--------|----------|-----------|
 | `GET` | `/api/tasks` | Ambil semua data |
+| `GET` | `/api/tasks/:id` | Ambil detail task |
 | `POST` | `/api/tasks` | Buat task baru |
 | `PUT` | `/api/tasks/:id` | Update task |
 | `DELETE` | `/api/tasks/:id` | Hapus task + todos |
@@ -101,15 +106,16 @@ STORAGE=mysql npm start         # Jalankan dengan MySQL
 | `DELETE` | `/api/tasks/:id/todos/:todoId` | Hapus todo |
 | `POST` | `/api/tasks/:id/evidences` | Tambah evidence |
 | `PUT` | `/api/tasks/:id/evidences/:evId` | Update evidence |
+| `POST` | `/api/tasks/:id/evidences/image` | Upload gambar evidence |
 | `DELETE` | `/api/tasks/:id/evidences/:evId` | Hapus evidence |
 | `POST` | `/api/backup` | Backup tasks.json ke file timestamp |
 | `GET` | `/api/backups` | List semua file backup di data/ |
 | `POST` | `/api/restore` | Restore data dari file backup |
 | `POST` | `/api/restore/upload` | Upload JSON data ke MySQL (khusus `STORAGE=mysql`) |
 | `GET` | `/api/restore-log` | Ambil history log restore & backup |
-| `POST` | `/api/sync/commit` | Sync JSON ke MySQL |
 | `GET` | `/api/metadata` | Ambil metadata (title, versi, lastSynced) |
 | `PUT` | `/api/metadata` | Update metadata (title) |
+| `POST` | `/api/sync/commit` | Sync JSON ke MySQL (stub) |
 
 ### Struktur data
 
@@ -136,7 +142,7 @@ Lihat `ARCHITECTURE.md` untuk detail data model Task, Todo, dan schema MySQL.
 - History restore & backup disimpan di file **terpisah** `data/restore-log.json`, bukan di `tasks.json` — menjaga data tugas tetap bersih. Backup otomatis tercatat dengan status `BackedUp` dan badge oranye di panel Restore.
 - Bootstrap Icons dimuat dari CDN (`bootstrap-icons.min.css`) untuk ikon copy di notifikasi.
 - MySQL mode menggunakan **soft delete** — task/todo/evidence tidak dihapus permanen, hanya di-set `deleted_at`.
-- Migration runner otomatis mendeteksi file SQL baru — cukup tambah file `V3__*.sql` di `backend/src/schema/migrations/`.
+- Migration runner otomatis mendeteksi file SQL baru — cukup tambah file `V(n+1)__*.sql` dengan nomor urut berikutnya di `backend/src/schema/migrations/`.
 - Lihat `ARCHITECTURE.md` untuk arsitektur dan `PLAN.md` untuk rencana implementasi (keduanya di `know-me/`).
 - Lihat `BASE_DESIGN.md` di `know-me/` untuk panduan design system (font, warna, komponen, layout) — gunakan sebagai acuan konsistensi UI.
 - Judul proyek bersifat inline-editable dan persist di metadata server — jangan hardcode di HTML.

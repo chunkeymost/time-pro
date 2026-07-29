@@ -67,7 +67,7 @@ async function autoMigrate() {
 | Storage (default) | JSON file (`data/tasks.json`) |
 | Storage (opsional) | MySQL 8+ via `mysql2` |
 | Migration | Custom runner (`src/schema/migrate.js`) |
-| Dependencies | `express`, `cors`, `mysql2` |
+| Dependencies | `express`, `cors`, `mysql2`, `multer`, `crypto` (Node built-in) |
 
 ## Fitur Utama
 
@@ -109,14 +109,17 @@ time-pro/
 │   │   │   └── migrations/
 │   │   │       ├── V1__initial_schema.sql
 │   │   │       ├── V2__seed_categories.sql
-│   │   │       └── V3__create_evidences.sql
+│   │   │       ├── V3__create_evidences.sql
+│   │   │       ├── V4__update_evidences_add_type.sql
+│   │   │       └── V5__update_evidences_add_image_type.sql
 │   │   ├── storage/
 │   │   │   ├── JsonStorage.js      # File-based storage (sync, default)
 │   │   │   └── MysqlStorage.js     # Database-based storage (async)
 │   │   └── seed-from-json.js       # Import data tasks.json → MySQL
 │   └── data/
 │       ├── tasks.json              # Auto-created dengan seed data (tidak di-git)
-│       └── restore-log.json        # History log restore & backup (terpisah)
+│       ├── restore-log.json        # History log restore & backup (terpisah)
+│       └── uploads/                # Upload evidence images (files)
 ├── know-me/
 │   ├── ARCHITECTURE.md
 │   ├── BASE_DESIGN.md
@@ -175,7 +178,8 @@ Foreign Key: `category_id` → `categories(id)`
 |-------|-----------|-------------|-------------|
 | `id` | `number` | `evidences.id` INT UNSIGNED AUTO_INCREMENT | Primary key |
 | `taskId` | — | `evidences.task_id` INT UNSIGNED FK | → `tasks.id` ON DELETE CASCADE |
-| `link` | `string` | `evidences.link` VARCHAR(500) | URL evidence |
+| `type` | `string` | `evidences.type` ENUM('link','text','image') | Tipe evidence: `link` (URL), `text` (teks biasa), `image` (file gambar upload) |
+| `link` | `string` | `evidences.link` VARCHAR(500) | URL evidence, atau path `uploads/<filename>` untuk tipe `image`, atau teks biasa untuk tipe `text` |
 | `keterangan` | `string` | `evidences.keterangan` TEXT | Deskripsi evidence |
 | — | — | `evidences.deleted_at` TIMESTAMP NULL | Soft delete |
 | `createdAt` / `created_at` | — | `evidences.created_at` TIMESTAMP | Created timestamp (ditampilkan di kolom Tanggal evidence panel) |
@@ -269,7 +273,8 @@ Force re-import: `npm run db:seed -- --force`
 
 **New behaviors:**
 - **Auto-create kategori** — Jika task memiliki `cat` slug yang belum ada di tabel `categories`, seed otomatis membuat kategori baru.
-- **Sync evidence** — Jika data sudah pernah di-seed, seed tetap melakukan sync evidence (INSERT IGNORE) untuk mengakomodasi penambahan tabel `evidences` via migrasi V3.
+- **Sync evidence** — Jika data sudah pernah di-seed, seed tetap melakukan sync evidence (INSERT IGNORE) untuk mengakomodasi penambahan tabel `evidences` via migrasi V3, V4 (tambah kolom `type`), dan V5 (perluas `type` ENUM, support image).
+- **Evidence `type` field** — Seed menambahkan `type: 'link'` default untuk evidence yang belum memiliki kolom `type` (kompatibel dengan V4).
 - **Force hapus evidence** — Force mode sekarang menghapus `evidences`, `todos`, dan `tasks` sebelum re-import.
 - **Preserve created_at** — Evidence di-seed dengan `created_at` asli dari JSON.
 
@@ -300,7 +305,8 @@ npm run db:seed -- --force   # Force re-import (hapus data lama)
 | `GET` | `/api/restore-log` | Ambil history log restore & backup | 1 |
 | `GET` | `/api/metadata` | Ambil metadata (title, versi, lastSynced) | 1 |
 | `PUT` | `/api/metadata` | Update metadata (title) | 1 |
-| `POST` | `/api/sync/commit` | Sync JSON → MySQL | 3 |
+| `POST` | `/api/tasks/:id/evidences/image` | Upload gambar evidence (multipart/form-data, field `file`) | 1 |
+| `POST` | `/api/sync/commit` | Sync JSON → MySQL | 3 (**stub** — placeholder only) |
 
 ## JSON File Structure (`data/tasks.json`)
 
@@ -352,9 +358,11 @@ Contoh setelah ada data:
 }
 ```
 
-## Sync Mechanism (Phase 3 — Completed)
+## Sync Mechanism (Phase 3 — Partial Stub)
 
-Proses commit (JSON → MySQL) menggunakan `seed-from-json.js` sebagai dasar:
+> **Catatan**: `POST /api/sync/commit` saat ini adalah **stub** — mengembalikan pesan placeholder `"Sync akan tersedia di Phase 2 setelah integrasi MySQL."`, bukan implementasi sync yang sebenarnya. Fitur sync pull, status, tombol commit, dan indikator di frontend belum diimplementasikan.
+
+Proses commit (JSON → MySQL) menggunakan `seed-from-json.js` sebagai dasar (jika diimplementasikan nanti):
 
 1. Baca seluruh data dari `data/tasks.json`
 2. Untuk setiap task: `INSERT ... ON DUPLICATE KEY UPDATE`
@@ -396,7 +404,7 @@ Memastikan semua migrasi pending tereksekusi sebelum server menerima koneksi.
 5. **Drag/Resize**: update local Date object immediately → save via `PUT` on `mouseup`
 6. **Todos**: create/update/delete via API → render ulang → `updateBellDot()`
 7. **Notification Panel**: klik bell btn → `openNotifPanel()` → collect semua `todos` dari semua `tasks` → filter `!done` → urut by due date → hitung `dayDiff(T, due)` → render tabel (No, To Do List, Tanggal, Sisa Hari, Status, Aksi). Toggle checkbox → `updateProgressFromTodos(task)` + `renderAll()` + `updateBellDot()`. Copy teks todo → `showToast()` navigator.clipboard. Klik teks todo → tutup panel notifikasi + `openModal(task)`.
-8. **Evidence Panel**: klik "+ Add Evidence" → `openEvidencePanel(taskId)` → sidepeek dari kiri dengan form Link + Keterangan. Render tabel (No, Tanggal, Link Evidence shortened 45 char, Keterangan, ✕ Hapus). CRUD via API. Kolom Tanggal menampilkan `created_at` dalam format `id-ID`.
+8. **Evidence Panel**: klik "+ Add Evidence" → `openEvidencePanel(taskId)` → sidepeek dari kiri dengan toggle tipe (Link/Text/Gambar) + form sesuai tipe. Tipe `link`: input URL + Keterangan. Tipe `text`: textarea teks + Keterangan. Tipe `image`: input file gambar (max 10MB, .jpg/.jpeg/.png/.gif/.webp/.bmp/.svg) + Keterangan. CRUD via API. Kolom Tanggal menampilkan `created_at` dalam format `id-ID`. Gambar ditampilkan sebagai thumbnail `60x40px` dengan preview lightbox saat klik.
 9. **Toast Notification**: `showToast(msg, type)` — popup di kanan bawah dengan animasi. Digunakan oleh backup (sukses/gagal), copy teks todo (sukses/gagal).
  10. **MysqlStorage cat resolution**: `getAll()` dan `getById()` melakukan query lookup `categories` untuk mengembalikan field `cat: slug` dari `category_id`, sehingga frontend mendapatkan data kompatibel dengan format JSON storage.
  11. **Title Edit**: Inline edit — klik teks judul di header → span diganti `<input>` → Enter/blur → `PUT /api/metadata { title }` → simpan ke metadata server. Escape untuk cancel. Icon ✏️ (28px) muncul saat hover.
