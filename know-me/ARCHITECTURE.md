@@ -38,26 +38,6 @@ cd backend && npm run dev
 
 Buka `http://localhost:3000` di browser.
 
-## Deploy ke Railway
-
-```bash
-# Railway build dari Dockerfile, set env:
-#   STORAGE=mysql
-#   MYSQL_URL=mysql://user:pass@host:3306/dbname
-```
-
-### Auto-Migration
-
-Server otomatis menjalankan migrasi saat startup dalam mode MySQL:
-
-```js
-async function autoMigrate() {
-  if (process.env.STORAGE !== 'mysql') return;
-  const { migrate } = require('./src/schema/migrate');
-  await migrate();
-}
-```
-
 ## Tech Stack
 
 | Layer | Technology |
@@ -94,11 +74,10 @@ async function autoMigrate() {
 ```
 time-pro/
 ├── package.json                    # Root scripts (postinstall, start)
-├── railway.json                    # Railway deployment config
 ├── frontend/
 │   └── index.html                  # Frontend (single-page app)
 ├── backend/
-│   ├── Dockerfile                  # Docker build (Railway-ready)
+│   ├── Dockerfile                  # Docker build (container-ready)
 │   ├── server.js                   # Entry point + Express router + storage switching
 │   ├── package.json                # Dependencies + scripts
 │   ├── .gitignore                  # Ignore node_modules, data, lockfile
@@ -189,7 +168,7 @@ Foreign Key: `category_id` → `categories(id)`
 
 `config.js` mendukung dua cara koneksi MySQL:
 
-1. **`MYSQL_URL`** — Connection URL lengkap (Railway style), otomatis diparsing:
+1. **`MYSQL_URL`** — Connection URL lengkap (otomatis diparsing):
    ```
    mysql://user:password@host:3306/database
    ```

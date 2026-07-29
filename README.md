@@ -22,25 +22,24 @@ cd backend && npm run dev
 
 Buka `http://localhost:3000` di browser.
 
-## Deploy ke Railway
+## Deployment (Docker)
 
-Proyek siap di-deploy ke Railway via Docker:
+Proyek dapat di-deploy menggunakan Docker:
 
 ```bash
-# Set environment variables di Railway:
+# Docker build dari backend/Dockerfile
+# Set environment variables:
 #   STORAGE=mysql
 #   MYSQL_URL=mysql://user:pass@host:3306/dbname
-
-# Railway akan otomatis build dari Dockerfile
 ```
 
 ### Environment Variables
 
 | Variable | Default | Deskripsi |
 |----------|---------|-----------|
-| `PORT` | `3000` | Port server |
+| `PORT` | `3000` | Port server (baca dari env `PORT`) |
 | `STORAGE` | — | Set `mysql` untuk MySQL mode |
-| `MYSQL_URL` | — | MySQL connection URL (Railway style, otomatis diparsing) |
+| `MYSQL_URL` | — | MySQL connection URL (otomatis diparsing) |
 | `MYSQL_HOST` | `localhost` | MySQL host (fallback jika tanpa `MYSQL_URL`) |
 | `MYSQL_PORT` | `8889` | MySQL port |
 | `MYSQL_USER` | `root` | MySQL user |
@@ -89,11 +88,11 @@ backend/src/schema/migrate.js          ← Migration runner
 backend/src/seed-from-json.js          ← Import JSON → MySQL
 ```
 
-**Deployment (Railway):**
+**Deployment (Docker):**
 ```
-Railway Container (Docker)
+Docker Container
   ↕ MYSQL_URL
-Railway MySQL Add-on
+MySQL Database
 ```
 
 Lihat `know-me/ARCHITECTURE.md` untuk detail arsitektur.
@@ -145,7 +144,7 @@ Lihat `know-me/PLAN.md` untuk detail rencana implementasi.
 - **Backend:** Node.js 20+, Express 4
 - **Database:** MySQL 8+ via `mysql2` (opsional)
 - **Migration:** Custom runner (file-based SQL versioning)
-- **Deployment:** Railway via Docker (Dockerfile multi-stage)
+- **Deployment:** Docker (Dockerfile single-stage)
 - **Design System:** Dokumentasi di `know-me/BASE_DESIGN.md`
 
 ## Catatan
@@ -157,7 +156,7 @@ Lihat `know-me/PLAN.md` untuk detail rencana implementasi.
 - Daftar tugas diurutkan ASC berdasarkan tanggal mulai
 - Sidebar diperluas `calc(350px + 7vw)` agar lebih lega
 - MySQL membutuhkan: `npm run db:migrate` (buat tabel) lalu `npm run db:seed` (import data) sebelum `STORAGE=mysql npm start`
-- Railway: `MYSQL_URL` otomatis diparsing oleh `config.js` — tidak perlu set `MYSQL_HOST` dll secara terpisah
+- `MYSQL_URL` otomatis diparsing oleh `config.js` — tidak perlu set `MYSQL_HOST` dll secara terpisah
 - Seed otomatis: jika ada kategori baru di JSON yang belum ada di DB, akan dibuat otomatis
 - Lihat `know-me/PLAN.md` untuk migration path lengkap
 - Lihat `know-me/BASE_DESIGN.md` untuk panduan design system dan konsistensi UI

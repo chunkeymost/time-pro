@@ -397,17 +397,17 @@ cd backend && npm run dev
 
 Buka `http://localhost:3000` di browser.
 
-## Deployment (Railway / Docker)
+## Deployment (Docker)
 
-Proyek dapat di-deploy ke Railway menggunakan Docker:
+Proyek dapat di-deploy menggunakan Docker:
 
 ```bash
-# railway.json mengarah ke backend/Dockerfile
+# Docker build dari backend/Dockerfile
 # Set environment variables:
 #   STORAGE=mysql
 #   MYSQL_URL=mysql://user:pass@host:3306/dbname
 ```
 
-- `config.js` mendukung `MYSQL_URL` (Railway style) sebagai alternatif env vars individual
+- `config.js` mendukung `MYSQL_URL` sebagai alternatif env vars individual
 - Server menjalankan auto-migration saat startup dalam mode MySQL
 - `backend/data/tasks.json` tidak di-track git (disimpan lokal)

@@ -17,7 +17,7 @@ function parseMysqlUrl(url) {
 const mysqlUrlConfig = parseMysqlUrl(process.env.MYSQL_URL);
 
 module.exports = {
-  port: 3030,
+  port: parseInt(process.env.PORT, 10) || 3000,
   dataPath: path.join(__dirname, '..', 'data', 'tasks.json'),
   mysql: {
     host: 'localhost',
