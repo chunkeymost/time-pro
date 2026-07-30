@@ -1,3 +1,5 @@
 /backend/node_modules/
 /backend/package-lock.json
 /data/tasks.json
+backend/uploads/
+.gitignore
