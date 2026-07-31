@@ -47,6 +47,18 @@ app.use('/uploads', express.static(uploadDir));
 
 /* ---------- Tasks ---------- */
 
+const CAT_LABELS = {
+  desain: 'Desain',
+  pengembangan: 'Pengembangan',
+  pengujian: 'Pengujian',
+  peluncuran: 'Peluncuran',
+  lainnya: 'Lainnya',
+  research: 'RnD (Research & Development)',
+  operasional: 'Operasional',
+};
+
+function catLabel(slug) { return CAT_LABELS[slug] || slug; }
+
 app.get('/api/tasks', async (req, res) => {
   try {
     const data = await storage.getAll();
@@ -61,6 +73,16 @@ app.get('/api/tasks/:id', async (req, res) => {
     const task = await storage.getById(parseInt(req.params.id, 10));
     if (!task) return res.status(404).json({ error: 'Task not found' });
     res.json({ task });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/tasks/:id/changelog', async (req, res) => {
+  try {
+    const taskId = parseInt(req.params.id, 10);
+    const logs = getTaskLogs(taskId);
+    res.json({ logs });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -82,8 +104,26 @@ app.post('/api/tasks', async (req, res) => {
 app.put('/api/tasks/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
+    const oldTask = await storage.getById(id);
+    if (!oldTask) return res.status(404).json({ error: 'Task not found' });
     const task = await storage.update(id, req.body);
     if (!task) return res.status(404).json({ error: 'Task not found' });
+
+    if (req.body.start !== undefined && req.body.start !== oldTask.start) {
+      appendTaskLog(id, 'Perubahan Start Date dari ' + oldTask.start + ' ke ' + req.body.start);
+    }
+    if (req.body.end !== undefined && req.body.end !== oldTask.end) {
+      appendTaskLog(id, 'Perubahan Due Date dari ' + oldTask.end + ' ke ' + req.body.end);
+    }
+    if (req.body.cat !== undefined && req.body.cat !== oldTask.cat) {
+      appendTaskLog(id, 'Perubahan Kategori dari ' + catLabel(oldTask.cat) + ' ke ' + catLabel(req.body.cat));
+    }
+    if (req.body.assignee !== undefined && req.body.assignee !== oldTask.assignee) {
+      const oldName = oldTask.assignee || '(kosong)';
+      const newName = req.body.assignee || '(kosong)';
+      appendTaskLog(id, 'Perubahan Penanggung Jawab dari ' + oldName + ' ke ' + newName);
+    }
+
     res.json({ task });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -136,6 +176,31 @@ function appendRestoreLog(status, filename) {
   } catch (_) { log = []; }
   log.unshift({ status, filename, restoreAt: new Date().toISOString() });
   fs.writeFileSync(restoreLogPath, JSON.stringify(log, null, 2), 'utf-8');
+}
+
+/* ---------- Task Changelog ---------- */
+
+const taskChangelogPath = path.join(path.dirname(config.dataPath), 'task-changelog.json');
+
+function appendTaskLog(taskId, action) {
+  let logs = [];
+  try {
+    if (fs.existsSync(taskChangelogPath)) {
+      logs = JSON.parse(fs.readFileSync(taskChangelogPath, 'utf-8'));
+    }
+  } catch (_) { logs = []; }
+  logs.unshift({ taskId, action, actionAt: new Date().toISOString() });
+  fs.writeFileSync(taskChangelogPath, JSON.stringify(logs, null, 2), 'utf-8');
+}
+
+function getTaskLogs(taskId) {
+  let logs = [];
+  try {
+    if (fs.existsSync(taskChangelogPath)) {
+      logs = JSON.parse(fs.readFileSync(taskChangelogPath, 'utf-8'));
+    }
+  } catch (_) { logs = []; }
+  return logs.filter(l => l.taskId === taskId);
 }
 
 /* ---------- Backups ---------- */
@@ -210,6 +275,7 @@ app.post('/api/tasks/:id/todos', async (req, res) => {
     if (!text) return res.status(400).json({ error: 'text is required' });
     const todo = await storage.addTodo(taskId, { text, due: due || null });
     if (!todo) return res.status(404).json({ error: 'Task not found' });
+    appendTaskLog(taskId, 'Menambahkan Sub Task: "' + text + '"');
     res.status(201).json({ todo });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -220,8 +286,27 @@ app.put('/api/tasks/:id/todos/:todoId', async (req, res) => {
   try {
     const taskId = parseInt(req.params.id, 10);
     const todoId = parseInt(req.params.todoId, 10);
+    const task = await storage.getById(taskId);
+    const oldTodo = task?.todos?.find(t => t.id === todoId);
     const todo = await storage.updateTodo(taskId, todoId, req.body);
     if (!todo) return res.status(404).json({ error: 'Task or Todo not found' });
+
+    if (oldTodo) {
+      const label = '"' + oldTodo.text + '"';
+      if (req.body.text !== undefined && req.body.text !== oldTodo.text) {
+        appendTaskLog(taskId, 'Perubahan Sub Task ' + label + ' ke "' + req.body.text + '"');
+      }
+      if (req.body.due !== undefined && req.body.due !== oldTodo.due) {
+        const oldDue = oldTodo.due || '(kosong)';
+        const newDue = req.body.due || '(kosong)';
+        appendTaskLog(taskId, 'Perubahan Due Date Sub Task ' + label + ' dari ' + oldDue + ' ke ' + newDue);
+      }
+      if (req.body.done !== undefined && req.body.done !== oldTodo.done) {
+        const status = req.body.done ? 'ditandai selesai' : 'ditandai belum selesai';
+        appendTaskLog(taskId, 'Sub Task ' + label + ' ' + status);
+      }
+    }
+
     res.json({ todo });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -232,8 +317,13 @@ app.delete('/api/tasks/:id/todos/:todoId', async (req, res) => {
   try {
     const taskId = parseInt(req.params.id, 10);
     const todoId = parseInt(req.params.todoId, 10);
+    const task = await storage.getById(taskId);
+    const oldTodo = task?.todos?.find(t => t.id === todoId);
     const ok = await storage.deleteTodo(taskId, todoId);
     if (!ok) return res.status(404).json({ error: 'Task or Todo not found' });
+    if (oldTodo) {
+      appendTaskLog(taskId, 'Menghapus Sub Task: "' + oldTodo.text + '"');
+    }
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

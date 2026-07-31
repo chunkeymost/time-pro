@@ -1431,6 +1431,58 @@
     text-align:center;
   }
 
+  /* ---------- Task Log History ---------- */
+  .task-log-section{
+    margin-top:14px;
+    border-top:1px solid var(--paper-line-strong);
+    padding-top:10px;
+  }
+  .task-log-section .todo-label{
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    padding:0 0 8px;
+    display:block;
+  }
+  .task-log-table{
+    max-height:200px;
+    overflow-y:auto;
+    display:block;
+  }
+  .task-log-table td{
+    font-size:11.5px;
+  }
+  .task-log-table .log-action-text{
+    color:var(--ink);
+    line-height:1.4;
+    width:70%;
+  }
+  .task-log-table .log-date-text{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    color:var(--ink-soft);
+    white-space:nowrap;
+    text-align:right;
+    width:30%;
+  }
+  .task-log-table .log-date-row{
+    display:block;
+    font-size:10.5px;
+  }
+  .task-log-table .log-time-row{
+    display:block;
+    font-size:10px;
+    color:var(--ink-faint);
+  }
+  .task-log-empty{
+    padding:16px 4px;
+    color:var(--ink-faint);
+    font-size:12px;
+    text-align:center;
+  }
+
   .empty-board{
     padding:60px 20px;
     text-align:center;
@@ -1594,6 +1646,16 @@
         <button class="btn btn-primary" id="save-btn">Simpan</button>
         <button class="btn btn-ghost" id="evidence-btn">+ Add Evidence</button>
       </div>
+    </div>
+
+    <div class="task-log-section" id="task-log-section" style="display:none;">
+      <label class="todo-label">Riwayat Perubahan</label>
+      <table class="todo-table task-log-table">
+        <thead>
+          <tr><th class="todo-num">No.</th><th>Log Action</th><th class="todo-due">Date Action</th></tr>
+        </thead>
+        <tbody id="task-log-body"></tbody>
+      </table>
     </div>
   </div>
 
@@ -1801,6 +1863,7 @@
   let nextTodoId = 1;
   let lastUpdated = null;
   let restoreLog = [];
+  let taskLogs = [];
   let editingTodoId = null;
   let selectedId = null;
   let view = "week"; // "week" | "month"
@@ -1859,6 +1922,8 @@
     reportContent: document.getElementById('report-content'),
     rStart: document.getElementById('r-start'),
     rEnd: document.getElementById('r-end'),
+    taskLogSection: document.getElementById('task-log-section'),
+    taskLogBody: document.getElementById('task-log-body'),
   };
 
   /* ---------------- API helper ---------------- */
@@ -2216,6 +2281,35 @@
     }).join('');
   }
 
+  /* ---------------- Task Log ---------------- */
+  async function loadTaskLog(taskId){
+    try {
+      const res = await fetch('/api/tasks/' + taskId + '/changelog');
+      const data = await res.json();
+      taskLogs = data.logs || [];
+    } catch(_){ taskLogs = []; }
+    renderTaskLog();
+  }
+
+  function renderTaskLog(){
+    els.taskLogBody.innerHTML = '';
+    if(!taskLogs || taskLogs.length === 0){
+      els.taskLogBody.innerHTML = '<tr><td colspan="3" class="task-log-empty">Belum ada riwayat perubahan.</td></tr>';
+      return;
+    }
+    taskLogs.forEach((log, i) => {
+      const d = new Date(log.actionAt);
+      const datePart = d.toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric' });
+      const timePart = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="todo-num">' + (i + 1) + '</td>' +
+        '<td class="log-action-text">' + escapeHtml(log.action) + '</td>' +
+        '<td class="log-date-text"><span class="log-date-row">' + datePart + '</span><span class="log-time-row">' + timePart + '</span></td>';
+      els.taskLogBody.appendChild(tr);
+    });
+  }
+
   /* ---------------- Master render ---------------- */
   function renderAll(scrollToToday){
     const range = computeRange();
@@ -2384,6 +2478,14 @@
     renderTodos(task);
     updateProgressSlider(task);
     updateProgressFromTodos(task);
+    if(task){
+      els.taskLogSection.style.display = '';
+      loadTaskLog(task.id);
+    } else {
+      els.taskLogSection.style.display = 'none';
+      taskLogs = [];
+      renderTaskLog();
+    }
     els.overlay.classList.add('open');
     els.fName.focus();
   }
@@ -2425,6 +2527,7 @@
         updateProgressFromTodos(task);
         renderTodos(task);
         updateBellDot();
+        if(editingId) loadTaskLog(editingId);
       });
       tr.querySelector('.todo-del-btn').addEventListener('click', function(){
         api.del('/api/tasks/'+task.id+'/todos/'+todo.id).catch(e => console.error('Delete todo failed:', e));
@@ -2433,6 +2536,7 @@
         renderTodos(task);
         updateProgressSlider(task);
         updateBellDot();
+        if(editingId) loadTaskLog(editingId);
       });
       tr.querySelector('.todo-text').addEventListener('click', function(){
         editingTodoId = todo.id;
@@ -2757,6 +2861,7 @@
     updateProgressFromTodos(t);
     updateProgressSlider(t);
     updateBellDot();
+    if(editingId) loadTaskLog(editingId);
   });
   els.todoInput.addEventListener('keydown', (e)=>{
     if(e.key==='Enter') els.todoAddBtn.click();
