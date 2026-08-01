@@ -153,8 +153,16 @@ app.delete('/api/tasks/:id', async (req, res) => {
 
 /* ---------- Backup ---------- */
 
+function copyIfExist(src, dest) {
+  try {
+    if (fs.existsSync(src)) fs.copyFileSync(src, dest);
+  } catch (_) {}
+}
+
 app.post('/api/backup', async (req, res) => {
   const dataDir = path.dirname(config.dataPath);
+  const backupDir = path.join(dataDir, 'backup');
+  if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
   const now = new Date();
   const y = now.getFullYear();
   const M = String(now.getMonth()+1).padStart(2,'0');
@@ -162,12 +170,35 @@ app.post('/api/backup', async (req, res) => {
   const h = String(now.getHours()).padStart(2,'0');
   const m = String(now.getMinutes()).padStart(2,'0');
   const s = String(now.getSeconds()).padStart(2,'0');
-  const filename = `task-${y}${M}${d}-${h}${m}${s}.json`;
-  const dest = path.join(dataDir, filename);
+  const timestamp = `${y}${M}${d}-${h}${m}${s}`;
+
+  const taskFile = `task-${timestamp}.json`;
+  const taskLogFile = `task-changelog-${timestamp}.json`;
+  const evidenceLogFile = `evidence-changelog-${timestamp}.json`;
+  const restoreLogFile = `restore-log-${timestamp}.json`;
+
   try {
-    fs.copyFileSync(config.dataPath, dest);
-    await storage.addRestoreLog('BackedUp', filename);
-    res.json({ success: true, file: filename });
+    // Baca tasks.json dan encode gambar evidence ke base64
+    const srcData = JSON.parse(fs.readFileSync(config.dataPath, 'utf-8'));
+    for (const task of srcData.tasks || []) {
+      for (const ev of task.evidences || []) {
+        if (ev.type === 'image' && ev.link) {
+          const imgPath = path.join(__dirname, ev.link);
+          if (fs.existsSync(imgPath)) {
+            const imgBuffer = fs.readFileSync(imgPath);
+            const ext = path.extname(ev.link).slice(1).toLowerCase();
+            ev._imageData = `data:image/${ext};base64,` + imgBuffer.toString('base64');
+          }
+        }
+      }
+    }
+    fs.writeFileSync(path.join(backupDir, taskFile), JSON.stringify(srcData, null, 2), 'utf-8');
+
+    copyIfExist(path.join(dataDir, 'task-changelog.json'), path.join(backupDir, taskLogFile));
+    copyIfExist(path.join(dataDir, 'evidence-changelog.json'), path.join(backupDir, evidenceLogFile));
+    copyIfExist(path.join(dataDir, 'restore-log.json'), path.join(backupDir, restoreLogFile));
+    await storage.addRestoreLog('BackedUp', taskFile);
+    res.json({ success: true, file: taskFile, logs: [taskLogFile, evidenceLogFile, restoreLogFile] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -176,15 +207,16 @@ app.post('/api/backup', async (req, res) => {
 /* ---------- Backups ---------- */
 
 app.get('/api/backups', async (req, res) => {
-  const dataDir = path.dirname(config.dataPath);
+  const backupDir = path.join(path.dirname(config.dataPath), 'backup');
   try {
-    const files = fs.readdirSync(dataDir)
-      .filter(f => /^task-\d{8}-\d{6}\.json$/.test(f))
+    const files = fs.readdirSync(backupDir)
+      .filter(f => /^(task|task-changelog|evidence-changelog|restore-log)-\d{8}-\d{6}\.json$/.test(f))
       .map(f => {
-        const stat = fs.statSync(path.join(dataDir, f));
-        const match = f.match(/^task-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})\.json$/);
-        const date = match ? `${match[1]}-${match[2]}-${match[3]} ${match[4]}:${match[5]}:${match[6]}` : '';
-        return { filename: f, date, size: stat.size };
+        const stat = fs.statSync(path.join(backupDir, f));
+        const match = f.match(/^(.+)-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})\.json$/);
+        const date = match ? `${match[2]}-${match[3]}-${match[4]} ${match[5]}:${match[6]}:${match[7]}` : '';
+        const type = match ? match[1] : 'unknown';
+        return { filename: f, type, date, size: stat.size };
       })
       .sort((a, b) => b.date.localeCompare(a.date));
     res.json({ backups: files });
@@ -206,7 +238,8 @@ app.post('/api/restore', async (req, res) => {
   const { filename } = req.body;
   if (!filename) return res.status(400).json({ error: 'filename is required' });
   const dataDir = path.dirname(config.dataPath);
-  const srcPath = path.join(dataDir, filename);
+  const backupDir = path.join(dataDir, 'backup');
+  const srcPath = path.join(backupDir, filename);
   const destPath = config.dataPath;
   try {
     if (!fs.existsSync(srcPath)) {
@@ -218,6 +251,29 @@ app.post('/api/restore', async (req, res) => {
       await storage.addRestoreLog('Failed', filename);
       return res.status(400).json({ error: 'Invalid backup file: no tasks array' });
     }
+
+    // Decode gambar dari base64 ke file uploads
+    const uploadsDir = path.join(__dirname, 'uploads');
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+    let imageCount = 0;
+    for (const task of srcData.tasks || []) {
+      for (const ev of task.evidences || []) {
+        if (ev.type === 'image' && ev._imageData) {
+          const match = ev._imageData.match(/^data:image\/(.+);base64,(.+)$/);
+          if (match) {
+            const ext = match[1];
+            const base64Data = match[2];
+            const imgFilename = path.basename(ev.link || `img-${ev.id}.${ext}`);
+            const imgPath = path.join(uploadsDir, imgFilename);
+            fs.writeFileSync(imgPath, Buffer.from(base64Data, 'base64'));
+            ev.link = 'uploads/' + imgFilename;
+            imageCount++;
+          }
+          delete ev._imageData;
+        }
+      }
+    }
+
     const currentData = JSON.parse(fs.readFileSync(destPath, 'utf-8'));
     currentData.tasks = srcData.tasks;
     currentData.nextId = srcData.nextId || srcData.tasks.length + 1;
@@ -225,8 +281,22 @@ app.post('/api/restore', async (req, res) => {
     currentData.nextEvidenceId = srcData.nextEvidenceId || 1;
     currentData.metadata.updatedAt = new Date().toISOString();
     fs.writeFileSync(destPath, JSON.stringify(currentData, null, 2), 'utf-8');
+
+    // Restore log history files dari backup
+    const timestamp = filename.replace(/^task-/, '').replace(/\.json$/, '');
+    const logFiles = [
+      { backup: `task-changelog-${timestamp}.json`, target: 'task-changelog.json' },
+      { backup: `evidence-changelog-${timestamp}.json`, target: 'evidence-changelog.json' },
+      { backup: `restore-log-${timestamp}.json`, target: 'restore-log.json' },
+    ];
+    for (const lf of logFiles) {
+      const src = path.join(backupDir, lf.backup);
+      const dest = path.join(dataDir, lf.target);
+      if (fs.existsSync(src)) fs.copyFileSync(src, dest);
+    }
+
     await storage.addRestoreLog('Restored', filename);
-    res.json({ success: true, taskCount: srcData.tasks.length });
+    res.json({ success: true, taskCount: srcData.tasks.length, imageCount });
   } catch (err) {
     await storage.addRestoreLog('Failed', filename);
     res.status(500).json({ error: err.message });
