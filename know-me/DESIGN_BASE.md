@@ -462,7 +462,52 @@ tbody tr:hover { background: var(--paper); }
 
 ---
 
-## 10. Animation & Transitions
+## 10. Background Grid Pattern
+
+Latar belakang aplikasi menggunakan pola grid kertas grafik (graph paper) yang dibuat murni dengan CSS gradient — tanpa file gambar atau library tambahan.
+
+### CSS Implementation
+
+```css
+body {
+  background:
+    /* Grid horizontal — garis 1px setiap 28px ke bawah */
+    linear-gradient(var(--paper-grid) 1px, transparent 1px) 0 0/100% 28px,
+    /* Grid vertikal — garis 1px setiap 28px ke samping */
+    linear-gradient(90deg, var(--paper-grid) 1px, transparent 1px) 0 0/28px 100%,
+    /* Warna latar dasar */
+    var(--paper);
+}
+```
+
+### Komponen
+
+| Layer | Fungsi | Value |
+|-------|--------|-------|
+| `linear-gradient(... 1px, transparent 1px)` | Membuat garis tipis 1px dengan sisa transparan | `var(--paper-grid)` |
+| `0 0/100% 28px` | Posisi awal (0,0), ukuran tile | lebar: 100%, tinggi: 28px |
+| `90deg` | Rotasi 90° untuk garis vertikal | — |
+| `var(--paper)` | Warna latar dasar | `#F6F8FB` (light) / `#1a1a2e` (dark) |
+
+### Nilai Grid per Theme
+
+| Theme | `--paper-grid` | Efek |
+|-------|----------------|------|
+| Light | `rgba(220,228,238,0.35)` | Grid abu-abu transparan |
+| Dark | `rgba(255,255,255,0.04)` | Grid putih sangat samar |
+
+### Spesifikasi
+
+- **Grid size**: 28px × 28px
+- **Garis**: 1px solid
+- **Warna**: Menggunakan CSS variable `--paper-grid` (otomatis berubah saat dark mode)
+- **Layering**: 2 gradient layer + 1 solid background color
+
+> Teknik ini sering disebut "CSS paper grid" atau "graph paper background". Seluruh pola dihasilkan oleh browser tanpa aset gambar tambahan.
+
+---
+
+## 11. Animation & Transitions
 
 | Timing | Properti | Elemen |
 |--------|----------|--------|
@@ -490,7 +535,7 @@ tbody tr:hover { background: var(--paper); }
 
 ---
 
-## 11. Responsive Breakpoints
+## 12. Responsive Breakpoints
 
 | Breakpoint | Perubahan |
 |------------|-----------|
@@ -499,7 +544,7 @@ tbody tr:hover { background: var(--paper); }
 
 ---
 
-## 12. Category System
+## 13. Category System
 
 7 kategori dengan warna dan bentuk unik (untuk legend dot dan sidebar tag dot).
 
@@ -527,7 +572,7 @@ tbody tr:hover { background: var(--paper); }
 
 ---
 
-## Aturan Pakai
+## 14. Aturan Pakai
 
 1. **Jangan hardcode value** — selalu gunakan CSS custom properties yang sudah ada.
 2. **Jangan tambah font baru** tanpa persetujuan — 3 font saat ini sudah cukup.
