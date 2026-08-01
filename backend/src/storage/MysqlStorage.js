@@ -332,6 +332,35 @@ class MysqlStorage {
     }
   }
 
+  async addTaskLog(taskId, action) {
+    const conn = await this._getConnection();
+    try {
+      await conn.execute(
+        'INSERT INTO task_changelog (task_id, action) VALUES (?, ?)',
+        [taskId, action]
+      );
+    } finally {
+      await conn.end();
+    }
+  }
+
+  async getTaskLogs(taskId) {
+    const conn = await this._getConnection();
+    try {
+      const [rows] = await conn.execute(
+        'SELECT task_id AS taskId, action, action_at AS actionAt FROM task_changelog WHERE task_id = ? ORDER BY action_at DESC',
+        [taskId]
+      );
+      return rows.map(r => ({
+        taskId: r.taskId,
+        action: r.action,
+        actionAt: r.actionAt ? r.actionAt.toISOString() : null,
+      }));
+    } finally {
+      await conn.end();
+    }
+  }
+
   async _resolveCategory(slug, conn) {
     if (!slug) return 2; // default: pengembangan
     const [rows] = await conn.execute(

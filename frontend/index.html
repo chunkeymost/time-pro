@@ -1027,6 +1027,54 @@
     font-style:italic;
   }
 
+  .evidence-log-section{
+    margin-top:14px;
+    border-top:1px solid var(--paper-line-strong);
+    padding-top:10px;
+    max-height:200px;
+    overflow-y:auto;
+  }
+  .evidence-log-section .todo-label{
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    padding:0 0 8px;
+    display:block;
+  }
+  .evidence-log-table td{
+    font-size:11.5px;
+  }
+  .evidence-log-table .log-action-text{
+    color:var(--ink);
+    line-height:1.4;
+    width:70%;
+  }
+  .evidence-log-table .log-date-text{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    color:var(--ink-soft);
+    white-space:nowrap;
+    text-align:right;
+    width:30%;
+  }
+  .evidence-log-table .log-date-row{
+    display:block;
+    font-size:10.5px;
+  }
+  .evidence-log-table .log-time-row{
+    display:block;
+    font-size:10px;
+    color:var(--ink-faint);
+  }
+  .evidence-log-empty{
+    padding:16px 4px;
+    color:var(--ink-faint);
+    font-size:12px;
+    text-align:center;
+  }
+
   /* ---------- Report Modal ---------- */
   .report-modal{
     width:60%;
@@ -1736,20 +1784,36 @@
       </div>
       <button class="btn btn-ghost" id="evidence-add-btn">Tambah</button>
     </div>
-    <table class="evidence-table">
-      <thead>
-        <tr>
-          <th class="evidence-num">No.</th>
-          <th class="evidence-date">Tanggal</th>
-          <th class="evidence-text">Evidence</th>
-          <th class="evidence-link">Link</th>
-          <th>Keterangan</th>
-          <th class="evidence-del"></th>
-        </tr>
-      </thead>
-      <tbody id="evidence-body"></tbody>
-    </table>
+      <table class="evidence-table">
+        <thead>
+          <tr>
+            <th class="evidence-num">No.</th>
+            <th class="evidence-date">Tanggal</th>
+            <th class="evidence-text">Evidence</th>
+            <th class="evidence-link">Link</th>
+            <th>Keterangan</th>
+            <th class="evidence-del"></th>
+          </tr>
+        </thead>
+        <tbody id="evidence-body"></tbody>
+      </table>
+
+      <div class="evidence-log-section" id="evidence-log-section">
+        <label class="todo-label">Riwayat Perubahan</label>
+        <table class="todo-table evidence-log-table">
+          <thead>
+            <tr>
+              <th class="todo-num">No.</th>
+              <th>Log Action</th>
+              <th class="todo-due">Tanggal</th>
+            </tr>
+          </thead>
+          <tbody id="evidence-log-body"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
+</div>
 </div>
 
 <!-- Report modal -->
@@ -1927,6 +1991,8 @@
     evidenceFileInput: document.getElementById('evidence-file-input'),
     evidenceImageKetInput: document.getElementById('evidence-image-ket-input'),
     evidenceAddBtn: document.getElementById('evidence-add-btn'),
+    evidenceLogSection: document.getElementById('evidence-log-section'),
+    evidenceLogBody: document.getElementById('evidence-log-body'),
     imgPreviewOverlay: document.getElementById('img-preview-overlay'),
     imgPreviewImg: document.getElementById('img-preview-img'),
     reportOverlay: document.getElementById('report-overlay'),
@@ -2710,6 +2776,7 @@
     document.querySelector('input[name="evidence-type"][value="link"]').checked = true;
     switchEvidenceMode('link');
     renderEvidences();
+    loadEvidenceLog(taskId);
     els.evidenceOverlay.classList.add('open');
   }
 
@@ -2764,6 +2831,7 @@
         await api.del('/api/tasks/'+task.id+'/evidences/'+evId).catch(e => console.error('Delete evidence failed:', e));
         task.evidences = task.evidences.filter(e => e.id !== evId);
         renderEvidences();
+        loadEvidenceLog(task.id);
       });
       if(isImage){
         tr.querySelector('.evidence-img-thumb').addEventListener('click', function(){
@@ -2790,6 +2858,7 @@
       els.evidenceFileInput.value = '';
       els.evidenceImageKetInput.value = '';
       renderEvidences();
+      loadEvidenceLog(task.id);
     } catch(e){ console.error('Failed to upload image evidence:', e); alert('Gagal upload gambar'); }
   }
 
@@ -2815,6 +2884,7 @@
       els.evidenceDescInput.value = '';
       els.evidenceTextInput.value = '';
       renderEvidences();
+      loadEvidenceLog(task.id);
       if(type === 'link') els.evidenceLinkInput.focus();
       else els.evidenceTextInput.focus();
     } catch(e){ console.error('Failed to add evidence:', e); }
@@ -2832,6 +2902,37 @@
   els.evidenceImageKetInput.addEventListener('keydown', (e)=>{
     if(e.key==='Enter') els.evidenceAddBtn.click();
   });
+
+  /* ---------------- Evidence Log ---------------- */
+  let evidenceLogs = [];
+
+  async function loadEvidenceLog(taskId){
+    try {
+      const res = await fetch('/api/tasks/' + taskId + '/evidence-changelog');
+      const data = await res.json();
+      evidenceLogs = data.logs || [];
+    } catch(_){ evidenceLogs = []; }
+    renderEvidenceLog();
+  }
+
+  function renderEvidenceLog(){
+    els.evidenceLogBody.innerHTML = '';
+    if(!evidenceLogs || evidenceLogs.length === 0){
+      els.evidenceLogBody.innerHTML = '<tr><td colspan="3" class="evidence-log-empty">Belum ada riwayat perubahan.</td></tr>';
+      return;
+    }
+    evidenceLogs.forEach((log, i) => {
+      const d = new Date(log.actionAt);
+      const datePart = d.toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric' });
+      const timePart = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="todo-num">' + (i + 1) + '</td>' +
+        '<td class="log-action-text">' + escapeHtml(log.action) + '</td>' +
+        '<td class="log-date-text"><span class="log-date-row">' + datePart + '</span><span class="log-time-row">' + timePart + '</span></td>';
+      els.evidenceLogBody.appendChild(tr);
+    });
+  }
 
   /* ---------------- Image Preview Lightbox ---------------- */
   function openImagePreview(src){

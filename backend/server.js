@@ -81,7 +81,17 @@ app.get('/api/tasks/:id', async (req, res) => {
 app.get('/api/tasks/:id/changelog', async (req, res) => {
   try {
     const taskId = parseInt(req.params.id, 10);
-    const logs = getTaskLogs(taskId);
+    const logs = await storage.getTaskLogs(taskId);
+    res.json({ logs });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/tasks/:id/evidence-changelog', async (req, res) => {
+  try {
+    const taskId = parseInt(req.params.id, 10);
+    const logs = getEvidenceLogs(taskId);
     res.json({ logs });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -110,18 +120,18 @@ app.put('/api/tasks/:id', async (req, res) => {
     if (!task) return res.status(404).json({ error: 'Task not found' });
 
     if (req.body.start !== undefined && req.body.start !== oldTask.start) {
-      appendTaskLog(id, 'Perubahan Start Date dari ' + oldTask.start + ' ke ' + req.body.start);
+      await storage.addTaskLog(id, 'Perubahan Start Date dari ' + oldTask.start + ' ke ' + req.body.start);
     }
     if (req.body.end !== undefined && req.body.end !== oldTask.end) {
-      appendTaskLog(id, 'Perubahan Due Date dari ' + oldTask.end + ' ke ' + req.body.end);
+      await storage.addTaskLog(id, 'Perubahan Due Date dari ' + oldTask.end + ' ke ' + req.body.end);
     }
     if (req.body.cat !== undefined && req.body.cat !== oldTask.cat) {
-      appendTaskLog(id, 'Perubahan Kategori dari ' + catLabel(oldTask.cat) + ' ke ' + catLabel(req.body.cat));
+      await storage.addTaskLog(id, 'Perubahan Kategori dari ' + catLabel(oldTask.cat) + ' ke ' + catLabel(req.body.cat));
     }
     if (req.body.assignee !== undefined && req.body.assignee !== oldTask.assignee) {
       const oldName = oldTask.assignee || '(kosong)';
       const newName = req.body.assignee || '(kosong)';
-      appendTaskLog(id, 'Perubahan Penanggung Jawab dari ' + oldName + ' ke ' + newName);
+      await storage.addTaskLog(id, 'Perubahan Penanggung Jawab dari ' + oldName + ' ke ' + newName);
     }
 
     res.json({ task });
@@ -178,26 +188,26 @@ function appendRestoreLog(status, filename) {
   fs.writeFileSync(restoreLogPath, JSON.stringify(log, null, 2), 'utf-8');
 }
 
-/* ---------- Task Changelog ---------- */
+/* ---------- Evidence Changelog ---------- */
 
-const taskChangelogPath = path.join(path.dirname(config.dataPath), 'task-changelog.json');
+const evidenceChangelogPath = path.join(path.dirname(config.dataPath), 'evidence-changelog.json');
 
-function appendTaskLog(taskId, action) {
+function appendEvidenceLog(taskId, evidenceId, action) {
   let logs = [];
   try {
-    if (fs.existsSync(taskChangelogPath)) {
-      logs = JSON.parse(fs.readFileSync(taskChangelogPath, 'utf-8'));
+    if (fs.existsSync(evidenceChangelogPath)) {
+      logs = JSON.parse(fs.readFileSync(evidenceChangelogPath, 'utf-8'));
     }
   } catch (_) { logs = []; }
-  logs.unshift({ taskId, action, actionAt: new Date().toISOString() });
-  fs.writeFileSync(taskChangelogPath, JSON.stringify(logs, null, 2), 'utf-8');
+  logs.unshift({ taskId, evidenceId, action, actionAt: new Date().toISOString() });
+  fs.writeFileSync(evidenceChangelogPath, JSON.stringify(logs, null, 2), 'utf-8');
 }
 
-function getTaskLogs(taskId) {
+function getEvidenceLogs(taskId) {
   let logs = [];
   try {
-    if (fs.existsSync(taskChangelogPath)) {
-      logs = JSON.parse(fs.readFileSync(taskChangelogPath, 'utf-8'));
+    if (fs.existsSync(evidenceChangelogPath)) {
+      logs = JSON.parse(fs.readFileSync(evidenceChangelogPath, 'utf-8'));
     }
   } catch (_) { logs = []; }
   return logs.filter(l => l.taskId === taskId);
@@ -275,7 +285,7 @@ app.post('/api/tasks/:id/todos', async (req, res) => {
     if (!text) return res.status(400).json({ error: 'text is required' });
     const todo = await storage.addTodo(taskId, { text, due: due || null });
     if (!todo) return res.status(404).json({ error: 'Task not found' });
-    appendTaskLog(taskId, 'Menambahkan Sub Task: "' + text + '"');
+    await storage.addTaskLog(taskId, 'Menambahkan Sub Task: "' + text + '"');
     res.status(201).json({ todo });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -294,16 +304,16 @@ app.put('/api/tasks/:id/todos/:todoId', async (req, res) => {
     if (oldTodo) {
       const label = '"' + oldTodo.text + '"';
       if (req.body.text !== undefined && req.body.text !== oldTodo.text) {
-        appendTaskLog(taskId, 'Perubahan Sub Task ' + label + ' ke "' + req.body.text + '"');
+        await storage.addTaskLog(taskId, 'Perubahan Sub Task ' + label + ' ke "' + req.body.text + '"');
       }
       if (req.body.due !== undefined && req.body.due !== oldTodo.due) {
         const oldDue = oldTodo.due || '(kosong)';
         const newDue = req.body.due || '(kosong)';
-        appendTaskLog(taskId, 'Perubahan Due Date Sub Task ' + label + ' dari ' + oldDue + ' ke ' + newDue);
+        await storage.addTaskLog(taskId, 'Perubahan Due Date Sub Task ' + label + ' dari ' + oldDue + ' ke ' + newDue);
       }
       if (req.body.done !== undefined && req.body.done !== oldTodo.done) {
         const status = req.body.done ? 'ditandai selesai' : 'ditandai belum selesai';
-        appendTaskLog(taskId, 'Sub Task ' + label + ' ' + status);
+        await storage.addTaskLog(taskId, 'Sub Task ' + label + ' ' + status);
       }
     }
 
@@ -322,7 +332,7 @@ app.delete('/api/tasks/:id/todos/:todoId', async (req, res) => {
     const ok = await storage.deleteTodo(taskId, todoId);
     if (!ok) return res.status(404).json({ error: 'Task or Todo not found' });
     if (oldTodo) {
-      appendTaskLog(taskId, 'Menghapus Sub Task: "' + oldTodo.text + '"');
+      await storage.addTaskLog(taskId, 'Menghapus Sub Task: "' + oldTodo.text + '"');
     }
     res.json({ success: true });
   } catch (err) {
@@ -340,6 +350,8 @@ app.post('/api/tasks/:id/evidences', async (req, res) => {
     if (!['link', 'text'].includes(evType)) return res.status(400).json({ error: 'type must be link or text' });
     const ev = await storage.addEvidence(taskId, { type: evType, link: link || '', keterangan: keterangan || '' });
     if (!ev) return res.status(404).json({ error: 'Task not found' });
+    const desc = keterangan || link || '';
+    appendEvidenceLog(taskId, ev.id, 'Menambahkan evidence ' + evType + ': ' + desc.substring(0, 80));
     res.status(201).json({ evidence: ev });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -350,8 +362,19 @@ app.put('/api/tasks/:id/evidences/:evId', async (req, res) => {
   try {
     const taskId = parseInt(req.params.id, 10);
     const evId = parseInt(req.params.evId, 10);
+    const oldTask = await storage.getById(taskId);
+    const oldEv = oldTask?.evidences?.find(e => e.id === evId);
     const ev = await storage.updateEvidence(taskId, evId, req.body);
     if (!ev) return res.status(404).json({ error: 'Task or Evidence not found' });
+    if (oldEv) {
+      const changes = [];
+      if (req.body.link !== undefined && req.body.link !== oldEv.link) changes.push('link');
+      if (req.body.keterangan !== undefined && req.body.keterangan !== oldEv.keterangan) changes.push('keterangan');
+      if (req.body.type !== undefined && req.body.type !== oldEv.type) changes.push('tipe');
+      if (changes.length > 0) {
+        appendEvidenceLog(taskId, evId, 'Mengubah evidence (ID: ' + evId + '): ' + changes.join(', '));
+      }
+    }
     res.json({ evidence: ev });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -374,6 +397,7 @@ app.post('/api/tasks/:id/evidences/image', (req, res, next) => {
     const keterangan = req.body.keterangan || '';
     const ev = await storage.addEvidence(taskId, { type: 'image', link: 'uploads/' + req.file.filename, keterangan });
     if (!ev) return res.status(404).json({ error: 'Task not found' });
+    appendEvidenceLog(taskId, ev.id, 'Menambahkan evidence gambar: ' + (keterangan || 'tanpa keterangan').substring(0, 80));
     res.status(201).json({ evidence: ev });
   } catch (err) {
     res.status(400).json({ error: 'Gagal upload gambar: ' + err.message });
@@ -388,9 +412,13 @@ app.delete('/api/tasks/:id/evidences/:evId', async (req, res) => {
     const ev = task?.evidences?.find(e => e.id === evId);
     const ok = await storage.deleteEvidence(taskId, evId);
     if (!ok) return res.status(404).json({ error: 'Task or Evidence not found' });
-    if (ev && ev.type === 'image' && ev.link) {
-      const filePath = path.join(__dirname, ev.link);
-      fs.unlink(filePath, () => {});
+    if (ev) {
+      const desc = ev.type === 'image' ? 'gambar' : (ev.link || ev.keterangan || '');
+      appendEvidenceLog(taskId, evId, 'Menghapus evidence (ID: ' + evId + '): ' + desc.substring(0, 60));
+      if (ev.type === 'image' && ev.link) {
+        const filePath = path.join(__dirname, ev.link);
+        fs.unlink(filePath, () => {});
+      }
     }
     res.json({ success: true });
   } catch (err) {

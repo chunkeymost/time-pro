@@ -21,9 +21,9 @@ module.exports = {
   dataPath: path.join(__dirname, '..', 'data', 'tasks.json'),
   mysql: {
     host: 'localhost',
-    port: 8889,
+    port: 3306,
     user: 'root',
-    password: 'root',
+    password: '!!&21adi',
     database: 'db_timepro',
   },
 };

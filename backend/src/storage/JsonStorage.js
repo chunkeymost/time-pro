@@ -195,6 +195,34 @@ class JsonStorage {
     this._save(data);
     return true;
   }
+
+  _getChangelogPath() {
+    return path.join(path.dirname(this.filePath), 'task-changelog.json');
+  }
+
+  addTaskLog(taskId, action) {
+    const logPath = this._getChangelogPath();
+    let logs = [];
+    try {
+      if (fs.existsSync(logPath)) {
+        logs = JSON.parse(fs.readFileSync(logPath, 'utf-8'));
+      }
+    } catch (_) { logs = []; }
+    logs.unshift({ taskId, action, actionAt: new Date().toISOString() });
+    fs.writeFileSync(logPath, JSON.stringify(logs, null, 2), 'utf-8');
+  }
+
+  getTaskLogs(taskId) {
+    const logPath = this._getChangelogPath();
+    let logs = [];
+    try {
+      if (fs.existsSync(logPath)) {
+        logs = JSON.parse(fs.readFileSync(logPath, 'utf-8'));
+      }
+    } catch (_) { logs = []; }
+    return logs.filter(l => l.taskId === taskId);
+  }
+
   getMetadata() {
     const data = this._load();
     const meta = data.metadata || {};
