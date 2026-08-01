@@ -1040,11 +1040,17 @@
   .report-section:last-child{ border-bottom:none; }
   .report-section-title{
     font-family:'Space Grotesk', sans-serif;
-    font-size:14px;
+    font-size:21px;
     font-weight:600;
     color:#000;
-    margin-bottom:8px;
     letter-spacing:.02em;
+  }
+  .report-title-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    margin-bottom:8px;
   }
   .report-table{
     width:100%;
@@ -1081,12 +1087,18 @@
     font-family:'IBM Plex Mono', monospace;
   }
   .report-progress{
-    display:inline-block;
-    padding:2px 8px;
-    border-radius:10px;
-    font-size:11px;
-    font-weight:600;
-    font-family:'IBM Plex Mono', monospace;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:10px 20px;
+    border-radius:8px;
+    font-size:36px;
+    font-weight:700;
+    font-family:'Space Grotesk',sans-serif;
+    white-space:nowrap;
+    background:var(--paper);
+    border:1px solid var(--paper-line);
+    line-height:1;
   }
   .report-todo-item{
     display:flex;
@@ -3129,9 +3141,6 @@
     html += '</div>';
 
     filtered.forEach((task, idx) => {
-      html += '<div class="report-section">';
-      html += '<div class="report-section-title"><i class="bi bi-folder"></i> ' + (idx+1) + '. ' + escapeHtml(task.name) + '</div>';
-      html += '<div class="report-task-meta">Kategori: ' + escapeHtml(task.cat || '-') + ' &bull; Assignee: ' + escapeHtml(task.assignee || '-') + ' &bull; Mulai: ' + fmt(task.start) + ' &bull; Selesai: ' + fmt(task.end) + '</div>';
       let actualProgress;
       if(task.todos && task.todos.length > 0){
         const taskDone = task.todos.filter(t => t.done).length;
@@ -3139,8 +3148,9 @@
       } else {
         actualProgress = 0;
       }
-      const progressColor = actualProgress >= 100 ? 'var(--status-done)' : actualProgress > 0 ? 'var(--status-progress)' : '#000';
-      html += '<div style="margin:6px 0 10px;"><span class="report-progress" style="background:' + progressColor + '22;color:#000;">Progres: ' + actualProgress + '%</span></div>';
+      const progressBg = actualProgress >= 100 ? 'background:#2e7d32;color:#fff;' : 'background:#e53935;color:#fff;';
+      html += '<div class="report-section">';
+      html += '<div class="report-title-row"><div><div class="report-section-title"><i class="bi bi-folder"></i> ' + (idx+1) + '. ' + escapeHtml(task.name) + '</div><div class="report-task-meta">Kategori: ' + escapeHtml(task.cat || '-') + ' &bull; Assignee: ' + escapeHtml(task.assignee || '-') + ' &bull; Mulai: ' + fmt(task.start) + ' &bull; Selesai: ' + fmt(task.end) + '</div></div><span class="report-progress" style="' + progressBg + '">' + actualProgress + '%</span></div>';
 
       if(task.todos && task.todos.length > 0){
         html += '<div class="report-section-title" style="font-size:12px;color:#000;margin-bottom:4px;"><i class="bi bi-list-check"></i> Sub Tugas (' + task.todos.length + ')</div>';
