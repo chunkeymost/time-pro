@@ -223,6 +223,60 @@ class JsonStorage {
     return logs.filter(l => l.taskId === taskId);
   }
 
+  _getEvidenceChangelogPath() {
+    return path.join(path.dirname(this.filePath), 'evidence-changelog.json');
+  }
+
+  addEvidenceLog(taskId, evidenceId, action) {
+    const logPath = this._getEvidenceChangelogPath();
+    let logs = [];
+    try {
+      if (fs.existsSync(logPath)) {
+        logs = JSON.parse(fs.readFileSync(logPath, 'utf-8'));
+      }
+    } catch (_) { logs = []; }
+    logs.unshift({ taskId, evidenceId, action, actionAt: new Date().toISOString() });
+    fs.writeFileSync(logPath, JSON.stringify(logs, null, 2), 'utf-8');
+  }
+
+  getEvidenceLogs(taskId) {
+    const logPath = this._getEvidenceChangelogPath();
+    let logs = [];
+    try {
+      if (fs.existsSync(logPath)) {
+        logs = JSON.parse(fs.readFileSync(logPath, 'utf-8'));
+      }
+    } catch (_) { logs = []; }
+    return logs.filter(l => l.taskId === taskId);
+  }
+
+  _getRestoreLogPath() {
+    return path.join(path.dirname(this.filePath), 'restore-log.json');
+  }
+
+  addRestoreLog(status, filename) {
+    const logPath = this._getRestoreLogPath();
+    let logs = [];
+    try {
+      if (fs.existsSync(logPath)) {
+        logs = JSON.parse(fs.readFileSync(logPath, 'utf-8'));
+      }
+    } catch (_) { logs = []; }
+    logs.unshift({ status, filename, restoreAt: new Date().toISOString() });
+    fs.writeFileSync(logPath, JSON.stringify(logs, null, 2), 'utf-8');
+  }
+
+  getRestoreLogs() {
+    const logPath = this._getRestoreLogPath();
+    let logs = [];
+    try {
+      if (fs.existsSync(logPath)) {
+        logs = JSON.parse(fs.readFileSync(logPath, 'utf-8'));
+      }
+    } catch (_) { logs = []; }
+    return logs;
+  }
+
   getMetadata() {
     const data = this._load();
     const meta = data.metadata || {};

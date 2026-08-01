@@ -1,0 +1,7 @@
+CREATE TABLE restore_log (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  status VARCHAR(50) NOT NULL,
+  filename VARCHAR(255) NOT NULL,
+  restore_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_restore_log_status (status)
+) ENGINE=InnoDB;

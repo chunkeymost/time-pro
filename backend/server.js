@@ -91,7 +91,7 @@ app.get('/api/tasks/:id/changelog', async (req, res) => {
 app.get('/api/tasks/:id/evidence-changelog', async (req, res) => {
   try {
     const taskId = parseInt(req.params.id, 10);
-    const logs = getEvidenceLogs(taskId);
+    const logs = await storage.getEvidenceLogs(taskId);
     res.json({ logs });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -166,52 +166,12 @@ app.post('/api/backup', async (req, res) => {
   const dest = path.join(dataDir, filename);
   try {
     fs.copyFileSync(config.dataPath, dest);
-    appendRestoreLog('BackedUp', filename);
+    await storage.addRestoreLog('BackedUp', filename);
     res.json({ success: true, file: filename });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
-
-/* ---------- Restore Log Helper ---------- */
-
-const restoreLogPath = path.join(path.dirname(config.dataPath), 'restore-log.json');
-
-function appendRestoreLog(status, filename) {
-  let log = [];
-  try {
-    if (fs.existsSync(restoreLogPath)) {
-      log = JSON.parse(fs.readFileSync(restoreLogPath, 'utf-8'));
-    }
-  } catch (_) { log = []; }
-  log.unshift({ status, filename, restoreAt: new Date().toISOString() });
-  fs.writeFileSync(restoreLogPath, JSON.stringify(log, null, 2), 'utf-8');
-}
-
-/* ---------- Evidence Changelog ---------- */
-
-const evidenceChangelogPath = path.join(path.dirname(config.dataPath), 'evidence-changelog.json');
-
-function appendEvidenceLog(taskId, evidenceId, action) {
-  let logs = [];
-  try {
-    if (fs.existsSync(evidenceChangelogPath)) {
-      logs = JSON.parse(fs.readFileSync(evidenceChangelogPath, 'utf-8'));
-    }
-  } catch (_) { logs = []; }
-  logs.unshift({ taskId, evidenceId, action, actionAt: new Date().toISOString() });
-  fs.writeFileSync(evidenceChangelogPath, JSON.stringify(logs, null, 2), 'utf-8');
-}
-
-function getEvidenceLogs(taskId) {
-  let logs = [];
-  try {
-    if (fs.existsSync(evidenceChangelogPath)) {
-      logs = JSON.parse(fs.readFileSync(evidenceChangelogPath, 'utf-8'));
-    }
-  } catch (_) { logs = []; }
-  return logs.filter(l => l.taskId === taskId);
-}
 
 /* ---------- Backups ---------- */
 
@@ -235,10 +195,7 @@ app.get('/api/backups', async (req, res) => {
 
 app.get('/api/restore-log', async (req, res) => {
   try {
-    if (!fs.existsSync(restoreLogPath)) {
-      return res.json({ restoreLog: [] });
-    }
-    const log = JSON.parse(fs.readFileSync(restoreLogPath, 'utf-8'));
+    const log = await storage.getRestoreLogs();
     res.json({ restoreLog: log });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -253,12 +210,12 @@ app.post('/api/restore', async (req, res) => {
   const destPath = config.dataPath;
   try {
     if (!fs.existsSync(srcPath)) {
-      appendRestoreLog('Failed', filename);
+      await storage.addRestoreLog('Failed', filename);
       return res.status(404).json({ error: 'File not found' });
     }
     const srcData = JSON.parse(fs.readFileSync(srcPath, 'utf-8'));
     if (!srcData.tasks || !Array.isArray(srcData.tasks)) {
-      appendRestoreLog('Failed', filename);
+      await storage.addRestoreLog('Failed', filename);
       return res.status(400).json({ error: 'Invalid backup file: no tasks array' });
     }
     const currentData = JSON.parse(fs.readFileSync(destPath, 'utf-8'));
@@ -268,10 +225,10 @@ app.post('/api/restore', async (req, res) => {
     currentData.nextEvidenceId = srcData.nextEvidenceId || 1;
     currentData.metadata.updatedAt = new Date().toISOString();
     fs.writeFileSync(destPath, JSON.stringify(currentData, null, 2), 'utf-8');
-    appendRestoreLog('Restored', filename);
+    await storage.addRestoreLog('Restored', filename);
     res.json({ success: true, taskCount: srcData.tasks.length });
   } catch (err) {
-    appendRestoreLog('Failed', filename);
+    await storage.addRestoreLog('Failed', filename);
     res.status(500).json({ error: err.message });
   }
 });
@@ -351,7 +308,7 @@ app.post('/api/tasks/:id/evidences', async (req, res) => {
     const ev = await storage.addEvidence(taskId, { type: evType, link: link || '', keterangan: keterangan || '' });
     if (!ev) return res.status(404).json({ error: 'Task not found' });
     const desc = keterangan || link || '';
-    appendEvidenceLog(taskId, ev.id, 'Menambahkan evidence ' + evType + ': ' + desc.substring(0, 80));
+    await storage.addEvidenceLog(taskId, ev.id, 'Menambahkan evidence ' + evType + ': ' + desc.substring(0, 80));
     res.status(201).json({ evidence: ev });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -372,7 +329,7 @@ app.put('/api/tasks/:id/evidences/:evId', async (req, res) => {
       if (req.body.keterangan !== undefined && req.body.keterangan !== oldEv.keterangan) changes.push('keterangan');
       if (req.body.type !== undefined && req.body.type !== oldEv.type) changes.push('tipe');
       if (changes.length > 0) {
-        appendEvidenceLog(taskId, evId, 'Mengubah evidence (ID: ' + evId + '): ' + changes.join(', '));
+        await storage.addEvidenceLog(taskId, evId, 'Mengubah evidence (ID: ' + evId + '): ' + changes.join(', '));
       }
     }
     res.json({ evidence: ev });
@@ -397,7 +354,7 @@ app.post('/api/tasks/:id/evidences/image', (req, res, next) => {
     const keterangan = req.body.keterangan || '';
     const ev = await storage.addEvidence(taskId, { type: 'image', link: 'uploads/' + req.file.filename, keterangan });
     if (!ev) return res.status(404).json({ error: 'Task not found' });
-    appendEvidenceLog(taskId, ev.id, 'Menambahkan evidence gambar: ' + (keterangan || 'tanpa keterangan').substring(0, 80));
+    await storage.addEvidenceLog(taskId, ev.id, 'Menambahkan evidence gambar: ' + (keterangan || 'tanpa keterangan').substring(0, 80));
     res.status(201).json({ evidence: ev });
   } catch (err) {
     res.status(400).json({ error: 'Gagal upload gambar: ' + err.message });
@@ -414,7 +371,7 @@ app.delete('/api/tasks/:id/evidences/:evId', async (req, res) => {
     if (!ok) return res.status(404).json({ error: 'Task or Evidence not found' });
     if (ev) {
       const desc = ev.type === 'image' ? 'gambar' : (ev.link || ev.keterangan || '');
-      appendEvidenceLog(taskId, evId, 'Menghapus evidence (ID: ' + evId + '): ' + desc.substring(0, 60));
+      await storage.addEvidenceLog(taskId, evId, 'Menghapus evidence (ID: ' + evId + '): ' + desc.substring(0, 60));
       if (ev.type === 'image' && ev.link) {
         const filePath = path.join(__dirname, ev.link);
         fs.unlink(filePath, () => {});

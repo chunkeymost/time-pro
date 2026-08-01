@@ -5,6 +5,76 @@ const config = require('./config');
 
 const FORCE = process.argv.includes('--force');
 
+async function importLogHistory(conn, jsonPath) {
+  const dataDir = path.dirname(jsonPath);
+  let taskLogCount = 0;
+  let evidenceLogCount = 0;
+  let restoreLogCount = 0;
+
+  // Import task-changelog.json
+  const taskChangelogPath = path.join(dataDir, 'task-changelog.json');
+  if (fs.existsSync(taskChangelogPath)) {
+    try {
+      const taskLogs = JSON.parse(fs.readFileSync(taskChangelogPath, 'utf-8'));
+      for (const log of taskLogs) {
+        const actionAt = log.actionAt
+          ? new Date(log.actionAt).toISOString().slice(0, 19).replace('T', ' ')
+          : new Date().toISOString().slice(0, 19).replace('T', ' ');
+        await conn.execute(
+          'INSERT IGNORE INTO task_changelog (task_id, action, action_at) VALUES (?, ?, ?)',
+          [log.taskId, log.action, actionAt]
+        );
+        taskLogCount++;
+      }
+      console.log(`  Import ${taskLogCount} task changelog entries.`);
+    } catch (e) {
+      console.warn('  Gagal import task-changelog:', e.message);
+    }
+  }
+
+  // Import evidence-changelog.json
+  const evidenceChangelogPath = path.join(dataDir, 'evidence-changelog.json');
+  if (fs.existsSync(evidenceChangelogPath)) {
+    try {
+      const evidenceLogs = JSON.parse(fs.readFileSync(evidenceChangelogPath, 'utf-8'));
+      for (const log of evidenceLogs) {
+        const actionAt = log.actionAt
+          ? new Date(log.actionAt).toISOString().slice(0, 19).replace('T', ' ')
+          : new Date().toISOString().slice(0, 19).replace('T', ' ');
+        await conn.execute(
+          'INSERT IGNORE INTO evidence_changelog (task_id, evidence_id, action, action_at) VALUES (?, ?, ?, ?)',
+          [log.taskId, log.evidenceId || null, log.action, actionAt]
+        );
+        evidenceLogCount++;
+      }
+      console.log(`  Import ${evidenceLogCount} evidence changelog entries.`);
+    } catch (e) {
+      console.warn('  Gagal import evidence-changelog:', e.message);
+    }
+  }
+
+  // Import restore-log.json
+  const restoreLogPath = path.join(dataDir, 'restore-log.json');
+  if (fs.existsSync(restoreLogPath)) {
+    try {
+      const restoreLogs = JSON.parse(fs.readFileSync(restoreLogPath, 'utf-8'));
+      for (const log of restoreLogs) {
+        const restoreAt = log.restoreAt
+          ? new Date(log.restoreAt).toISOString().slice(0, 19).replace('T', ' ')
+          : new Date().toISOString().slice(0, 19).replace('T', ' ');
+        await conn.execute(
+          'INSERT IGNORE INTO restore_log (status, filename, restore_at) VALUES (?, ?, ?)',
+          [log.status, log.filename, restoreAt]
+        );
+        restoreLogCount++;
+      }
+      console.log(`  Import ${restoreLogCount} restore log entries.`);
+    } catch (e) {
+      console.warn('  Gagal import restore-log:', e.message);
+    }
+  }
+}
+
 async function seedFromJson() {
   const jsonPath = config.dataPath;
   if (!fs.existsSync(jsonPath)) {
@@ -65,6 +135,9 @@ async function seedFromJson() {
           }
         }
         console.log(`Sync ${syncCount} evidences dari data JSON.`);
+
+        console.log('Import log history...');
+        await importLogHistory(conn, jsonPath);
 
         console.log('Gunakan --force untuk mengulang (hapus data lama + re-import).');
         await conn.end();
@@ -194,6 +267,9 @@ async function seedFromJson() {
     await conn.commit();
 
     console.log(`Import selesai: ${taskCount} tasks, ${todoCount} todos, ${evidenceCount} evidences`);
+
+    // Import log history dari JSON ke MySQL
+    await importLogHistory(conn, jsonPath);
   } catch (err) {
     await conn.rollback();
     console.error('Gagal import data:', err.message);

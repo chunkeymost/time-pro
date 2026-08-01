@@ -361,6 +361,64 @@ class MysqlStorage {
     }
   }
 
+  async addEvidenceLog(taskId, evidenceId, action) {
+    const conn = await this._getConnection();
+    try {
+      await conn.execute(
+        'INSERT INTO evidence_changelog (task_id, evidence_id, action) VALUES (?, ?, ?)',
+        [taskId, evidenceId, action]
+      );
+    } finally {
+      await conn.end();
+    }
+  }
+
+  async getEvidenceLogs(taskId) {
+    const conn = await this._getConnection();
+    try {
+      const [rows] = await conn.execute(
+        'SELECT task_id AS taskId, evidence_id AS evidenceId, action, action_at AS actionAt FROM evidence_changelog WHERE task_id = ? ORDER BY action_at DESC',
+        [taskId]
+      );
+      return rows.map(r => ({
+        taskId: r.taskId,
+        evidenceId: r.evidenceId,
+        action: r.action,
+        actionAt: r.actionAt ? r.actionAt.toISOString() : null,
+      }));
+    } finally {
+      await conn.end();
+    }
+  }
+
+  async addRestoreLog(status, filename) {
+    const conn = await this._getConnection();
+    try {
+      await conn.execute(
+        'INSERT INTO restore_log (status, filename) VALUES (?, ?)',
+        [status, filename]
+      );
+    } finally {
+      await conn.end();
+    }
+  }
+
+  async getRestoreLogs() {
+    const conn = await this._getConnection();
+    try {
+      const [rows] = await conn.execute(
+        'SELECT status, filename, restore_at AS restoreAt FROM restore_log ORDER BY restore_at DESC'
+      );
+      return rows.map(r => ({
+        status: r.status,
+        filename: r.filename,
+        restoreAt: r.restoreAt ? r.restoreAt.toISOString() : null,
+      }));
+    } finally {
+      await conn.end();
+    }
+  }
+
   async _resolveCategory(slug, conn) {
     if (!slug) return 2; // default: pengembangan
     const [rows] = await conn.execute(
