@@ -295,7 +295,14 @@ app.post('/api/restore', async (req, res) => {
       if (fs.existsSync(src)) fs.copyFileSync(src, dest);
     }
 
-    await storage.addRestoreLog('Restored', filename);
+    const restoredFiles = [filename];
+    for (const lf of logFiles) {
+      const src = path.join(backupDir, lf.backup);
+      if (fs.existsSync(src)) restoredFiles.push(lf.backup);
+    }
+    for (const f of restoredFiles) {
+      await storage.addRestoreLog('Restored', f);
+    }
     res.json({ success: true, taskCount: srcData.tasks.length, imageCount });
   } catch (err) {
     await storage.addRestoreLog('Failed', filename);
