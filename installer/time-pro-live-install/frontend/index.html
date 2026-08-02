@@ -1,0 +1,3376 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proyek Management | as System Analyst</title>
+<link rel="icon" type="image/svg+xml" href="kanban-fill.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+  :root{
+    --paper:#F6F8FB;
+    --paper-line:#DCE4EE;
+    --paper-line-strong:#C4D0E0;
+    --paper-grid:rgba(220,228,238,0.35);
+    --ink:#1B3350;
+    --ink-soft:#5B7290;
+    --ink-faint:#8B9CB3;
+    --surface:#FFFFFF;
+    --gold:#C99A3B;
+    --gold-soft:#F1E4C6;
+    --status-done:#3F8F63;
+    --status-progress:#2F6BA3;
+    --status-planned:#8996A8;
+    --status-risk:#B5482F;
+    --cut-line:#C0392B;
+    --sky:#74B9FF;
+    --shadow:0 1px 2px rgba(27,51,80,.06), 0 6px 16px rgba(27,51,80,.07);
+    --radius:0px;
+  }
+  [data-theme="dark"]{
+    --paper:#1a1a2e;
+    --paper-line:#2a2a3e;
+    --paper-line-strong:#3a3a4e;
+    --paper-grid:rgba(255,255,255,0.04);
+    --ink:#e8e8f0;
+    --ink-soft:#a8a8b8;
+    --ink-faint:#787888;
+    --surface:#242438;
+    --gold:#e2b84d;
+    --gold-soft:#3a3020;
+    --status-done:#4CAF50;
+    --status-progress:#42a5f5;
+    --status-planned:#90a4ae;
+    --status-risk:#ef5350;
+    --cut-line:#ef5350;
+    --sky:#4fc3f7;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 6px 16px rgba(0,0,0,.4);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%; overflow:hidden;}
+  body{
+    margin:0;
+    background:
+      linear-gradient(var(--paper-grid) 1px, transparent 1px) 0 0/100% 28px,
+      linear-gradient(90deg, var(--paper-grid) 1px, transparent 1px) 0 0/28px 100%,
+      var(--paper);
+    background-color:var(--paper);
+    color:var(--ink);
+    font-family:'Inter', sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  ::selection{background:var(--gold-soft);}
+
+  /* ---------- App shell ---------- */
+  .app{
+    height:100vh;
+    display:flex;
+    flex-direction:column;
+    max-width:100%;
+    margin:0 auto;
+    padding:clamp(12px,3.5vw,28px) clamp(12px,3.5vw,28px) 0;
+  }
+
+  /* ---------- Header ---------- */
+  .app-header{
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:24px;
+    flex-wrap:wrap;
+    padding-bottom:20px;
+    margin-bottom:22px;
+    position:sticky;
+    top:0;
+    z-index:10;
+    background:transparent;
+    flex-shrink:0;
+  }
+  .title-block{display:flex; flex-direction:column; gap:6px; min-width:280px;}
+  .title-row{display:flex; align-items:center; gap:6px;}
+  .title-edit-icon{
+    font-size:28px;
+    color:var(--ink-faint);
+    cursor:pointer;
+    opacity:0;
+    transition:opacity .15s;
+    flex-shrink:0;
+  }
+  .title-row:hover .title-edit-icon{ opacity:1; }
+  .title-edit-icon:hover{ color:var(--ink); }
+  .title-input{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:30px;
+    font-weight:700;
+    color:var(--ink);
+    background:var(--surface);
+    border:1px solid var(--paper-line-strong);
+    border-radius:7px;
+    padding:0 6px;
+    outline:2px solid var(--gold);
+    width:100%;
+    min-width:200px;
+  }
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--gold);
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .eyebrow::before{
+    content:'';
+    width:18px; height:1px;
+    background:var(--gold);
+    display:inline-block;
+  }
+  #project-title{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:30px;
+    font-weight:700;
+    color:var(--ink);
+  }
+  .project-sub{
+    font-size:13px;
+    color:var(--ink-soft);
+    font-family:'IBM Plex Mono', monospace;
+  }
+
+  .header-actions{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+
+  .view-toggle{
+    display:flex;
+    border:1px solid var(--ink);
+    border-radius:8px;
+    overflow:hidden;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+  }
+  .view-toggle button{
+    padding:9px 14px;
+    background:var(--surface);
+    border:none;
+    color:var(--ink-soft);
+    cursor:pointer;
+    letter-spacing:.03em;
+  }
+  .view-toggle button + button{ border-left:1px solid var(--ink); }
+  .view-toggle button.active{
+    background:var(--ink);
+    color:var(--paper);
+  }
+
+  .bell-btn{
+    position:relative;
+    background:none;
+    border:none;
+    color:var(--ink-soft);
+    cursor:pointer;
+    padding:8px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:8px;
+    transition:color .15s, background .15s;
+  }
+  .bell-btn:hover{
+    color:var(--ink);
+    background:var(--paper);
+  }
+  .bell-dot{
+    position:absolute;
+    top:5px;
+    right:5px;
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    background:#ef4444;
+    display:none;
+  }
+  .bell-dot.active{
+    display:block;
+    animation:bell-blink 1.2s ease-in-out infinite;
+  }
+  @keyframes bell-blink{
+    0%,100%{ opacity:1; }
+    50%{ opacity:.2; }
+  }
+
+  .btn{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:600;
+    font-size:13.5px;
+    border-radius:8px;
+    padding:10px 16px;
+    cursor:pointer;
+    border:1px solid transparent;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .btn:active{ transform:translateY(1px); }
+  .btn-primary{
+    background:var(--ink);
+    color:var(--paper);
+    box-shadow:var(--shadow);
+  }
+  .btn-primary:hover{ background:#142842; color:#fff; }
+  .btn-ghost{
+    background:var(--surface);
+    border:1px solid var(--paper-line-strong);
+    color:var(--ink);
+  }
+  .btn-ghost:hover{ border-color:var(--ink-soft); }
+  .btn-report{
+    background:#3F8F63;
+    color:#fff;
+    border:1px solid #3F8F63;
+    font-size:12.5px;
+    font-weight:600;
+    font-family:'Space Grotesk', sans-serif;
+    padding:10px 16px;
+    border-radius:7px;
+    cursor:pointer;
+    transition:background .15s;
+  }
+  .btn-report:hover{ background:#2d7a50; }
+  #backup-btn{ background:#E67E22; border-color:#E67E22; color:#fff; }
+  #backup-btn:hover{ background:#D35400; border-color:#D35400; }
+  #backup-btn:disabled{ background:#CCC; border-color:#CCC; color:#999; cursor:not-allowed; opacity:0.6; }
+
+  .theme-toggle{
+    font-size:18px;
+    padding:8px 12px;
+    line-height:1;
+  }
+
+  [data-theme="dark"] .btn-primary{
+    background:var(--ink);
+    color:var(--paper);
+  }
+  [data-theme="dark"] .btn-primary:hover{ background:#2a3a50; color:#fff; }
+  [data-theme="dark"] .btn-ghost{
+    background:var(--surface);
+    border-color:var(--paper-line-strong);
+    color:var(--ink);
+  }
+  [data-theme="dark"] .btn-ghost:hover{ border-color:var(--ink-soft); }
+  [data-theme="dark"] .view-toggle button{ background:var(--surface); color:var(--ink-soft); }
+  [data-theme="dark"] .view-toggle button.active{ background:var(--ink); color:var(--paper); }
+  [data-theme="dark"] .view-toggle{ border-color:var(--ink); }
+  [data-theme="dark"] .view-toggle button+button{ border-color:var(--ink); }
+  [data-theme="dark"] .bell-btn:hover{ background:var(--paper); color:var(--ink); }
+  [data-theme="dark"] .toast{ color:#fff; }
+  [data-theme="dark"] .overlay.open{ background:rgba(0,0,0,.55); }
+  [data-theme="dark"] .confirm-overlay{ background:rgba(0,0,0,.6); }
+  [data-theme="dark"] .restore-history-status.Restored{ background:rgba(63,143,99,0.2); }
+  [data-theme="dark"] .restore-history-status.Failed{ background:rgba(181,72,47,0.2); }
+  [data-theme="dark"] .restore-history-status.BackedUp{ background:rgba(201,154,59,0.2); color:var(--gold); }
+  [data-theme="dark"] .scroll-area::before{ background:linear-gradient(to bottom, rgba(0,0,0,.55) 0%, transparent 100%); }
+
+  /* ---------- Scroll Area ---------- */
+  .scroll-area{
+    flex:1;
+    min-height:0;
+    overflow-y:auto;
+    padding-bottom:clamp(12px,3.5vw,28px);
+    position:relative;
+  }
+  .scroll-area::before{
+    content:'';
+    position:sticky;
+    display:block;
+    left:0; right:0;
+    height:24px;
+    pointer-events:none;
+    z-index:4;
+    opacity:0;
+    transition:opacity .25s ease;
+    flex-shrink:0;
+    top:0;
+    background:linear-gradient(to bottom, rgba(27,51,80,.3) 0%, transparent 100%);
+  }
+  .scroll-area.scrolled-top::before{ opacity:1; }
+
+  /* ---------- Legend ---------- */
+  .legend{
+    display:flex;
+    gap:18px;
+    flex-wrap:wrap;
+    margin-bottom:18px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11.5px;
+    color:var(--ink-soft);
+  }
+  .legend-label{font-weight:600; color:var(--ink); margin-right:4px;}
+  .legend-item{display:flex; align-items:center; gap:7px;}
+  .legend-dot{width:9px; height:9px; display:inline-block;}
+
+  /* ---------- Toast ---------- */
+  .toast-container{
+    position:fixed; bottom:24px; right:24px;
+    display:flex; flex-direction:column-reverse; gap:8px;
+    z-index:999;
+  }
+  .toast{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:13px; font-weight:500;
+    padding:12px 20px; border-radius:8px;
+    color:#fff; box-shadow:var(--shadow);
+    animation:toast-in .25s ease;
+  }
+  .toast.success{ background:var(--status-done); }
+  .toast.error{ background:var(--status-risk); }
+  @keyframes toast-in{
+    from{ opacity:0; transform:translateY(12px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+
+  /* ---------- Board layout ---------- */
+  .board{
+    display:grid;
+    grid-template-columns:calc(350px + 7vw) 1fr;
+    border:0.1px solid var(--paper-line-strong);
+    border-radius:var(--radius);
+    background:var(--surface);
+    box-shadow:var(--shadow);
+    margin-top: -20px;
+  }
+
+  /* Sidebar */
+  .sidebar{
+    border-right:1px solid var(--paper-line-strong);
+    display:flex;
+    flex-direction:column;
+  }
+  .sidebar-head{
+    position:sticky;
+    top:0;
+    z-index:3;
+    height:56px;
+    display:flex;
+    align-items:center;
+    padding:0 16px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    border-bottom:1px solid var(--paper-line-strong);
+    background:var(--paper);
+  }
+  .sidebar-list{ flex:1; overflow:hidden; }
+  .sidebar-row{
+    height:52px;
+    padding:0 16px;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    gap:2px;
+    border-bottom:1px solid var(--paper-line);
+    cursor:pointer;
+  }
+  .sidebar-row:hover{ background:var(--paper); }
+  .sidebar-row.selected{ background:var(--gold-soft); }
+  .sidebar-row.done{ background:rgba(34,197,94,0.1); }
+  .sidebar-row.done:hover{ background:rgba(34,197,94,0.16); }
+  .sidebar-row.done.selected{ background:rgba(34,197,94,0.18); }
+  .sidebar-row.overdue{ background:rgba(181,72,47,0.1); }
+  .sidebar-row.overdue:hover{ background:rgba(181,72,47,0.16); }
+  .sidebar-row.overdue.selected{ background:rgba(181,72,47,0.18); }
+  .sidebar-row.overdue .name{ color:var(--status-risk); }
+  .sidebar-row.overdue .meta{ color:var(--status-risk); }
+  .overdue-flag{ flex-shrink:0; font-size:14px; color:var(--status-risk); }
+  .sidebar-row-top{ display:flex; align-items:center; gap:6px; }
+  .sidebar-row-top .name{ flex:1; min-width:0; }
+  .done-flag{ flex-shrink:0; font-size:14px; }
+  .sidebar-row .name{
+    font-size:13.5px;
+    font-weight:600;
+    color:var(--ink);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .sidebar-row .meta{
+    font-size:11px;
+    color:var(--ink-soft);
+    font-family:'IBM Plex Mono', monospace;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .meta .tag-dot{ width:7px; height:7px; display:inline-block; }
+  .sidebar-empty{
+    padding:26px 16px;
+    font-size:12.5px;
+    color:var(--ink-faint);
+    line-height:1.5;
+  }
+  
+  /* Timeline */
+  .timeline-group{
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+    min-height:0;
+  }
+  .timeline-wrap{
+    overflow-x:auto;
+    overflow-y:hidden;
+    position:relative;
+    min-width:0;
+  }
+  .timeline-inner{ position:relative; }
+
+  .ruler{
+    position:sticky;
+    top:0;
+    z-index:3;
+    height:56px;
+    overflow:hidden;
+    flex-shrink:0;
+    border-bottom:1px solid var(--paper-line-strong);
+    background:var(--surface);
+  }
+  .ruler-scroll{
+    position:relative;
+    height:56px;
+    background-image:
+      repeating-linear-gradient(90deg, transparent 0, transparent calc(var(--day-w) - 1px), var(--paper-line) calc(var(--day-w) - 1px), var(--paper-line) var(--day-w));
+  }
+  .ruler-month{
+    position:absolute;
+    top:8px;
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:600;
+    font-size:12.5px;
+    color:var(--ink);
+    padding-left:4px;
+    border-left:1px solid var(--ink-soft);
+    white-space:nowrap;
+  }
+  .ruler-day{
+    position:absolute;
+    bottom:6px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:9.5px;
+    color:var(--ink-faint);
+    width:var(--day-w);
+    text-align:center;
+  }
+  .ruler-day.weekend{ color:var(--gold); }
+  .ruler-tick{
+    position:absolute;
+    bottom:0;
+    width:1px;
+    height:6px;
+    background:var(--paper-line-strong);
+  }
+
+  .rows{ position:relative; }
+  .row-bg{
+    height:52px;
+    border-bottom:1px solid var(--paper-line);
+    position:relative;
+  }
+  .row-bg.weekend-shade::before{
+    content:'';
+  }
+  .weekend-col{
+    position:absolute;
+    top:0; bottom:0;
+    width:var(--day-w);
+    background:rgba(139,156,179,0.06);
+    pointer-events:none;
+  }
+
+  .today-line{
+    position:absolute;
+    top:0; bottom:0;
+    width:2px;
+    background:var(--cut-line);
+    z-index:2;
+    pointer-events:none;
+  }
+  .today-line::before{
+    content:'HARI INI';
+    position:absolute;
+    top:-2px;
+    left:5px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:9px;
+    letter-spacing:.08em;
+    color:var(--cut-line);
+    white-space:nowrap;
+    margin-top: 48px;
+  }
+  [data-theme="dark"] .today-line::before{ color:#fff; }
+  .today-line::after{
+    content:'';
+    position:absolute;
+    top:0; left:-3px;
+    width:0; height:0;
+    border-left:4px solid transparent;
+    border-right:4px solid transparent;
+    border-top:6px solid var(--cut-line);
+  }
+
+  .bar{
+    position:absolute;
+    top:10px;
+    height:32px;
+    border-radius:7px;
+    box-shadow:0 1px 2px rgba(27,51,80,.18);
+    cursor:grab;
+    display:flex;
+    align-items:center;
+    z-index:2;
+    border:1px solid rgba(0,0,0,.08);
+  }
+  .bar:active{ cursor:grabbing; }
+  .bar .fill{
+    position:absolute;
+    left:0; top:0; bottom:0;
+    border-radius:7px 0 0 7px;
+    background:rgba(255,255,255,.32);
+  }
+  .bar .label{
+    position:relative;
+    padding:0 10px;
+    font-size:12px;
+    font-weight:700;
+    color:#000;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    pointer-events:none;
+  }
+  .bar .pct{
+    position:relative;
+    margin-left:auto;
+    padding-right:10px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    color:#000;
+    pointer-events:none;
+  }
+  .handle{
+    position:absolute;
+    top:0; bottom:0;
+    width:8px;
+    cursor:ew-resize;
+    z-index:3;
+  }
+  .handle.left{ left:0; }
+  .handle.right{ right:0; }
+
+  .cat-desain{ background:var(--status-progress); }
+  .cat-pengembangan{ background:var(--ink); }
+  .cat-pengujian{ background:var(--status-done); }
+  .cat-peluncuran{ background:var(--status-risk); }
+  .cat-lainnya{ background:var(--status-planned); }
+  .cat-research{ background:var(--gold); }
+  .cat-operasional{ background:var(--sky); }
+
+  .legend-dot.cat-desain, .tag-dot.cat-desain{ clip-path:polygon(50% 0%,0% 100%,100% 100%); }
+  .legend-dot.cat-pengembangan, .tag-dot.cat-pengembangan{ clip-path:circle(50%); }
+  .legend-dot.cat-pengujian, .tag-dot.cat-pengujian{ clip-path:polygon(50% 0%,100% 38%,82% 100%,18% 100%,0% 38%); }
+  .legend-dot.cat-peluncuran, .tag-dot.cat-peluncuran{ clip-path:none; }
+  .legend-dot.cat-lainnya, .tag-dot.cat-lainnya{ clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%); }
+  .legend-dot.cat-research, .tag-dot.cat-research{ clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%); }
+  .legend-dot.cat-operasional, .tag-dot.cat-operasional{ clip-path:polygon(5% 75%,5% 50%,15% 35%,30% 25%,50% 20%,65% 25%,80% 15%,90% 30%,95% 50%,95% 75%); }
+  .cat-today{ background:var(--cut-line); }
+  .legend-dot.cat-today{ clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%); }
+
+  /* ---------- Side Panel ---------- */
+  .overlay{
+    position:fixed; inset:0;
+    background:rgba(27,51,80,0);
+    z-index:50;
+    display:flex;
+    justify-content:flex-end;
+    visibility:hidden;
+    opacity:0;
+    transition:opacity .25s ease, visibility .25s ease, background .25s ease;
+    pointer-events:none;
+  }
+  .overlay.open{
+    background:rgba(27,51,80,.35);
+    visibility:visible;
+    opacity:1;
+    pointer-events:auto;
+  }
+  .modal{
+    background:var(--surface);
+    width:45%;
+    max-width:100vw;
+    height:100%;
+    box-shadow:-4px 0 24px rgba(15,30,50,.25);
+    padding:24px;
+    font-family:'Inter', sans-serif;
+    overflow-y:auto;
+    transform:translateX(100%);
+    transition:transform .25s ease;
+    position:relative;
+  }
+  .overlay.open .modal{
+    transform:translateX(0);
+  }
+  .modal-head{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    margin-bottom:4px;
+  }
+  .modal-head h2{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:19px;
+    margin:0;
+    color:var(--ink);
+  }
+  .modal-close{
+    background:none; border:none;
+    font-size:24px;
+    color:var(--ink-soft);
+    cursor:pointer;
+    padding:0 2px;
+    line-height:1;
+  }
+  .modal-close:hover{ color:var(--ink); }
+  .modal .modal-sub{
+    font-size:12px;
+    color:var(--ink-soft);
+    font-family:'IBM Plex Mono', monospace;
+    margin-bottom:18px;
+  }
+  .field{ margin-bottom:14px; }
+  .field label{
+    display:block;
+    font-size:11.5px;
+    font-weight:600;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin-bottom:6px;
+  }
+  .field input[type=text], .field input[type=date], .field select{
+    width:100%;
+    padding:9px 10px;
+    border:1px solid var(--paper-line-strong);
+    border-radius:7px;
+    font-size:13.5px;
+    font-family:'Inter', sans-serif;
+    color:var(--ink);
+    background:var(--paper);
+  }
+  .field input:focus, .field select:focus{
+    outline:2px solid var(--gold);
+    outline-offset:1px;
+  }
+  [data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator{
+    filter:invert(1);
+  }
+  .row-2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .range-row{ display:flex; align-items:center; gap:10px; }
+  .range-row input[type=range]{ flex:1; accent-color:var(--ink); }
+  .range-val{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    color:var(--ink);
+    width:36px;
+    text-align:right;
+  }
+  .modal-actions{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+  }
+  .link-danger{
+    background:rgba(181,72,47,0.1);
+    border:1px solid var(--status-risk);
+    color:var(--status-risk);
+    font-size:12.5px;
+    font-family:'IBM Plex Mono', monospace;
+    cursor:pointer;
+    padding:10px 16px;
+    border-radius:8px;
+  }
+  .link-danger:hover{ background:rgba(181,72,47,0.2); }
+  .modal-actions-right{ display:flex; gap:8px; }
+
+  /* ---------- Confirm dialog ---------- */
+  .confirm-overlay{
+    position:fixed; inset:0;
+    background:rgba(27,51,80,0.45);
+    z-index:60;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    pointer-events:auto;
+  }
+  .confirm-overlay.open{ display:flex; }
+  .confirm-box{
+    background:var(--surface);
+    border-radius:12px;
+    box-shadow:0 20px 50px rgba(15,30,50,.25);
+    padding:28px 24px 20px;
+    text-align:center;
+    width:340px;
+    max-width:100%;
+    font-family:'Inter', sans-serif;
+  }
+  .confirm-icon{
+    width:44px; height:44px;
+    border-radius:50%;
+    background:rgba(181,72,47,0.12);
+    color:var(--status-risk);
+    font-size:22px;
+    font-weight:700;
+    line-height:44px;
+    text-align:center;
+    margin:0 auto 14px;
+  }
+  .confirm-msg{
+    font-size:14px;
+    color:var(--ink);
+    margin-bottom:20px;
+    line-height:1.4;
+  }
+  .confirm-actions{
+    display:flex;
+    gap:10px;
+    justify-content:center;
+  }
+  .confirm-yes{
+    background:var(--status-risk);
+    color:#fff;
+    border:1px solid var(--status-risk);
+  }
+  .confirm-yes:hover{ background:#9e3d28; }
+
+  /* ---------- To Do List ---------- */
+  .todo-section{ margin-bottom:14px; }
+  .todo-label{
+    display:block;
+    font-size:11.5px;
+    font-weight:600;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin-bottom:8px;
+  }
+  .todo-add{
+    display:flex;
+    gap:6px;
+    margin-bottom:8px;
+  }
+  .todo-add input{
+    padding:7px 10px;
+    border:1px solid var(--paper-line-strong);
+    border-radius:7px;
+    font-size:13px;
+    font-family:'Inter', sans-serif;
+    color:var(--ink);
+    background:var(--paper);
+    outline:none;
+  }
+  .todo-date-input{ width:140px; }
+  .todo-add input:focus{ outline:2px solid var(--gold); outline-offset:1px; }
+  .todo-add .btn{ font-size:12px; padding:7px 12px; white-space:nowrap; }
+  .todo-table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:12.5px;
+    table-layout:fixed;
+  }
+  .todo-table thead th{
+    text-align:left;
+    font-size:10px;
+    font-weight:600;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    padding:4px 4px 6px;
+    border-bottom:1px solid var(--paper-line);
+  }
+  .todo-table tbody td{
+    padding:6px 4px;
+    border-bottom:1px solid var(--paper-line);
+    vertical-align:middle;
+  }
+  .todo-num{ width:32px; }
+  .todo-due{ width:90px; }
+  .todo-status{ width:40px; text-align:center !important; }
+  .todo-del{ width:28px; }
+  .todo-aksi{ width:40px; text-align:center !important; padding-left:12px !important; }
+  .todo-table tbody tr:hover{ background:var(--paper); }
+  .todo-text{
+    color:var(--ink);
+    word-wrap:break-word;
+    overflow-wrap:break-word;
+    cursor:pointer;
+  }
+  .todo-text.done{ text-decoration:line-through; color:var(--ink-faint); }
+  .todo-cb{
+    width:16px; height:16px;
+    accent-color:var(--status-done);
+    cursor:pointer;
+  }
+  .todo-del-btn{
+    background:none; border:none;
+    color:var(--ink-faint);
+    cursor:pointer;
+    font-size:16px;
+    line-height:1;
+    padding:2px;
+    opacity:0;
+  }
+  .todo-table tbody tr:hover .todo-del-btn{ opacity:1; }
+  .todo-del-btn:hover{ color:var(--status-risk); }
+  .todo-copy-btn{
+    background:none; border:none;
+    color:var(--ink-faint);
+    cursor:pointer;
+    font-size:16px;
+    line-height:1;
+    padding:2px;
+    opacity:0;
+    transition:opacity .15s;
+  }
+  .todo-table tbody tr:hover .todo-copy-btn{ opacity:1; }
+  .todo-copy-btn:hover{ color:var(--ink); }
+  .overdue{ color:var(--status-risk); font-weight:600; }
+  .notif-empty{ padding:16px 4px; color:var(--ink-faint); font-size:12px; }
+
+  /* ---------- Evidence Panel ---------- */
+  .overlay-left{
+    justify-content:flex-start;
+  }
+  .evidence-modal{
+    transform:translateX(-100%);
+  }
+  .overlay.open .evidence-modal{
+    transform:translateX(0);
+  }
+  /* Evidence type toggle */
+  .evidence-type-toggle{
+    display:flex;
+    gap:0;
+    margin-bottom:10px;
+    border-radius:7px;
+    overflow:hidden;
+    border:1px solid var(--paper-line-strong);
+  }
+  .evidence-type-option{
+    flex:1;
+    text-align:center;
+    cursor:pointer;
+  }
+  .evidence-type-option input{ display:none; }
+  .evidence-type-option span{
+    display:block;
+    padding:6px 12px;
+    font-size:12px;
+    font-weight:500;
+    color:var(--ink-faint);
+    background:var(--paper);
+    transition:all .15s;
+  }
+  .evidence-type-option:not(:last-child) span{ border-right:1px solid var(--paper-line-strong); }
+  .evidence-type-option input:checked + span{
+    color:var(--ink);
+    background:var(--gold-soft);
+  }
+  .evidence-add{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    margin-bottom:14px;
+  }
+  .evidence-add-row{
+    display:flex;
+    gap:8px;
+  }
+  .evidence-add-row input{
+    flex:1;
+    padding:7px 10px;
+    border:1px solid var(--paper-line-strong);
+    border-radius:7px;
+    font-size:13px;
+    font-family:'Inter', sans-serif;
+    color:var(--ink);
+    background:var(--paper);
+    outline:none;
+  }
+  .evidence-add-row input:focus{ outline:2px solid var(--gold); outline-offset:1px; }
+  .evidence-add-row input[type=file]{
+    padding:6px 10px;
+    font-size:12px;
+    font-family:'Inter', sans-serif;
+    color:var(--ink);
+    background:var(--paper);
+    border:1px solid var(--paper-line-strong);
+    border-radius:7px;
+    cursor:pointer;
+  }
+  .evidence-add-row input[type=file]::file-selector-button{
+    padding:4px 12px;
+    border-radius:5px;
+    border:1px solid var(--paper-line-strong);
+    background:var(--surface);
+    color:var(--ink);
+    font-family:'Inter', sans-serif;
+    font-size:11px;
+    cursor:pointer;
+    margin-right:8px;
+  }
+  .evidence-add-row input[type=file]::file-selector-button:hover{
+    background:var(--paper);
+  }
+  .evidence-add .btn{ font-size:12px; padding:7px 12px; white-space:nowrap; align-self:flex-end; }
+  .evidence-text-input{
+    width:100%;
+    padding:8px 10px;
+    border:1px solid var(--paper-line-strong);
+    border-radius:7px;
+    font-size:13px;
+    font-family:'Inter', sans-serif;
+    color:var(--ink);
+    background:var(--paper);
+    outline:none;
+    resize:vertical;
+    min-height:80px;
+    box-sizing:border-box;
+  }
+  .evidence-text-input:focus{ outline:2px solid var(--gold); outline-offset:1px; }
+  .evidence-table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:12.5px;
+    table-layout:fixed;
+  }
+  .evidence-table thead th{
+    text-align:left;
+    font-size:10px;
+    font-weight:600;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    padding:4px 4px 6px;
+    border-bottom:1px solid var(--paper-line);
+  }
+  .evidence-table tbody td{
+    padding:6px 4px;
+    border-bottom:1px solid var(--paper-line);
+    vertical-align:middle;
+  }
+  .evidence-num{ width:32px; }
+  .evidence-date{ width:85px; }
+  .evidence-text{ width:30%; word-wrap:break-word; overflow-wrap:break-word; }
+  .evidence-link{ width:25%; }
+  .evidence-del{ width:28px; }
+  .evidence-table tbody tr:hover{ background:var(--paper); }
+  .evidence-link-text{
+    color:var(--status-progress);
+    word-wrap:break-word;
+    overflow-wrap:break-word;
+    text-decoration:none;
+  }
+  .evidence-link-text:hover{ text-decoration:underline; }
+  .evidence-text-cell{
+    word-wrap:break-word;
+    overflow-wrap:break-word;
+    max-width:0;
+  }
+  .evidence-del-btn{
+    background:none; border:none;
+    color:var(--ink-faint);
+    cursor:pointer;
+    font-size:16px;
+    line-height:1;
+    padding:2px;
+    opacity:0;
+  }
+  .evidence-table tbody tr:hover .evidence-del-btn{ opacity:1; }
+  .evidence-del-btn:hover{ color:var(--status-risk); }
+  .evidence-empty{ padding:16px 4px; color:var(--ink-faint); font-size:12px; }
+  .evidence-img-thumb{
+    width:60px; height:40px;
+    object-fit:cover;
+    border-radius:4px;
+    cursor:pointer;
+    border:1px solid var(--paper-line-strong);
+    transition:opacity .15s;
+    vertical-align:middle;
+  }
+  .evidence-img-thumb:hover{ opacity:.75; }
+  .evidence-img-placeholder{
+    color:var(--ink-faint);
+    font-size:11px;
+    font-style:italic;
+  }
+
+  .evidence-log-section{
+    margin-top:14px;
+    border-top:1px solid var(--paper-line-strong);
+    padding-top:10px;
+    max-height:200px;
+    overflow-y:auto;
+  }
+  .evidence-log-section .todo-label{
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    padding:0 0 8px;
+    display:block;
+  }
+  .evidence-log-table td{
+    font-size:11.5px;
+  }
+  .evidence-log-table .log-action-text{
+    color:var(--ink);
+    line-height:1.4;
+    width:70%;
+  }
+  .evidence-log-table .log-date-text{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    color:var(--ink-soft);
+    white-space:nowrap;
+    text-align:right;
+    width:30%;
+  }
+  .evidence-log-table .log-date-row{
+    display:block;
+    font-size:10.5px;
+  }
+  .evidence-log-table .log-time-row{
+    display:block;
+    font-size:10px;
+    color:var(--ink-faint);
+  }
+  .evidence-log-empty{
+    padding:16px 4px;
+    color:var(--ink-faint);
+    font-size:12px;
+    text-align:center;
+  }
+
+  /* ---------- Report Modal ---------- */
+  .report-modal{
+    width:60%;
+    max-width:800px;
+  }
+  .report-section{
+    margin-bottom:20px;
+    padding-bottom:16px;
+    border-bottom:1px dashed var(--paper-line-strong);
+  }
+  .report-section:last-child{ border-bottom:none; }
+  .report-section-title{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:21px;
+    font-weight:600;
+    color:#000;
+    letter-spacing:.02em;
+    margin:8px 0;
+  }
+  .report-title-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    margin-bottom:8px;
+  }
+  .report-table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:12.5px;
+    margin-bottom:6px;
+  }
+  .report-table thead th{
+    text-align:left;
+    font-size:10px;
+    font-weight:600;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:#fff;
+    background:#000;
+    padding:5px 6px;
+    border-bottom:1px solid #000;
+  }
+  .report-table tbody td{
+    padding:6px;
+    border-bottom:1px solid var(--paper-line);
+    vertical-align:top;
+  }
+  .report-table tbody tr:hover{ background:var(--paper); }
+  .report-task-name{
+    font-weight:600;
+    color:var(--ink);
+    font-size:13px;
+    margin-bottom:2px;
+  }
+  .report-task-meta{
+    font-size:11px;
+    color:#000;
+    font-family:'IBM Plex Mono', monospace;
+    margin-top:-5px;
+  }
+  .report-progress{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:10px 20px;
+    border-radius:8px;
+    font-size:36px;
+    font-weight:700;
+    font-family:'Space Grotesk',sans-serif;
+    white-space:nowrap;
+    background:var(--paper);
+    border:1px solid var(--paper-line);
+    line-height:1;
+  }
+  .report-todo-item{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:4px 0;
+    font-size:12.5px;
+  }
+  .report-todo-check{
+    width:14px; height:14px;
+    border:2px solid var(--paper-line-strong);
+    border-radius:3px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    flex-shrink:0;
+    font-size:10px;
+  }
+  .report-todo-check.checked{
+    background:var(--status-done);
+    border-color:var(--status-done);
+    color:#fff;
+  }
+  .report-todo-text.done{ text-decoration:line-through; color:#888; }
+  .report-todo-due{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    color:#000;
+    white-space:nowrap;
+  }
+  .report-evidence-item{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:3px 0;
+    font-size:12px;
+  }
+  .report-evidence-item img{
+    max-width:400px;
+    border-radius:4px;
+    object-fit:cover;
+    border-radius:4px;
+    border:1px solid var(--paper-line-strong);
+    cursor:pointer;
+  }
+  .report-evidence-item img:hover{ opacity:.75; }
+  .report-evidence-item a{
+    color:#2F6BA3;
+    text-decoration:none;
+    word-break:break-all;
+  }
+  .report-evidence-item a:hover{ text-decoration:underline; }
+  .report-evidence-text{
+    color:#000;
+    font-style:italic;
+  }
+  .report-empty{
+    text-align:center;
+    padding:24px 12px;
+    color:#000;
+    font-size:13px;
+  }
+  .report-overdue{
+    color:#e53935;
+    font-weight:600;
+  }
+  .report-summary{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:10px;
+    margin-bottom:20px;
+    padding-bottom:16px;
+    border-bottom:1px dashed var(--paper-line-strong);
+  }
+  .report-summary-card{
+    background:var(--paper);
+    border-radius:8px;
+    padding:12px;
+    text-align:center;
+    border:1px solid var(--paper-line);
+  }
+  .report-summary-icon{
+    font-size:18px;
+    color:#000;
+    margin-bottom:4px;
+  }
+  .report-summary-data{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+  .report-summary-num{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:22px;
+    font-weight:700;
+    color:#000;
+    line-height:1.2;
+  }
+  .report-summary-label{
+    font-size:11px;
+    color:#000;
+    letter-spacing:.03em;
+    text-transform:uppercase;
+  }
+  .report-summary-stat{
+    margin-top:4px;
+    font-size:11px;
+    color:#000;
+    font-family:'IBM Plex Mono',monospace;
+  }
+
+  /* ---------- Report Dark Mode ---------- */
+  [data-theme="dark"] #report-printable,
+  [data-theme="dark"] #report-printable *{
+    color:#fff !important;
+  }
+  [data-theme="dark"] .report-table thead th{
+    background:#333 !important;
+  }
+  [data-theme="dark"] .report-evidence-item a{
+    color:#74B9FF !important;
+  }
+  [data-theme="dark"] .report-overdue{
+    color:#ef5350 !important;
+  }
+  [data-theme="dark"] .report-todo-text.done{
+    color:#aaa !important;
+  }
+  [data-theme="dark"] .report-table tbody td{
+    border-bottom-color:#444 !important;
+  }
+  [data-theme="dark"] .report-section{
+    border-bottom-color:#444 !important;
+  }
+  [data-theme="dark"] .report-summary-card{
+    background:#333 !important;
+    border-color:#444 !important;
+  }
+
+  /* ---------- Report Print Light Override ---------- */
+  .report-print-light,
+  .report-print-light *{
+    color:#000 !important;
+  }
+  .report-print-light .report-table thead th{
+    background:#000 !important;
+    color:#fff !important;
+  }
+  .report-print-light .report-evidence-item a{
+    color:#2F6BA3 !important;
+  }
+  .report-print-light .report-overdue{
+    color:#e53935 !important;
+  }
+  .report-print-light .report-todo-text.done{
+    color:#888 !important;
+  }
+  .report-print-light .report-summary-card{
+    background:var(--paper) !important;
+    border-color:var(--paper-line) !important;
+  }
+
+  /* ---------- Image Preview Lightbox ---------- */
+  .img-preview-overlay{
+    position:fixed; inset:0;
+    background:rgba(0,0,0,.85);
+    z-index:100;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    cursor:pointer;
+  }
+  .img-preview-overlay.open{ display:flex; }
+  .img-preview-container{
+    position:relative;
+    max-width:90vw;
+    max-height:90vh;
+    cursor:default;
+  }
+  .img-preview-container img{
+    max-width:100%;
+    max-height:90vh;
+    border-radius:8px;
+    box-shadow:0 8px 40px rgba(0,0,0,.5);
+    display:block;
+  }
+  .img-preview-close{
+    position:absolute;
+    top:-12px; right:-12px;
+    width:32px; height:32px;
+    border-radius:50%;
+    background:var(--surface);
+    border:none;
+    font-size:20px;
+    line-height:1;
+    color:var(--ink);
+    cursor:pointer;
+    box-shadow:0 2px 8px rgba(0,0,0,.3);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition:transform .12s;
+  }
+  .img-preview-close:hover{ transform:scale(1.1); }
+
+  /* ---------- Restore Panel ---------- */
+  .restore-list{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    max-height:360px;
+    overflow-y:auto;
+  }
+  .restore-item{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:10px 12px;
+    border:1px solid var(--paper-line-strong);
+    border-radius:7px;
+    background:var(--surface);
+    transition:border-color .15s;
+  }
+  .restore-item:hover{ border-color:var(--gold); }
+  .restore-item.latest{ border-color:var(--status-done); background:rgba(63,143,99,0.06); }
+  .restore-item.latest .restore-filename{ color:var(--status-done); }
+  .restore-item.latest .restore-date{ color:var(--status-done); }
+  .restore-latest-badge{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:10px;
+    font-weight:700;
+    padding:3px 8px;
+    border-radius:4px;
+    background:var(--status-done);
+    color:#fff;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    white-space:nowrap;
+  }
+  .restore-info{ display:flex; flex-direction:column; gap:2px; }
+  .restore-filename{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    color:var(--ink);
+    font-weight:500;
+  }
+  .restore-type{
+    font-size:10px;
+    font-weight:600;
+    padding:2px 6px;
+    border-radius:4px;
+    background:var(--paper-line-strong);
+    color:var(--ink-soft);
+    letter-spacing:.03em;
+    text-transform:uppercase;
+  }
+  .restore-date{
+    font-size:11px;
+    color:var(--ink-soft);
+  }
+  .restore-btn{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:12px;
+    font-weight:600;
+    padding:7px 14px;
+    border-radius:6px;
+    border:1px solid var(--status-progress);
+    background:transparent;
+    color:var(--status-progress);
+    cursor:pointer;
+    transition:all .15s;
+    white-space:nowrap;
+  }
+  .restore-btn:hover{
+    background:var(--status-progress);
+    color:#fff;
+  }
+  .restore-loading, .restore-empty{
+    padding:24px 12px;
+    text-align:center;
+    color:var(--ink-soft);
+    font-size:13px;
+  }
+
+  /* ---------- Restore History ---------- */
+  .restore-history{
+    border-top:1px solid var(--paper-line-strong);
+    margin-top:14px;
+    padding-top:10px;
+  }
+  .restore-history-head{
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    padding:0 0 8px;
+  }
+  .restore-history-list{
+    max-height:180px;
+    overflow-y:auto;
+  }
+  .restore-history-item{
+    display:grid;
+    grid-template-columns:auto 1fr auto;
+    gap:2px 10px;
+    padding:6px 8px;
+    font-size:11px;
+    border-bottom:1px solid var(--paper-line);
+    align-items:center;
+  }
+  .restore-history-item:last-child{ border-bottom:none; }
+  .restore-history-status{
+    font-size:8.5px;
+    font-weight:700;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    padding:2px 6px;
+    border-radius:4px;
+    text-align:center;
+  }
+  .restore-history-status.Restored{
+    background:#E8F5E9;
+    color:var(--status-done);
+  }
+  .restore-history-status.Failed{
+    background:#FDEDEC;
+    color:var(--status-risk);
+  }
+  .restore-history-status.BackedUp{
+    background:#FFF3E0;
+    color:#E67E22;
+  }
+  .restore-history-file{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    color:var(--ink);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .restore-history-date{
+    font-size:10px;
+    color:var(--ink-soft);
+
+  }
+  .restore-history-empty{
+    padding:12px 8px;
+    font-size:11px;
+    color:var(--ink-faint);
+    text-align:center;
+  }
+
+  /* ---------- Task Log History ---------- */
+  .task-log-section{
+    margin-top:14px;
+    border-top:1px solid var(--paper-line-strong);
+    padding-top:10px;
+    max-height:200px;
+    overflow-y:auto;
+  }
+  .task-log-section .todo-label{
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    padding:0 0 8px;
+    display:block;
+  }
+  .task-log-table td{
+    font-size:11.5px;
+  }
+  .task-log-table .log-action-text{
+    color:var(--ink);
+    line-height:1.4;
+    width:70%;
+  }
+  .task-log-table .log-date-text{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    color:var(--ink-soft);
+    white-space:nowrap;
+    text-align:right;
+    width:30%;
+  }
+  .task-log-table .log-date-row{
+    display:block;
+    font-size:10.5px;
+  }
+  .task-log-table .log-time-row{
+    display:block;
+    font-size:10px;
+    color:var(--ink-faint);
+  }
+  .task-log-empty{
+    padding:16px 4px;
+    color:var(--ink-faint);
+    font-size:12px;
+    text-align:center;
+  }
+
+  .empty-board{
+    padding:60px 20px;
+    text-align:center;
+    color:var(--ink-soft);
+  }
+
+  @media (max-width: 820px){
+    .board{ grid-template-columns:calc(250px + 7vw) 1fr; }
+    #project-title{ font-size:22px; }
+    .title-input{ font-size:22px; }
+    .app-header{ gap:12px; }
+    .header-actions{ width:100%; }
+    .view-toggle{ flex:1; }
+    .view-toggle button{ flex:1; text-align:center; }
+  }
+
+  @media (max-width: 480px){
+    .board{ grid-template-columns:1fr; border-radius:6px; }
+    .sidebar{ border-right:none; border-bottom:1px solid var(--paper-line-strong); }
+    #project-title{ font-size:18px; }
+    .title-input{ font-size:18px; }
+    .legend{ gap:8px; font-size:10.5px; }
+    .title-block{ min-width:0; }
+    .modal{ width:100vw; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .btn{ transition:none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="app-header">
+    <div class="title-block">
+      <span class="eyebrow">Proyek Management</span>
+      <div class="title-row">
+        <span id="project-title">Timeframe as a System Analyst</span>
+        <span class="title-edit-icon" id="title-edit-icon">&#9998;</span>
+      </div>
+      <span class="project-sub" id="project-range">—</span>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-ghost theme-toggle" id="theme-toggle" title="Toggle Dark Mode"><i class="bi bi-moon-fill"></i></button>
+      <button class="btn btn-ghost" id="backup-btn">KEPT ON IT</button>
+      <button class="btn btn-ghost" id="restore-btn">RESTORE</button>
+      <div class="view-toggle" id="view-toggle">
+        <button data-view="week" class="active">MINGGU</button>
+        <button data-view="month">BULAN</button>
+      </div>
+      <button class="btn btn-primary" id="add-task-btn">+ TUGAS BARU</button>
+      <button class="btn btn-ghost" id="today-btn">KE HARI INI</button>
+      <button class="btn btn-report" id="report-btn"><i class="bi bi-journal-text"></i> BUAT REPORT</button>
+      <button class="bell-btn" id="bell-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+        <span class="bell-dot" id="bell-dot"></span>
+      </button>
+    </div>
+  </header>
+
+  <div class="legend" id="legend"></div>
+
+  <div class="scroll-area">
+  <div class="board" id="board">
+    <aside class="sidebar">
+      <div class="sidebar-head">Daftar Tugas</div>
+      <div class="sidebar-list" id="sidebar-list"></div>
+    </aside>
+    <div class="timeline-group">
+      <div class="ruler" id="ruler">
+        <div class="ruler-scroll" id="ruler-scroll"></div>
+      </div>
+      <div class="timeline-wrap" id="timeline-wrap">
+        <div class="timeline-inner" id="timeline-inner">
+          <div class="rows" id="rows"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <div class="toast-container" id="toast-container"></div>
+</div>
+
+<!-- Modal -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="modal-title">Tugas Baru</h2>
+      <button class="modal-close" id="close-btn">&times;</button>
+    </div>
+    <div class="modal-sub" id="modal-sub">Isi detail tugas di bawah ini.</div>
+
+    <div class="field">
+      <label for="f-name">Nama Tugas</label>
+      <input type="text" id="f-name" placeholder="cth. Desain wireframe">
+    </div>
+
+    <div class="row-2">
+      <div class="field">
+        <label for="f-start">Mulai</label>
+        <input type="date" id="f-start">
+      </div>
+      <div class="field">
+        <label for="f-end">Selesai</label>
+        <input type="date" id="f-end">
+      </div>
+    </div>
+
+    <div class="row-2">
+      <div class="field">
+        <label for="f-cat">Kategori</label>
+        <select id="f-cat">
+          <option value="desain">Desain</option>
+          <option value="pengembangan">Pengembangan</option>
+          <option value="pengujian">Pengujian</option>
+          <option value="peluncuran">Peluncuran</option>
+          <option value="research">RnD (Research & Development)</option>
+          <option value="operasional">Operasional</option>
+          <option value="lainnya">Lainnya</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-assignee">Penanggung Jawab</label>
+        <input type="text" id="f-assignee" placeholder="cth. Sari">
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="f-progress">Progres</label>
+      <div class="range-row">
+        <input type="range" id="f-progress" min="0" max="100" value="0">
+        <span class="range-val" id="f-progress-val">0%</span>
+      </div>
+    </div>
+
+    <div class="todo-section" id="todo-section">
+      <label class="todo-label">To Do List</label>
+      <div class="todo-add">
+        <input type="date" id="todo-date" class="todo-date-input">
+        <input type="text" id="todo-input" placeholder="Tambah aktivitas..." style="flex:1;">
+        <button class="btn btn-ghost" id="todo-cancel-btn" style="display:none;">Batal</button>
+        <button class="btn btn-ghost" id="todo-add-btn">Tambah</button>
+      </div>
+      <table class="todo-table" id="todo-table">
+        <thead>
+          <tr><th class="todo-num">No.</th><th>To Do List</th><th class="todo-due">Tanggal</th><th class="todo-status">Status</th><th class="todo-del"></th></tr>
+        </thead>
+        <tbody id="todo-body"></tbody>
+      </table>
+    </div>
+
+    <div class="modal-actions">
+      <button class="link-danger" id="delete-btn" style="visibility:hidden;">Hapus Tugas</button>
+      <div class="modal-actions-right">
+        <button class="btn btn-ghost" id="cancel-btn">Batal</button>
+        <button class="btn btn-primary" id="save-btn">Simpan</button>
+        <button class="btn btn-ghost" id="evidence-btn">+ Add Evidence</button>
+      </div>
+    </div>
+
+    <div class="task-log-section" id="task-log-section" style="display:none;">
+      <label class="todo-label">Riwayat Perubahan</label>
+      <table class="todo-table task-log-table">
+        <thead>
+          <tr><th class="todo-num">No.</th><th>Log Action</th><th class="todo-due">Date Action</th></tr>
+        </thead>
+        <tbody id="task-log-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- Notification sidepeek -->
+<div class="overlay" id="notif-overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Notifikasi Tugas</h2>
+      <button class="modal-close" id="notif-close-btn">&times;</button>
+    </div>
+    <div class="modal-sub" id="notif-sub">Daftar aktivitas yang perlu diproses.</div>
+    <table class="todo-table" id="notif-table">
+      <thead>
+        <tr>
+          <th class="todo-num">No.</th>
+          <th>To Do List</th>
+          <th class="todo-due">Tanggal</th>
+          <th class="todo-due">Sisa Hari</th>
+          <th class="todo-status">Status</th>
+          <th class="todo-aksi">Aksi</th>
+        </tr>
+      </thead>
+      <tbody id="notif-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Evidence sidepeek -->
+<div class="overlay overlay-left" id="evidence-overlay">
+  <div class="modal evidence-modal">
+    <div class="modal-head">
+      <h2>Daftar Evidence</h2>
+      <button class="modal-close" id="evidence-close-btn">&times;</button>
+    </div>
+    <div class="modal-sub" id="evidence-sub">Kumpulan evidence tugas.</div>
+    <div class="evidence-type-toggle">
+      <label class="evidence-type-option">
+        <input type="radio" name="evidence-type" value="link" checked>
+        <span>Link</span>
+      </label>
+      <label class="evidence-type-option">
+        <input type="radio" name="evidence-type" value="text">
+        <span>Teks</span>
+      </label>
+      <label class="evidence-type-option">
+        <input type="radio" name="evidence-type" value="image">
+        <span>Gambar</span>
+      </label>
+    </div>
+    <div class="evidence-add">
+      <div id="evidence-link-mode">
+        <div class="evidence-add-row">
+          <input type="text" id="evidence-link-input" placeholder="Link Evidence (URL)...">
+          <input type="text" id="evidence-desc-input" placeholder="Keterangan...">
+        </div>
+      </div>
+      <div id="evidence-text-mode" style="display:none;">
+        <textarea id="evidence-text-input" class="evidence-text-input" placeholder="Tulis teks evidence..." rows="4"></textarea>
+      </div>
+      <div id="evidence-image-mode" style="display:none;">
+        <div class="evidence-add-row">
+          <input type="file" id="evidence-file-input" accept="image/*">
+          <input type="text" id="evidence-image-ket-input" placeholder="Keterangan...">
+        </div>
+      </div>
+      <button class="btn btn-ghost" id="evidence-add-btn">Tambah</button>
+    </div>
+      <table class="evidence-table">
+        <thead>
+          <tr>
+            <th class="evidence-num">No.</th>
+            <th class="evidence-date">Tanggal</th>
+            <th class="evidence-text">Evidence</th>
+            <th class="evidence-link">Link</th>
+            <th>Keterangan</th>
+            <th class="evidence-del"></th>
+          </tr>
+        </thead>
+        <tbody id="evidence-body"></tbody>
+      </table>
+
+      <div class="evidence-log-section" id="evidence-log-section">
+        <label class="todo-label">Riwayat Perubahan</label>
+        <table class="todo-table evidence-log-table">
+          <thead>
+            <tr>
+              <th class="todo-num">No.</th>
+              <th>Log Action</th>
+              <th class="todo-due">Tanggal</th>
+            </tr>
+          </thead>
+          <tbody id="evidence-log-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- Report modal -->
+<div class="overlay" id="report-overlay">
+  <div class="modal report-modal">
+    <div class="modal-head">
+      <h2><i class="bi bi-journal-text"></i> RINGKASAN LAPORAN</h2>
+      <button class="modal-close" id="report-close-btn">&times;</button>
+    </div>
+    <div class="modal-sub">Pilih periode tanggal untuk melihat ringkasan tugas.</div>
+
+    <div class="row-2">
+      <div class="field">
+        <label for="r-start">Tanggal Mulai</label>
+        <input type="date" id="r-start">
+      </div>
+      <div class="field">
+        <label for="r-end">Tanggal Selesai</label>
+        <input type="date" id="r-end">
+      </div>
+    </div>
+
+    <div id="report-content"></div>
+
+    <div class="modal-actions" style="justify-content:flex-end;">
+      <button class="btn btn-primary" id="report-generate-btn"><i class="bi bi-funnel"></i> TAMPILKAN</button>
+      <button class="btn btn-primary" id="export-pdf-btn"><i class="bi bi-file-earmark-pdf"></i> Export PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- Image preview lightbox -->
+<div class="img-preview-overlay" id="img-preview-overlay">
+  <div class="img-preview-container">
+    <button class="img-preview-close" id="img-preview-close">&times;</button>
+    <img id="img-preview-img" src="" alt="Preview">
+  </div>
+</div>
+
+<!-- Confirm dialog -->
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-box">
+    <div class="confirm-icon">!</div>
+    <div class="confirm-msg" id="confirm-msg">Yakin ingin menghapus tugas ini?</div>
+    <div class="confirm-actions">
+      <button class="btn btn-ghost" id="confirm-cancel">Batal</button>
+      <button class="btn confirm-yes" id="confirm-yes">Ya, Hapus</button>
+    </div>
+  </div>
+</div>
+
+<!-- Restore panel -->
+<div class="overlay" id="restore-overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Restore Data</h2>
+      <button class="modal-close" id="restore-close-btn">&times;</button>
+    </div>
+    <div class="modal-sub">Pilih file backup yang akan direstore ke timeframe saat ini.</div>
+    <div class="restore-list" id="restore-list">
+      <div class="restore-loading">Memuat daftar backup...</div>
+    </div>
+    <div class="restore-history">
+      <div class="restore-history-head">History Log Restore &amp; Backup</div>
+      <div class="restore-history-list" id="restore-history-list">
+        <div class="restore-history-empty">Belum ada aktivitas restore</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------- State ---------------- */
+  const CATS = {
+    desain:        { label:"Desain",        cls:"cat-desain" },
+    pengembangan:  { label:"Pengembangan",  cls:"cat-pengembangan" },
+    pengujian:     { label:"Pengujian",     cls:"cat-pengujian" },
+    peluncuran:    { label:"Peluncuran",    cls:"cat-peluncuran" },
+    lainnya:       { label:"Lainnya",       cls:"cat-lainnya" },
+    research:      { label:"RnD (Research & Development)", cls:"cat-research" },
+    operasional:   { label:"Operasional",                 cls:"cat-operasional" },
+  };
+
+  function today(){
+    const d = new Date();
+    d.setHours(0,0,0,0);
+    return d;
+  }
+  function addDays(date, n){
+    const d = new Date(date);
+    d.setDate(d.getDate()+n);
+    return d;
+  }
+  function fmt(d){
+    const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  }
+  function parseDate(str){
+    const parts = str.split('-').map(Number);
+    if(parts.length!==3 || parts.some(isNaN)) return null;
+    const d = new Date(parts[0], parts[1]-1, parts[2]);
+    d.setHours(0,0,0,0);
+    return d;
+  }
+  function dayDiff(a,b){ return Math.round((b-a)/86400000); }
+  function countWeekdays(start,end){
+    if(!start||!end) return 0;
+    let c=0; const d=new Date(start);
+    while(d<=end){ const w=d.getDay(); if(w!==0&&w!==6) c++; d.setDate(d.getDate()+1); }
+    return c;
+  }
+  const MONTHS_ID = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+  const DOW_ID = ["Min","Sen","Sel","Rab","Kam","Jum","Sab"];
+
+  const T = today();
+
+  let tasks = [];
+  let nextId = 1;
+  let nextTodoId = 1;
+  let lastUpdated = null;
+  let restoreLog = [];
+  let taskLogs = [];
+  let editingTodoId = null;
+  let selectedId = null;
+  let view = "week"; // "week" | "month"
+  let dayWidth = 40;
+
+  const els = {
+    title: document.getElementById('project-title'),
+    range: document.getElementById('project-range'),
+    legend: document.getElementById('legend'),
+    sidebarList: document.getElementById('sidebar-list'),
+    ruler: document.getElementById('ruler'),
+    rows: document.getElementById('rows'),
+    timelineInner: document.getElementById('timeline-inner'),
+    timelineWrap: document.getElementById('timeline-wrap'),
+    overlay: document.getElementById('overlay'),
+    modalTitle: document.getElementById('modal-title'),
+    modalSub: document.getElementById('modal-sub'),
+    fName: document.getElementById('f-name'),
+    fStart: document.getElementById('f-start'),
+    fEnd: document.getElementById('f-end'),
+    fCat: document.getElementById('f-cat'),
+    fAssignee: document.getElementById('f-assignee'),
+    fProgress: document.getElementById('f-progress'),
+    fProgressVal: document.getElementById('f-progress-val'),
+    todoInput: document.getElementById('todo-input'),
+    todoDate: document.getElementById('todo-date'),
+    todoAddBtn: document.getElementById('todo-add-btn'),
+    todoCancelBtn: document.getElementById('todo-cancel-btn'),
+    todoBody: document.getElementById('todo-body'),
+    deleteBtn: document.getElementById('delete-btn'),
+    confirmOverlay: document.getElementById('confirm-overlay'),
+    confirmMsg: document.getElementById('confirm-msg'),
+    confirmYes: document.getElementById('confirm-yes'),
+    todoSection: document.getElementById('todo-section'),
+    bellBtn: document.getElementById('bell-btn'),
+    bellDot: document.getElementById('bell-dot'),
+    notifOverlay: document.getElementById('notif-overlay'),
+    notifBody: document.getElementById('notif-body'),
+    notifSub: document.getElementById('notif-sub'),
+    evidenceOverlay: document.getElementById('evidence-overlay'),
+    evidenceBody: document.getElementById('evidence-body'),
+    evidenceSub: document.getElementById('evidence-sub'),
+    evidenceTypeRadios: document.querySelectorAll('input[name="evidence-type"]'),
+    evidenceLinkMode: document.getElementById('evidence-link-mode'),
+    evidenceTextMode: document.getElementById('evidence-text-mode'),
+    evidenceLinkInput: document.getElementById('evidence-link-input'),
+    evidenceDescInput: document.getElementById('evidence-desc-input'),
+    evidenceTextInput: document.getElementById('evidence-text-input'),
+    evidenceImageMode: document.getElementById('evidence-image-mode'),
+    evidenceFileInput: document.getElementById('evidence-file-input'),
+    evidenceImageKetInput: document.getElementById('evidence-image-ket-input'),
+    evidenceAddBtn: document.getElementById('evidence-add-btn'),
+    evidenceLogSection: document.getElementById('evidence-log-section'),
+    evidenceLogBody: document.getElementById('evidence-log-body'),
+    imgPreviewOverlay: document.getElementById('img-preview-overlay'),
+    imgPreviewImg: document.getElementById('img-preview-img'),
+    reportOverlay: document.getElementById('report-overlay'),
+    reportContent: document.getElementById('report-content'),
+    rStart: document.getElementById('r-start'),
+    rEnd: document.getElementById('r-end'),
+    taskLogSection: document.getElementById('task-log-section'),
+    taskLogBody: document.getElementById('task-log-body'),
+  };
+
+  /* ---------------- API helper ---------------- */
+  const api = {
+    async get(path) {
+      const r = await fetch(path);
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    },
+    async post(path, body) {
+      const r = await fetch(path, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    },
+    async put(path, body) {
+      const r = await fetch(path, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    },
+    async del(path) {
+      const r = await fetch(path, { method:'DELETE' });
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    },
+  };
+
+  async function loadTasks(){
+    try {
+      const data = await api.get('/api/tasks');
+      tasks = data.tasks.map(t => ({
+        ...t,
+        start: parseDate(t.start),
+        end: parseDate(t.end),
+        todos: (t.todos||[]).map(td => ({ ...td, due: td.due ? parseDate(td.due) : null })),
+        evidences: t.evidences || [],
+      }));
+      tasks.sort((a, b) => a.start - b.start);
+      nextId = data.nextId;
+      nextTodoId = data.nextTodoId;
+      lastUpdated = data.metadata?.updatedAt || null;
+      if (data.metadata?.title) els.title.textContent = data.metadata.title;
+      try {
+        const logRes = await fetch('/api/restore-log');
+        const logData = await logRes.json();
+        restoreLog = logData.restoreLog || [];
+      } catch(_){ restoreLog = []; }
+      renderRestoreLog();
+    } catch(e){
+      console.error('Gagal memuat data:', e);
+      alert('Gagal memuat data. Pastikan server API berjalan (node server.js).');
+    }
+    renderLegend();
+    renderAll(true);
+    updateBellDot();
+  }
+
+  let _confirmResolve = null;
+
+  function showConfirm(msg, confirmLabel = 'Ya, Hapus', cancelLabel = 'Batal', confirmClass = 'confirm-yes'){
+    return new Promise(resolve => {
+      els.confirmMsg.innerHTML = msg;
+      document.getElementById('confirm-cancel').textContent = cancelLabel;
+      const confirmBtn = document.getElementById('confirm-yes');
+      confirmBtn.textContent = confirmLabel;
+      confirmBtn.className = 'btn ' + confirmClass;
+      _confirmResolve = resolve;
+      els.confirmOverlay.classList.add('open');
+    });
+  }
+  function closeConfirm(){
+    els.confirmOverlay.classList.remove('open');
+    _confirmResolve = null;
+  }
+  document.getElementById('confirm-cancel').addEventListener('click', ()=>{
+    els.confirmOverlay.classList.remove('open');
+    _confirmResolve = null;
+  });
+  els.confirmYes.addEventListener('click', ()=>{
+    const resolve = _confirmResolve;
+    els.confirmOverlay.classList.remove('open');
+    _confirmResolve = null;
+    if(resolve) resolve();
+  });
+
+  /* ---------------- Legend ---------------- */
+  function renderLegend(){
+    els.legend.innerHTML =
+      `<span class="legend-label">Tags : </span>` +
+      Object.values(CATS).map(c =>
+        `<span class="legend-item"><span class="legend-dot ${c.cls}"></span>${c.label}</span>`
+      ).join('') + `<span class="legend-item"><span class="legend-dot cat-today"></span>Hari ini</span>`;
+  }
+
+  /* ---------------- Range calc ---------------- */
+  function computeRange(){
+    if(tasks.length===0){
+      return { start: addDays(T,-5), end: addDays(T,20) };
+    }
+    let min = tasks[0].start, max = tasks[0].end;
+    tasks.forEach(t=>{
+      if(t.start < min) min = t.start;
+      if(t.end > max) max = t.end;
+    });
+    min = addDays(min, -4);
+    max = addDays(max, 6);
+    // ensure today is visible
+    if(T < min) min = addDays(T,-3);
+    if(T > max) max = addDays(T,3);
+    return { start:min, end:max };
+  }
+
+  /* ---------------- Render ruler ---------------- */
+  function renderRuler(range){
+    const totalDays = dayDiff(range.start, range.end)+1;
+    els.timelineInner.style.setProperty('--day-w', dayWidth+'px');
+    els.timelineInner.style.width = (totalDays*dayWidth)+'px';
+    els.ruler.style.setProperty('--day-w', dayWidth+'px');
+    const rs = document.getElementById('ruler-scroll');
+    rs.innerHTML = '';
+    rs.style.width = (totalDays*dayWidth)+'px';
+
+    let lastMonth = null;
+    for(let i=0;i<totalDays;i++){
+      const d = addDays(range.start, i);
+      const x = i*dayWidth;
+
+      if(d.getDate()===1 || i===0){
+        const label = document.createElement('div');
+        label.className='ruler-month';
+        label.style.left = x+'px';
+        label.textContent = `${MONTHS_ID[d.getMonth()]} ${d.getFullYear()}`;
+        rs.appendChild(label);
+      }
+
+      if(view==='week' && dayWidth>=28){
+        const dayLbl = document.createElement('div');
+        const isWeekend = d.getDay()===0 || d.getDay()===6;
+        dayLbl.className = 'ruler-day' + (isWeekend?' weekend':'');
+        dayLbl.style.left = x+'px';
+        dayLbl.textContent = d.getDate();
+        rs.appendChild(dayLbl);
+      } else if(d.getDay()===1) {
+        const dayLbl = document.createElement('div');
+        dayLbl.className = 'ruler-day';
+        dayLbl.style.left = x+'px';
+        dayLbl.textContent = d.getDate()+' '+MONTHS_ID[d.getMonth()];
+        rs.appendChild(dayLbl);
+      }
+
+      const tick = document.createElement('div');
+      tick.className='ruler-tick';
+      tick.style.left = x+'px';
+      rs.appendChild(tick);
+    }
+  }
+
+  /* ---------------- Render rows / bars ---------------- */
+  function renderRows(range){
+    const totalDays = dayDiff(range.start, range.end)+1;
+    els.rows.innerHTML = '';
+    els.rows.style.width = (totalDays*dayWidth)+'px';
+
+    // weekend shading
+    for(let i=0;i<totalDays;i++){
+      const d = addDays(range.start,i);
+      if(d.getDay()===0 || d.getDay()===6){
+        const col = document.createElement('div');
+        col.className='weekend-col';
+        col.style.left = (i*dayWidth)+'px';
+        col.style.height = (tasks.length*52)+'px';
+        els.rows.appendChild(col);
+      }
+    }
+
+    tasks.forEach((t, idx) => {
+      const rowBg = document.createElement('div');
+      rowBg.className='row-bg';
+      rowBg.style.width = (totalDays*dayWidth)+'px';
+      els.rows.appendChild(rowBg);
+    });
+
+    // today line
+    const todayOffset = dayDiff(range.start, T);
+    if(todayOffset>=0 && todayOffset<=totalDays){
+      const line = document.createElement('div');
+      line.className='today-line';
+      line.style.left = (todayOffset*dayWidth)+'px';
+      line.style.height = Math.max(tasks.length*52, 52)+'px';
+      els.rows.appendChild(line);
+    }
+
+    tasks.forEach((t, idx) => {
+      const bar = document.createElement('div');
+      bar.className = 'bar ' + (CATS[t.cat] ?? CATS.lainnya).cls;
+      bar.dataset.id = t.id;
+      const left = dayDiff(range.start, t.start)*dayWidth;
+      const width = (dayDiff(t.start,t.end)+1)*dayWidth - 4;
+      bar.style.left = (left+2)+'px';
+      bar.style.width = Math.max(width, 18)+'px';
+      bar.style.top = (idx*52 + 10)+'px';
+
+      const fill = document.createElement('div');
+      fill.className='fill';
+      fill.style.width = t.progress+'%';
+      bar.appendChild(fill);
+
+      const label = document.createElement('span');
+      label.className='label';
+      label.textContent = t.name;
+      bar.appendChild(label);
+
+      const pct = document.createElement('span');
+      pct.className='pct';
+      pct.textContent = t.progress+'%';
+      bar.appendChild(pct);
+
+      const hLeft = document.createElement('div');
+      hLeft.className='handle left';
+      const hRight = document.createElement('div');
+      hRight.className='handle right';
+      bar.appendChild(hLeft);
+      bar.appendChild(hRight);
+
+      attachBarDrag(bar, t, hLeft, hRight);
+      bar.addEventListener('click', (e)=>{
+        if(bar._dragged) { bar._dragged=false; return; }
+        openModal(t);
+      });
+
+      els.rows.appendChild(bar);
+    });
+
+    els.rows.style.height = Math.max(tasks.length*52, 52)+'px';
+  }
+
+  /* ---------------- Drag & resize ---------------- */
+  function attachBarDrag(bar, task, hLeft, hRight){
+    let mode = null; // 'move' | 'left' | 'right'
+    let startX = 0;
+    let origStart = null, origEnd = null;
+
+    function onDown(e, m){
+      mode = m;
+      startX = e.clientX;
+      origStart = task.start;
+      origEnd = task.end;
+      bar._dragged = false;
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+      e.stopPropagation();
+      e.preventDefault();
+    }
+
+    function onMove(e){
+      const dx = e.clientX - startX;
+      if(Math.abs(dx) > 3) bar._dragged = true;
+      const deltaDays = Math.round(dx/dayWidth);
+      if(mode==='move'){
+        task.start = addDays(origStart, deltaDays);
+        task.end = addDays(origEnd, deltaDays);
+      } else if(mode==='left'){
+        const newStart = addDays(origStart, deltaDays);
+        if(newStart <= task.end) task.start = newStart;
+      } else if(mode==='right'){
+        const newEnd = addDays(origEnd, deltaDays);
+        if(newEnd >= task.start) task.end = newEnd;
+      }
+      renderAll(false);
+    }
+
+    function onUp(){
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      mode = null;
+      if(task && bar._dragged){
+        api.put('/api/tasks/'+task.id, {
+          name: task.name, start: fmt(task.start), end: fmt(task.end),
+          cat: task.cat, assignee: task.assignee, progress: task.progress,
+        }).catch(e => console.error('Save drag failed:', e));
+      }
+    }
+
+    bar.addEventListener('mousedown', (e)=> onDown(e,'move'));
+    hLeft.addEventListener('mousedown', (e)=> onDown(e,'left'));
+    hRight.addEventListener('mousedown', (e)=> onDown(e,'right'));
+  }
+
+  /* ---------------- Sidebar ---------------- */
+  function renderSidebar(){
+    if(tasks.length===0){
+      els.sidebarList.innerHTML = `<div class="sidebar-empty">Belum ada tugas. Tambahkan tugas pertama untuk mulai membangun lini waktu.</div>`;
+      return;
+    }
+    els.sidebarList.innerHTML = '';
+    tasks.forEach(t=>{
+      const row = document.createElement('div');
+      const isDone = t.progress === 100;
+      const isOverdue = !isDone && t.end && t.end < today();
+      row.className = 'sidebar-row' + (t.id===selectedId ? ' selected':'') + (isDone ? ' done':'') + (isOverdue ? ' overdue':'');
+      row.innerHTML = `
+        <div class="sidebar-row-top">
+          <span class="name">${escapeHtml(t.name)}</span>
+          ${isDone ? '<span class="done-flag">🏁</span>' : ''}
+          ${isOverdue ? '<span class="overdue-flag"><i class="bi bi-bell-fill"></i></span>' : ''}
+        </div>
+        <span class="meta"><span class="tag-dot ${(CATS[t.cat] ?? CATS.lainnya).cls}"></span>${(CATS[t.cat] ?? CATS.lainnya).label} · ${t.progress}% · ${countWeekdays(t.start,t.end)} Hari Pengerjaan</span>
+      `;
+      row.addEventListener('click', ()=> openModal(t));
+      els.sidebarList.appendChild(row);
+    });
+  }
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function shortenUrl(url, maxLen){
+    if(maxLen === undefined) maxLen = 45;
+    return url.length > maxLen ? url.slice(0, maxLen) + '...' : url;
+  }
+
+  function fmtDateTime(isoStr){
+    if(!isoStr) return '';
+    const d = new Date(isoStr);
+    return `${String(d.getDate()).padStart(2,'0')} ${MONTHS_ID[d.getMonth()]} ${d.getFullYear()}, ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  }
+
+  /* ---------------- Project range label ---------------- */
+  function renderProjectRange(){
+    if(tasks.length===0){ els.range.textContent='Belum ada tugas'; return; }
+    let min=tasks[0].start, max=tasks[0].end;
+    tasks.forEach(t=>{ if(t.start<min) min=t.start; if(t.end>max) max=t.end; });
+    const updated = lastUpdated ? ` · Last updated ${fmtDateTime(lastUpdated)}` : '';
+    els.range.textContent = `${fmt(min)} — ${fmt(max)} · ${tasks.length} tugas${updated}`;
+  }
+
+  /* ---------------- Restore Log ---------------- */
+  function renderRestoreLog(){
+    const container = document.getElementById('restore-history-list');
+    if(!container) return;
+    if(!restoreLog || restoreLog.length === 0){
+      container.innerHTML = '<div class="restore-history-empty">Belum ada aktivitas restore</div>';
+      return;
+    }
+    const statusDisplay = { 'Restored':'Restored', 'Failed':'Failed', 'BackedUp':'Backed Up' };
+    container.innerHTML = restoreLog.map(e => {
+      const d = new Date(e.restoreAt);
+      const dateStr = d.toLocaleDateString('id-ID', { year:'numeric', month:'long', day:'numeric' }) + ', ' + 
+        String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+      return '<div class="restore-history-item">' +
+        '<div class="restore-history-status ' + e.status + '">' + (statusDisplay[e.status] || e.status) + '</div>' +
+        '<div class="restore-history-file">' + e.filename + '</div>' +
+        '<div class="restore-history-date">' + dateStr + '</div>' +
+        '</div>';
+    }).join('');
+  }
+
+  /* ---------------- Task Log ---------------- */
+  async function loadTaskLog(taskId){
+    try {
+      const res = await fetch('/api/tasks/' + taskId + '/changelog');
+      const data = await res.json();
+      taskLogs = data.logs || [];
+    } catch(_){ taskLogs = []; }
+    renderTaskLog();
+  }
+
+  function renderTaskLog(){
+    els.taskLogBody.innerHTML = '';
+    if(!taskLogs || taskLogs.length === 0){
+      els.taskLogBody.innerHTML = '<tr><td colspan="3" class="task-log-empty">Belum ada riwayat perubahan.</td></tr>';
+      return;
+    }
+    taskLogs.forEach((log, i) => {
+      const d = new Date(log.actionAt);
+      const datePart = d.toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric' });
+      const timePart = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="todo-num">' + (i + 1) + '</td>' +
+        '<td class="log-action-text">' + escapeHtml(log.action) + '</td>' +
+        '<td class="log-date-text"><span class="log-date-row">' + datePart + '</span><span class="log-time-row">' + timePart + '</span></td>';
+      els.taskLogBody.appendChild(tr);
+    });
+  }
+
+  /* ---------------- Master render ---------------- */
+  function renderAll(scrollToToday){
+    const range = computeRange();
+    renderRuler(range);
+    renderRows(range);
+    renderSidebar();
+    renderProjectRange();
+    document.getElementById('backup-btn').disabled = tasks.length === 0;
+    if(scrollToToday) scrollToTodayLine(range);
+  }
+
+  function scrollToTodayLine(range){
+    const offset = dayDiff(range.start, T)*dayWidth;
+    els.timelineWrap.scrollLeft = Math.max(offset - 200, 0);
+    syncRulerScroll();
+  }
+
+  function syncRulerScroll(){
+    const rs = document.getElementById('ruler-scroll');
+    if(rs) rs.style.transform = `translateX(${-els.timelineWrap.scrollLeft}px)`;
+  }
+
+  /* ---------------- View toggle ---------------- */
+  document.getElementById('view-toggle').addEventListener('click', (e)=>{
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    document.querySelectorAll('#view-toggle button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    view = btn.dataset.view;
+    dayWidth = view==='week' ? 40 : 14;
+    renderAll(true);
+  });
+
+  document.getElementById('today-btn').addEventListener('click', ()=>{
+    renderAll(true);
+  });
+
+  /* ---------------- Toast ---------------- */
+  function showToast(msg, type='success'){
+    const el = document.createElement('div');
+    el.className = 'toast '+type;
+    el.textContent = msg;
+    document.getElementById('toast-container').appendChild(el);
+    setTimeout(()=>{ el.remove(); }, 3000);
+  }
+
+  /* ---------------- Backup ---------------- */
+  document.getElementById('backup-btn').addEventListener('click', async ()=>{
+    await showConfirm('Yakin ingin melakukan backup data?', 'Ya, Backup', 'Batal', 'btn-primary');
+    const btn = document.getElementById('backup-btn');
+    btn.textContent = 'MENYIMPAN...';
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/backup', { method:'POST' });
+      const data = await res.json();
+      if(data.success) {
+        showToast('Backup berhasil: '+data.file);
+        const logRes = await fetch('/api/restore-log');
+        const logData = await logRes.json();
+        restoreLog = logData.restoreLog || [];
+        renderRestoreLog();
+      } else showToast('Backup gagal', 'error');
+    } catch(e){
+      showToast('Backup gagal: '+e.message, 'error');
+    } finally {
+      btn.textContent = 'KEPT ON IT';
+      btn.disabled = false;
+    }
+  });
+
+  /* ---------------- Restore ---------------- */
+  const restoreOverlay = document.getElementById('restore-overlay');
+  const restoreList = document.getElementById('restore-list');
+
+  document.getElementById('restore-btn').addEventListener('click', async ()=>{
+    restoreOverlay.classList.add('open');
+    restoreList.innerHTML = '<div class="restore-loading">Memuat daftar backup...</div>';
+    try {
+      const res = await fetch('/api/backups');
+      const data = await res.json();
+      if (!data.backups || data.backups.length === 0) {
+        restoreList.innerHTML = '<div class="restore-empty">Tidak ada file backup ditemukan.</div>';
+        return;
+      }
+      restoreList.innerHTML = '';
+      const typeLabels = {
+        'task': 'Tasks',
+        'task-changelog': 'Task Log',
+        'evidence-changelog': 'Evidence Log',
+        'restore-log': 'Restore Log'
+      };
+      const latestByType = {};
+      data.backups.forEach((b) => {
+        if (!latestByType[b.type]) latestByType[b.type] = b.filename;
+      });
+      data.backups.forEach((b) => {
+        const isLatest = b.filename === latestByType[b.type];
+        const item = document.createElement('div');
+        item.className = 'restore-item' + (isLatest ? ' latest' : '');
+        item.innerHTML = `
+          <div class="restore-info">
+            <span class="restore-filename">${b.filename}</span>
+            <span class="restore-type">${typeLabels[b.type] || b.type}</span>
+            <span class="restore-date">${b.date || ''}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            ${isLatest ? '<span class="restore-latest-badge">Latest</span>' : ''}
+            <button class="restore-btn" data-file="${b.filename}">Restore</button>
+          </div>
+        `;
+        restoreList.appendChild(item);
+      });
+      renderRestoreLog();
+    } catch(e){
+      restoreList.innerHTML = '<div class="restore-empty">Gagal memuat daftar backup: ' + e.message + '</div>';
+    }
+  });
+
+  document.getElementById('restore-close-btn').addEventListener('click', ()=>{
+    restoreOverlay.classList.remove('open');
+  });
+
+  restoreOverlay.addEventListener('click', (e)=>{
+    if (e.target === restoreOverlay) restoreOverlay.classList.remove('open');
+  });
+
+  restoreList.addEventListener('click', async (e)=>{
+    const btn = e.target.closest('.restore-btn');
+    if (!btn) return;
+    const filename = btn.dataset.file;
+    await showConfirm('Yakin ingin me-restore data dari file <strong>' + filename + '</strong>?<br><br>Data tugas yang ada saat ini akan digantikan seluruhnya.', 'Ya, Restore', 'Batal', 'btn-primary');
+    btn.textContent = 'MERESTORE...';
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/restore', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ filename }) });
+      const data = await res.json();
+      if(data.success) {
+        showToast('Restore berhasil: ' + data.taskCount + ' tugas diimpor.');
+        restoreOverlay.classList.remove('open');
+        loadTasks();
+      } else {
+        showToast('Restore gagal: ' + (data.error || ''), 'error');
+      }
+    } catch(e){
+      showToast('Restore gagal: ' + e.message, 'error');
+    } finally {
+      btn.textContent = 'Restore';
+      btn.disabled = false;
+    }
+  });
+
+  /* ---------------- Modal logic ---------------- */
+  let editingId = null;
+
+  function openModal(task){
+    editingId = task ? task.id : null;
+    els.modalTitle.textContent = task ? 'Ubah Tugas' : 'Tugas Baru';
+    els.modalSub.textContent = task ? 'Perbarui detail atau geser jadwal tugas ini.' : 'Isi detail tugas di bawah ini.';
+    els.fName.value = task ? task.name : '';
+    els.fStart.value = task ? fmt(task.start) : fmt(T);
+    els.fEnd.value = task ? fmt(task.end) : fmt(addDays(T,3));
+    els.fCat.value = task ? task.cat : 'pengembangan';
+    els.fAssignee.value = task ? task.assignee : '';
+    els.fProgress.value = task ? task.progress : 0;
+    els.fProgressVal.textContent = (task ? task.progress : 0)+'%';
+    els.deleteBtn.style.visibility = task ? 'visible' : 'hidden';
+    selectedId = task ? task.id : null;
+    renderSidebar();
+    els.todoSection.style.display = task ? '' : 'none';
+    if(task){
+      els.todoDate.min = fmt(task.start);
+      els.todoDate.max = fmt(task.end);
+    } else {
+      els.todoDate.min = '';
+      els.todoDate.max = '';
+    }
+    renderTodos(task);
+    updateProgressSlider(task);
+    updateProgressFromTodos(task);
+    if(task){
+      els.taskLogSection.style.display = '';
+      loadTaskLog(task.id);
+    } else {
+      els.taskLogSection.style.display = 'none';
+      taskLogs = [];
+      renderTaskLog();
+    }
+    els.overlay.classList.add('open');
+    els.fName.focus();
+  }
+
+  function closeModal(force){
+    if(!force && els.confirmOverlay.classList.contains('open')) return;
+    els.overlay.classList.remove('open');
+    els.todoSection.style.display = '';
+    cancelTodoEdit();
+    editingId = null;
+    selectedId = null;
+    renderSidebar();
+    closeEvidencePanel();
+  }
+
+  els.fProgress.addEventListener('input', ()=>{
+    els.fProgressVal.textContent = els.fProgress.value+'%';
+  });
+
+  /* ---------------- To Do List ---------------- */
+  function renderTodos(task){
+    els.todoBody.innerHTML = '';
+    if(!task || !task.todos || task.todos.length===0){
+      els.todoBody.innerHTML = '<tr><td colspan="5" style="padding:16px 4px;color:var(--ink-faint);font-size:12px;">Belum ada aktivitas.</td></tr>';
+      return;
+    }
+    task.todos.forEach((todo, i)=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="todo-num">${i+1}</td>
+        <td><span class="todo-text${todo.done?' done':''}">${escapeHtml(todo.text)}</span></td>
+        <td class="todo-due" style="font-size:11px;font-family:'IBM Plex Mono',monospace;">${todo.due ? fmt(todo.due) : '—'}</td>
+        <td class="todo-status"><input type="checkbox" class="todo-cb" data-todo-id="${todo.id}"${todo.done?' checked':''}></td>
+        <td class="todo-del"><button class="todo-del-btn" data-todo-id="${todo.id}">&times;</button></td>
+      `;
+      tr.querySelector('.todo-cb').addEventListener('change', function(){
+        todo.done = this.checked;
+        api.put('/api/tasks/'+task.id+'/todos/'+todo.id, { done: todo.done }).catch(e => console.error('Save todo cb failed:', e));
+        updateProgressFromTodos(task);
+        renderTodos(task);
+        updateBellDot();
+        if(editingId) loadTaskLog(editingId);
+      });
+      tr.querySelector('.todo-del-btn').addEventListener('click', function(){
+        api.del('/api/tasks/'+task.id+'/todos/'+todo.id).catch(e => console.error('Delete todo failed:', e));
+        task.todos = task.todos.filter(t=>t.id!==todo.id);
+        updateProgressFromTodos(task);
+        renderTodos(task);
+        updateProgressSlider(task);
+        updateBellDot();
+        if(editingId) loadTaskLog(editingId);
+      });
+      tr.querySelector('.todo-text').addEventListener('click', function(){
+        editingTodoId = todo.id;
+        els.todoInput.value = todo.text;
+        els.todoDate.value = todo.due ? fmt(todo.due) : '';
+        els.todoAddBtn.textContent = 'Ubah';
+        els.todoCancelBtn.style.display = '';
+        els.todoInput.focus();
+      });
+      els.todoBody.appendChild(tr);
+    });
+  }
+
+  function updateProgressFromTodos(task){
+    if(!task || !task.todos || task.todos.length===0) return;
+    const done = task.todos.filter(t=>t.done).length;
+    task.progress = Math.round((done / task.todos.length) * 100);
+    els.fProgress.value = task.progress;
+    els.fProgressVal.textContent = task.progress+'%';
+  }
+
+  function updateProgressSlider(task){
+    if(!task || !task.todos || task.todos.length===0){
+      els.fProgress.disabled = false;
+      els.fProgress.style.opacity = '';
+      els.fProgress.style.cursor = '';
+    } else {
+      els.fProgress.disabled = true;
+      els.fProgress.style.opacity = '0.5';
+      els.fProgress.style.cursor = 'not-allowed';
+    }
+  }
+
+  function cancelTodoEdit(){
+    editingTodoId = null;
+    els.todoInput.value = '';
+    els.todoDate.value = '';
+    els.todoAddBtn.textContent = 'Tambah';
+    els.todoCancelBtn.style.display = 'none';
+  }
+
+  /* ---------------- Notification Panel ---------------- */
+  function openNotifPanel(){
+    const T = today();
+    const allTodos = [];
+    tasks.forEach(task => {
+      (task.todos||[]).forEach(todo => {
+        allTodos.push({ ...todo, taskId: task.id, taskName: task.name });
+      });
+    });
+
+    const sorted = allTodos.sort((a, b) => {
+      if(!a.due && !b.due) return 0;
+      if(!a.due) return 1;
+      if(!b.due) return -1;
+      return a.due - b.due;
+    });
+
+    const ordered = sorted.filter(t => !t.done);
+
+    if(ordered.length === 0){
+      els.notifBody.innerHTML = '<tr><td colspan="6" class="notif-empty">Semua aktivitas telah selesai.</td></tr>';
+      els.notifSub.textContent = 'Tidak ada aktivitas yang perlu diproses.';
+      return;
+    }
+
+    els.notifSub.textContent = 'Daftar aktivitas yang perlu diproses.';
+    els.notifBody.innerHTML = '';
+    ordered.forEach((todo, i) => {
+      let sisaHariText, sisaClass;
+      if(!todo.due){
+        sisaHariText = '—';
+        sisaClass = '';
+      } else {
+        const diff = dayDiff(T, todo.due);
+        if(diff < 0){
+          sisaHariText = 'Overdue';
+          sisaClass = 'overdue';
+        } else if(diff === 0){
+          sisaHariText = 'Hari ini';
+          sisaClass = '';
+        } else {
+          sisaHariText = diff + ' hari';
+          sisaClass = '';
+        }
+      }
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="todo-num">${i+1}</td>
+        <td><span class="todo-text${todo.done?' done':''}">${escapeHtml(todo.text)}</span></td>
+        <td class="todo-due" style="font-size:11px;font-family:'IBM Plex Mono',monospace;">${todo.due ? fmt(todo.due) : '—'}</td>
+        <td class="todo-due" style="font-size:11px;font-family:'IBM Plex Mono',monospace;${sisaClass ? 'color:var(--status-risk);font-weight:600;' : ''}">${sisaHariText}</td>
+        <td class="todo-status"><input type="checkbox" class="todo-cb" data-task-id="${todo.taskId}" data-todo-id="${todo.id}"${todo.done?' checked':''}></td>
+        <td class="todo-aksi"><button class="todo-copy-btn" title="Copy teks"><i class="bi bi-copy"></i></button></td>
+      `;
+
+      tr.querySelector('.todo-cb').addEventListener('change', async function(){
+        todo.done = this.checked;
+        const task = tasks.find(t => t.id === todo.taskId);
+        if(task){
+          const t = task.todos.find(td => td.id === todo.id);
+          if(t) t.done = todo.done;
+          updateProgressFromTodos(task);
+          await api.put('/api/tasks/'+todo.taskId+'/todos/'+todo.id, { done: todo.done }).catch(e => console.error('Save notif todo failed:', e));
+        }
+        openNotifPanel();
+        updateBellDot();
+        renderAll(false);
+      });
+
+      tr.querySelector('.todo-text').addEventListener('click', function(){
+        els.notifOverlay.classList.remove('open');
+        const task = tasks.find(t => t.id === todo.taskId);
+        if(task) openModal(task);
+      });
+
+      tr.querySelector('.todo-copy-btn').addEventListener('click', function(){
+        navigator.clipboard.writeText(todo.text).then(() => showToast('Teks berhasil tercopy')).catch(() => showToast('Gagal copy teks', 'error'));
+      });
+
+      els.notifBody.appendChild(tr);
+    });
+  }
+
+  function updateBellDot(){
+    const pending = tasks.some(t => (t.todos||[]).some(td => !td.done));
+    els.bellDot.classList.toggle('active', pending);
+  }
+
+  /* ---------------- Evidence Panel ---------------- */
+  let evidenceTaskId = null;
+
+  function truncateText(text, maxLen){
+    if(!text) return '';
+    return text.length > maxLen ? text.slice(0, maxLen) + '...' : text;
+  }
+
+  function switchEvidenceMode(mode){
+    els.evidenceLinkMode.style.display = 'none';
+    els.evidenceTextMode.style.display = 'none';
+    els.evidenceImageMode.style.display = 'none';
+    if(mode === 'text'){
+      els.evidenceTextMode.style.display = '';
+    } else if(mode === 'image'){
+      els.evidenceImageMode.style.display = '';
+    } else {
+      els.evidenceLinkMode.style.display = '';
+    }
+  }
+
+  els.evidenceTypeRadios.forEach(radio => {
+    radio.addEventListener('change', function(){
+      if(this.checked) switchEvidenceMode(this.value);
+    });
+  });
+
+  function openEvidencePanel(taskId){
+    evidenceTaskId = taskId;
+    document.querySelector('input[name="evidence-type"][value="link"]').checked = true;
+    switchEvidenceMode('link');
+    renderEvidences();
+    loadEvidenceLog(taskId);
+    els.evidenceOverlay.classList.add('open');
+  }
+
+  function closeEvidencePanel(){
+    els.evidenceOverlay.classList.remove('open');
+    evidenceTaskId = null;
+    els.evidenceLinkInput.value = '';
+    els.evidenceDescInput.value = '';
+    els.evidenceTextInput.value = '';
+    els.evidenceFileInput.value = '';
+    els.evidenceImageKetInput.value = '';
+  }
+
+  function renderEvidences(){
+    els.evidenceBody.innerHTML = '';
+    const task = tasks.find(t => t.id === evidenceTaskId);
+    if(!task || !task.evidences || task.evidences.length === 0){
+      els.evidenceBody.innerHTML = '<tr><td colspan="6" class="evidence-empty">Belum ada evidence.</td></tr>';
+      els.evidenceSub.textContent = 'Belum ada evidence.';
+      return;
+    }
+    els.evidenceSub.textContent = 'Daftar evidence tugas.';
+    task.evidences.forEach((ev, i) => {
+      const tr = document.createElement('tr');
+      const isText = (ev.type === 'text');
+      const isImage = (ev.type === 'image');
+      let evTextDisplay, evLinkDisplay, evKet;
+      if(isImage){
+        const imgSrc = '/' + ev.link;
+        evTextDisplay = '<img src="'+escapeHtml(imgSrc)+'" class="evidence-img-thumb" data-preview="'+escapeHtml(imgSrc)+'" title="Klik untuk preview">';
+        evLinkDisplay = '<span class="evidence-img-placeholder">Gambar</span>';
+        evKet = escapeHtml(ev.keterangan || '');
+      } else if(isText){
+        evTextDisplay = '<span class="evidence-text-cell" title="'+escapeHtml(ev.keterangan || '')+'">'+escapeHtml(truncateText(ev.keterangan, 100))+'</span>';
+        evLinkDisplay = '-';
+        evKet = '-';
+      } else {
+        evTextDisplay = '-';
+        evLinkDisplay = ev.link ? '<a href="'+escapeHtml(ev.link)+'" target="_blank" class="evidence-link-text" title="'+escapeHtml(ev.link)+'">'+escapeHtml(shortenUrl(ev.link))+'</a>' : '-';
+        evKet = escapeHtml(ev.keterangan || '');
+      }
+      tr.innerHTML = `
+        <td class="evidence-num">${i+1}</td>
+        <td class="evidence-date">${ev.created_at ? new Date(ev.created_at).toLocaleDateString('id-ID') : '-'}</td>
+        <td class="evidence-text">${evTextDisplay}</td>
+        <td class="evidence-link">${evLinkDisplay}</td>
+        <td>${evKet}</td>
+        <td class="evidence-del"><button class="evidence-del-btn" data-ev-id="${ev.id}">&times;</button></td>
+      `;
+      tr.querySelector('.evidence-del-btn').addEventListener('click', async function(){
+        const evId = parseInt(this.dataset.evId, 10);
+        await api.del('/api/tasks/'+task.id+'/evidences/'+evId).catch(e => console.error('Delete evidence failed:', e));
+        task.evidences = task.evidences.filter(e => e.id !== evId);
+        renderEvidences();
+        loadEvidenceLog(task.id);
+      });
+      if(isImage){
+        tr.querySelector('.evidence-img-thumb').addEventListener('click', function(){
+          openImagePreview(this.dataset.preview);
+        });
+      }
+      els.evidenceBody.appendChild(tr);
+    });
+  }
+
+  async function uploadImageEvidence(task){
+    const file = els.evidenceFileInput.files[0];
+    if(!file){ alert('File gambar harus dipilih.'); return; }
+    const keterangan = els.evidenceImageKetInput.value.trim();
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('keterangan', keterangan);
+    try {
+      const r = await fetch('/api/tasks/'+task.id+'/evidences/image', { method:'POST', body: formData });
+      if(!r.ok){ const e = await r.json(); alert(e.error || 'Gagal upload gambar'); return; }
+      const result = await r.json();
+      if(!task.evidences) task.evidences = [];
+      task.evidences.push(result.evidence);
+      els.evidenceFileInput.value = '';
+      els.evidenceImageKetInput.value = '';
+      renderEvidences();
+      loadEvidenceLog(task.id);
+    } catch(e){ console.error('Failed to upload image evidence:', e); alert('Gagal upload gambar'); }
+  }
+
+  els.evidenceAddBtn.addEventListener('click', async ()=>{
+    const task = tasks.find(t => t.id === evidenceTaskId);
+    if(!task) return;
+    const type = document.querySelector('input[name="evidence-type"]:checked').value;
+    if(type === 'image'){ uploadImageEvidence(task); return; }
+    let link = '', keterangan = '';
+    if(type === 'link'){
+      link = els.evidenceLinkInput.value.trim();
+      if(!link){ alert('Link evidence harus diisi.'); return; }
+      keterangan = els.evidenceDescInput.value.trim();
+    } else {
+      keterangan = els.evidenceTextInput.value.trim();
+      if(!keterangan){ alert('Teks evidence harus diisi.'); return; }
+    }
+    try {
+      const result = await api.post('/api/tasks/'+task.id+'/evidences', { type, link, keterangan });
+      if(!task.evidences) task.evidences = [];
+      task.evidences.push(result.evidence);
+      els.evidenceLinkInput.value = '';
+      els.evidenceDescInput.value = '';
+      els.evidenceTextInput.value = '';
+      renderEvidences();
+      loadEvidenceLog(task.id);
+      if(type === 'link') els.evidenceLinkInput.focus();
+      else els.evidenceTextInput.focus();
+    } catch(e){ console.error('Failed to add evidence:', e); }
+  });
+
+  els.evidenceLinkInput.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter') els.evidenceAddBtn.click();
+  });
+  els.evidenceDescInput.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter') els.evidenceAddBtn.click();
+  });
+  els.evidenceTextInput.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter' && e.ctrlKey) els.evidenceAddBtn.click();
+  });
+  els.evidenceImageKetInput.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter') els.evidenceAddBtn.click();
+  });
+
+  /* ---------------- Evidence Log ---------------- */
+  let evidenceLogs = [];
+
+  async function loadEvidenceLog(taskId){
+    try {
+      const res = await fetch('/api/tasks/' + taskId + '/evidence-changelog');
+      const data = await res.json();
+      evidenceLogs = data.logs || [];
+    } catch(_){ evidenceLogs = []; }
+    renderEvidenceLog();
+  }
+
+  function renderEvidenceLog(){
+    els.evidenceLogBody.innerHTML = '';
+    if(!evidenceLogs || evidenceLogs.length === 0){
+      els.evidenceLogBody.innerHTML = '<tr><td colspan="3" class="evidence-log-empty">Belum ada riwayat perubahan.</td></tr>';
+      return;
+    }
+    evidenceLogs.forEach((log, i) => {
+      const d = new Date(log.actionAt);
+      const datePart = d.toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric' });
+      const timePart = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="todo-num">' + (i + 1) + '</td>' +
+        '<td class="log-action-text">' + escapeHtml(log.action) + '</td>' +
+        '<td class="log-date-text"><span class="log-date-row">' + datePart + '</span><span class="log-time-row">' + timePart + '</span></td>';
+      els.evidenceLogBody.appendChild(tr);
+    });
+  }
+
+  /* ---------------- Image Preview Lightbox ---------------- */
+  function openImagePreview(src){
+    els.imgPreviewImg.src = src;
+    els.imgPreviewOverlay.classList.add('open');
+  }
+  function closeImagePreview(){
+    els.imgPreviewOverlay.classList.remove('open');
+    els.imgPreviewImg.src = '';
+  }
+  els.imgPreviewOverlay.addEventListener('click', function(e){
+    if(e.target === els.imgPreviewOverlay) closeImagePreview();
+  });
+  document.getElementById('img-preview-close').addEventListener('click', closeImagePreview);
+
+  els.todoAddBtn.addEventListener('click', async ()=>{
+    const t = tasks.find(x=>x.id===editingId);
+    if(!t) return;
+    const text = els.todoInput.value.trim();
+    if(!text) return;
+    const dueStr = els.todoDate.value || null;
+    t.todos = t.todos || [];
+    if(editingTodoId){
+      const todo = t.todos.find(x=>x.id===editingTodoId);
+      if(todo){ todo.text = text; todo.due = dueStr ? parseDate(dueStr) : null; }
+      api.put('/api/tasks/'+t.id+'/todos/'+editingTodoId, { text, due: dueStr }).catch(e => console.error('Save todo failed:', e));
+      cancelTodoEdit();
+    } else {
+      try {
+        const result = await api.post('/api/tasks/'+t.id+'/todos', { text, due: dueStr });
+        t.todos.push({ id: result.todo.id, text: result.todo.text, done: false, due: result.todo.due ? parseDate(result.todo.due) : null });
+      } catch(e){ console.error('Failed to add todo:', e); return; }
+      els.todoInput.value = '';
+      els.todoDate.value = '';
+    }
+    els.todoInput.focus();
+    renderTodos(t);
+    updateProgressFromTodos(t);
+    updateProgressSlider(t);
+    updateBellDot();
+    if(editingId) loadTaskLog(editingId);
+  });
+  els.todoInput.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter') els.todoAddBtn.click();
+  });
+  els.todoDate.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter') els.todoAddBtn.click();
+  });
+  els.todoCancelBtn.addEventListener('click', cancelTodoEdit);
+
+  document.getElementById('cancel-btn').addEventListener('click', closeModal);
+  document.getElementById('close-btn').addEventListener('click', closeModal);
+  els.overlay.addEventListener('click', (e)=>{ if(e.target===els.overlay) closeModal(); });
+  els.confirmOverlay.addEventListener('click', (e)=>{ if(e.target===els.confirmOverlay) closeConfirm(); });
+
+  document.getElementById('save-btn').addEventListener('click', async ()=>{
+    const name = els.fName.value.trim();
+    const start = parseDate(els.fStart.value);
+    const end = parseDate(els.fEnd.value);
+    if(!name){ alert('Nama tugas tidak boleh kosong.'); return; }
+    if(!start || !end){ alert('Format tanggal harus YYYY-MM-DD.'); return; }
+    if(end < start){ alert('Tanggal selesai harus setelah tanggal mulai.'); return; }
+
+    const cat = els.fCat.value;
+    const assignee = els.fAssignee.value.trim();
+    const progress = Number(els.fProgress.value);
+
+    if(editingId){
+      const t = tasks.find(x=>x.id===editingId);
+      if(!t) return;
+      t.name = name; t.start = start; t.end = end;
+      t.cat = cat; t.assignee = assignee; t.progress = progress;
+      api.put('/api/tasks/'+editingId, { name, start:fmt(start), end:fmt(end), cat, assignee, progress }).catch(e => console.error('Save task failed:', e));
+    } else {
+      try {
+        const result = await api.post('/api/tasks', { name, start:fmt(start), end:fmt(end), cat, assignee, progress });
+        tasks.push({
+          ...result.task,
+          start: parseDate(result.task.start),
+          end: parseDate(result.task.end),
+          todos: (result.task.todos||[]).map(td => ({ ...td, due: td.due ? parseDate(td.due) : null })),
+        });
+      } catch(e){ console.error('Failed to create task:', e); return; }
+    }
+    tasks.sort((a, b) => a.start - b.start);
+    closeModal();
+    renderAll(false);
+  });
+
+  document.getElementById('delete-btn').addEventListener('click', async ()=>{
+    if(!editingId) return;
+    const name = tasks.find(t=>t.id===editingId)?.name||'';
+    await showConfirm('Yakin ingin menghapus tugas <strong>'+escapeHtml(name)+'</strong>?', 'Ya, Hapus', 'Batal', 'confirm-yes');
+    api.del('/api/tasks/'+editingId).catch(e => console.error('Delete task failed:', e));
+    tasks = tasks.filter(t=>t.id!==editingId);
+    closeModal(true);
+    renderAll(false);
+  });
+
+  document.getElementById('add-task-btn').addEventListener('click', ()=> openModal(null));
+
+  document.getElementById('evidence-btn').addEventListener('click', ()=>{
+    if(editingId) openEvidencePanel(editingId);
+  });
+
+  /* ---------------- Notification Panel Events ---------------- */
+  els.bellBtn.addEventListener('click', ()=>{
+    openNotifPanel();
+    els.notifOverlay.classList.add('open');
+  });
+
+  els.notifOverlay.addEventListener('click', (e)=>{
+    if(e.target === els.notifOverlay) els.notifOverlay.classList.remove('open');
+  });
+
+  document.getElementById('notif-close-btn').addEventListener('click', ()=>{
+    els.notifOverlay.classList.remove('open');
+  });
+
+  /* ---------------- Evidence Panel Events ---------------- */
+  els.evidenceOverlay.addEventListener('click', (e)=>{
+    if(e.target === els.evidenceOverlay) closeEvidencePanel();
+  });
+
+  document.getElementById('evidence-close-btn').addEventListener('click', closeEvidencePanel);
+
+  document.addEventListener('keydown', (e)=>{
+    if(e.key==='Escape' && els.confirmOverlay.classList.contains('open')){ closeConfirm(); return; }
+    if(e.key==='Escape' && els.overlay.classList.contains('open')) closeModal();
+    if(e.key==='Escape' && els.notifOverlay.classList.contains('open')) els.notifOverlay.classList.remove('open');
+    if(e.key==='Escape' && els.evidenceOverlay.classList.contains('open')) closeEvidencePanel();
+    if(e.key==='Escape' && els.imgPreviewOverlay.classList.contains('open')) closeImagePreview();
+  });
+
+  /* ---------------- Inline Title Edit ---------------- */
+  let _savedTitle = '';
+
+  function enableTitleEdit(){
+    const current = els.title.textContent;
+    _savedTitle = current;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'title-input';
+    input.value = current;
+    els.title.replaceWith(input);
+    input.focus();
+    input.select();
+
+    function commit(){
+      const val = input.value.trim();
+      if(!val){
+        input.focus();
+        return;
+      }
+      const span = document.createElement('span');
+      span.id = 'project-title';
+      span.textContent = val;
+      input.replaceWith(span);
+      els.title = span;
+      api.put('/api/metadata', { title: val }).catch(e => console.error('Save title failed:', e));
+    }
+
+    function cancel(){
+      const span = document.createElement('span');
+      span.id = 'project-title';
+      span.textContent = _savedTitle;
+      input.replaceWith(span);
+      els.title = span;
+    }
+
+    input.addEventListener('keydown', function(e){
+      if(e.key === 'Enter'){ e.preventDefault(); commit(); }
+      if(e.key === 'Escape'){ e.preventDefault(); cancel(); }
+    });
+    input.addEventListener('blur', commit);
+  }
+
+  document.querySelector('.title-row').addEventListener('click', function(e){
+    if(e.target.id === 'project-title' || e.target.id === 'title-edit-icon'){
+      enableTitleEdit();
+    }
+  });
+
+  /* ---------------- Theme ---------------- */
+  function setFavicon(){
+    const svg = `<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22><path fill=%22%23FFFFFF%22 d=%22M2.5 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2zm5 2h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1m-5 1a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1zm9-1h1a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1%22/></svg>`;
+    let link = document.querySelector('link[rel="icon"][type="image/svg+xml"]');
+    if(!link){
+      link = document.createElement('link');
+      link.rel = 'icon';
+      link.type = 'image/svg+xml';
+      document.head.appendChild(link);
+    }
+    link.href = 'data:image/svg+xml,' + svg;
+  }
+
+  function setTheme(theme){
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+    const btn = document.getElementById('theme-toggle');
+    if(btn) btn.innerHTML = theme === 'dark' ? '<i class="bi bi-sun-fill"></i>' : '<i class="bi bi-moon-fill"></i>';
+  }
+
+  function initTheme(){
+    const saved = localStorage.getItem('theme');
+    if(saved){ setTheme(saved); return; }
+    if(window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
+    else setTheme('light');
+  }
+
+  setFavicon();
+
+  document.getElementById('theme-toggle').addEventListener('click', function(){
+    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+  });
+
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e){
+    if(!localStorage.getItem('theme')) setTheme(e.matches ? 'dark' : 'light');
+  });
+
+  initTheme();
+
+  els.timelineWrap.addEventListener('scroll', syncRulerScroll);
+
+  /* ---------- Scroll Area Shadow ---------- */
+  const scrollArea = document.querySelector('.scroll-area');
+  if(scrollArea){
+    function updateScrollShadow(){
+      const {scrollTop} = scrollArea;
+      scrollArea.classList.toggle('scrolled-top', scrollTop > 4);
+    }
+    scrollArea.addEventListener('scroll', updateScrollShadow);
+    updateScrollShadow();
+  }
+
+  /* ---------------- Report ---------------- */
+  function openReportModal(){
+    const todayDate = new Date();
+    const weekAgo = new Date(todayDate);
+    weekAgo.setDate(todayDate.getDate() - 7);
+    els.rStart.value = fmt(weekAgo);
+    els.rEnd.value = fmt(todayDate);
+    els.reportContent.innerHTML = '';
+    els.reportOverlay.classList.add('open');
+  }
+
+  function closeReportModal(){
+    els.reportOverlay.classList.remove('open');
+  }
+
+  document.getElementById('report-btn').addEventListener('click', openReportModal);
+  document.getElementById('report-close-btn').addEventListener('click', closeReportModal);
+  els.reportOverlay.addEventListener('click', (e)=>{
+    if(e.target === els.reportOverlay) closeReportModal();
+  });
+
+  function generateReport(){
+    const startDate = parseDate(els.rStart.value);
+    const endDate = parseDate(els.rEnd.value);
+    if(!startDate || !endDate){
+      alert('Mohon isi tanggal mulai dan selesai.');
+      return;
+    }
+    if(startDate > endDate){
+      alert('Tanggal mulai harus sebelum tanggal selesai.');
+      return;
+    }
+
+    const filtered = tasks.filter(t => {
+      if(!t.start) return false;
+      return t.start >= startDate && t.start <= endDate;
+    });
+
+    if(filtered.length === 0){
+      els.reportContent.innerHTML = '<div class="report-empty"><i class="bi bi-inbox" style="font-size:32px;display:block;margin-bottom:8px;color:#000;"></i>Tidak ada tugas dalam periode ini.</div>';
+      return;
+    }
+
+    const rangeStr = els.rStart.value.split('-').reverse().join('/') + ' — ' + els.rEnd.value.split('-').reverse().join('/');
+
+    let totalTodos = 0, doneTodos = 0, overdueTodos = 0, totalProgress = 0, doneTasks = 0;
+    filtered.forEach(task => {
+      let actualProgress;
+      if(task.todos && task.todos.length > 0){
+        const taskDone = task.todos.filter(t => t.done).length;
+        actualProgress = Math.round((taskDone / task.todos.length) * 100);
+        task.todos.forEach(todo => {
+          totalTodos++;
+          if(todo.done) doneTodos++;
+          if(todo.due && !todo.done && todo.due < today()) overdueTodos++;
+        });
+      } else {
+        actualProgress = 0;
+      }
+      totalProgress += actualProgress;
+      if(actualProgress >= 100) doneTasks++;
+    });
+    const avgProgress = filtered.length > 0 ? Math.round(totalProgress / filtered.length) : 0;
+
+    let html = '<div id="report-printable" style="font-family:Inter,sans-serif;color:#000;">';
+    html += '<div style="text-align:center;margin-bottom:16px;"><div style="font-family:Space Grotesk,sans-serif;font-size:18px;font-weight:700;color:#000;">LAPORAN TUGAS</div><div style="font-size:12px;color:#000;font-family:IBM Plex Mono,monospace;">Periode: ' + rangeStr + '</div></div>';
+
+    html += '<div class="report-summary">';
+    html += '<div class="report-summary-card"><div class="report-summary-icon"><i class="bi bi-clipboard-check"></i></div><div class="report-summary-data"><span class="report-summary-num">' + filtered.length + '</span><span class="report-summary-label">Tugas Utama</span></div><div class="report-summary-stat">' + doneTasks + '/' + filtered.length + ' Selesai</div></div>';
+    html += '<div class="report-summary-card"><div class="report-summary-icon"><i class="bi bi-list-check"></i></div><div class="report-summary-data"><span class="report-summary-num">' + totalTodos + '</span><span class="report-summary-label">Sub Tugas</span></div><div class="report-summary-stat">' + doneTodos + '/' + totalTodos + ' Selesai</div></div>';
+    html += '<div class="report-summary-card"><div class="report-summary-icon" style="' + (overdueTodos > 0 ? 'color:#e53935;' : '') + '"><i class="bi bi-exclamation-triangle"></i></div><div class="report-summary-data"><span class="report-summary-num" style="' + (overdueTodos > 0 ? 'color:#e53935;' : '') + '">' + overdueTodos + '</span><span class="report-summary-label">Overdue</span></div><div class="report-summary-stat">' + (overdueTodos > 0 ? 'Ada keterlambatan' : 'No Overdue') + '</div></div>';
+    html += '<div class="report-summary-card"><div class="report-summary-icon"><i class="bi bi-graph-up"></i></div><div class="report-summary-data"><span class="report-summary-num">' + avgProgress + '%</span><span class="report-summary-label">Progres Rata-rata</span></div><div class="report-summary-stat">Dari ' + filtered.length + ' tugas</div></div>';
+    html += '</div>';
+
+    filtered.forEach((task, idx) => {
+      let actualProgress;
+      if(task.todos && task.todos.length > 0){
+        const taskDone = task.todos.filter(t => t.done).length;
+        actualProgress = Math.round((taskDone / task.todos.length) * 100);
+      } else {
+        actualProgress = 0;
+      }
+      const progressBg = actualProgress >= 100 ? 'background:#2e7d32;color:#fff;' : 'background:#e53935;color:#fff;';
+      html += '<div class="report-section">';
+      html += '<div class="report-title-row"><div><div class="report-section-title"><i class="bi bi-folder"></i> ' + (idx+1) + '. ' + escapeHtml(task.name) + '</div><div class="report-task-meta">Kategori: ' + escapeHtml(task.cat || '-') + ' &bull; Assignee: ' + escapeHtml(task.assignee || '-') + ' &bull; Mulai: ' + fmt(task.start) + ' &bull; Selesai: ' + fmt(task.end) + '</div></div><span class="report-progress" style="' + progressBg + '">' + actualProgress + '%</span></div>';
+
+      if(task.todos && task.todos.length > 0){
+        html += '<div class="report-section-title" style="font-size:12px;color:#000;margin-bottom:10px;"><i class="bi bi-list-check"></i> Sub Tugas (' + task.todos.length + ')</div>';
+        html += '<table class="report-table"><thead><tr><th style="width:30px;">No.</th><th>Tugas</th><th style="width:100px;">Due Date</th><th style="width:80px;">Status</th></tr></thead><tbody>';
+        task.todos.forEach((todo, ti) => {
+          const isOverdue = todo.due && !todo.done && todo.due < today();
+          html += '<tr>';
+          html += '<td>' + (ti+1) + '</td>';
+          html += '<td><span class="report-todo-text' + (todo.done ? ' done' : '') + '">' + escapeHtml(todo.text) + '</span></td>';
+          html += '<td class="report-todo-due' + (isOverdue ? ' report-overdue' : '') + '">' + (todo.due ? fmt(todo.due) : '—') + '</td>';
+          html += '<td><span class="report-todo-check' + (todo.done ? ' checked' : '') + '">' + (todo.done ? '<i class="bi bi-check"></i>' : '') + '</span></td>';
+          html += '</tr>';
+        });
+        html += '</tbody></table>';
+      } else {
+        html += '<div style="font-size:12px;color:#000;padding:4px 0;">Tidak ada sub tugas.</div>';
+      }
+
+      if(task.evidences && task.evidences.length > 0){
+        html += '<div class="report-section-title" style="font-size:12px;color:#000;margin-top:10px;margin-bottom:4px;"><i class="bi bi-paperclip"></i> Evidence (' + task.evidences.length + ')</div>';
+        task.evidences.forEach(ev => {
+          html += '<div class="report-evidence-item">';
+          const isLink = ev.type === 'link' || (!ev.type && ev.link && ev.link !== 'None' && ev.link !== 'null');
+          const isImage = ev.type === 'image';
+          if(isImage){
+            const imgSrc = '/' + ev.link;
+            html += '<img src="' + escapeHtml(imgSrc) + '" data-preview="' + escapeHtml(imgSrc) + '" class="report-evidence-img" alt="Evidence">';
+            html += '<span>' + escapeHtml(ev.keterangan || 'Gambar') + '</span>';
+          } else if(isLink){
+            html += '<i class="bi bi-link-45deg"></i>';
+            html += '<span>' + escapeHtml(ev.keterangan || '') + '</span>';
+            html += ' <a href="' + escapeHtml(ev.link) + '" target="_blank" title="' + escapeHtml(ev.link) + '">' + escapeHtml(ev.link) + '</a>';
+          } else {
+            html += '<i class="bi bi-fonts"></i>';
+            html += '<span class="report-evidence-text">' + escapeHtml(ev.keterangan || '-') + '</span>';
+          }
+          html += '</div>';
+        });
+      }
+
+      html += '</div>';
+    });
+
+    html += '</div>';
+    els.reportContent.innerHTML = html;
+  }
+
+  document.getElementById('report-generate-btn').addEventListener('click', generateReport);
+
+  els.reportContent.addEventListener('click', (e)=>{
+    if(e.target.classList.contains('report-evidence-img')){
+      openImagePreview(e.target.dataset.preview);
+    }
+  });
+
+  document.getElementById('export-pdf-btn').addEventListener('click', ()=>{
+    const el = document.getElementById('report-printable');
+    if(!el){
+      alert('Mohon generate report terlebih dahulu.');
+      return;
+    }
+    if(typeof html2pdf === 'undefined'){
+      alert('Library PDF belum dimuat. Silakan coba lagi.');
+      return;
+    }
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    if(currentTheme === 'dark'){
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+    el.classList.add('report-print-light');
+    const fmtFile = (val) => val.split('-').reverse().join('');
+    const fileName = 'report-' + fmtFile(els.rStart.value) + '-' + fmtFile(els.rEnd.value) + '.pdf';
+    const opt = {
+      margin:       [10, 10, 10, 10],
+      filename:     fileName,
+      image:        { type:'jpeg', quality:0.98 },
+      html2canvas:  { scale:2, useCORS:true },
+      jsPDF:        { unit:'mm', format:'a4', orientation:'portrait' }
+    };
+    html2pdf().set(opt).from(el).save().then(()=>{
+      el.classList.remove('report-print-light');
+      if(currentTheme === 'dark'){
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    }).catch(()=>{
+      el.classList.remove('report-print-light');
+      if(currentTheme === 'dark'){
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    });
+  });
+
+  /* ---------------- Init ---------------- */
+  loadTasks();
+
+})();
+</script>
+</body>
+</html>
