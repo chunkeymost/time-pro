@@ -1405,7 +1405,6 @@
     color:var(--ink-soft);
     letter-spacing:.03em;
     text-transform:uppercase;
-    align-self:flex-start;
   }
   .restore-date{
     font-size:11px;
@@ -2495,9 +2494,8 @@
       });
       data.backups.forEach((b) => {
         const isLatest = b.filename === latestByType[b.type];
-        const isTask = b.type === 'task';
         const item = document.createElement('div');
-        item.className = 'restore-item' + (isLatest && isTask ? ' latest' : '');
+        item.className = 'restore-item' + (isLatest ? ' latest' : '');
         item.innerHTML = `
           <div class="restore-info">
             <span class="restore-filename">${b.filename}</span>
@@ -2506,7 +2504,7 @@
           </div>
           <div style="display:flex;align-items:center;gap:8px;">
             ${isLatest ? '<span class="restore-latest-badge">Latest</span>' : ''}
-            ${isTask ? '<button class="restore-btn" data-file="' + b.filename + '">Restore</button>' : ''}
+            <button class="restore-btn" data-file="${b.filename}">Restore</button>
           </div>
         `;
         restoreList.appendChild(item);

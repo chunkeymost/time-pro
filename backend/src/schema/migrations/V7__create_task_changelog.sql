@@ -1,0 +1,8 @@
+CREATE TABLE task_changelog (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  task_id INT UNSIGNED NOT NULL,
+  action VARCHAR(500) NOT NULL,
+  action_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+  INDEX idx_task_changelog_task (task_id)
+) ENGINE=InnoDB;

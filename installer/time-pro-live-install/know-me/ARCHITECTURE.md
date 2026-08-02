@@ -96,15 +96,8 @@ time-pro/
 │   │   │   └── MysqlStorage.js     # Database-based storage (async)
 │   │   └── seed-from-json.js       # Import data tasks.json → MySQL
 │   └── data/
-│       ├── tasks.json              # Production data (auto-created)
-│       ├── task-changelog.json     # Production task change log
-│       ├── evidence-changelog.json # Production evidence change log
-│       ├── restore-log.json        # Production backup/restore history log
-│       ├── backup/                 # Timestamped backup files (4 files per backup)
-│       │   ├── task-YYYYMMDD-HHmmss.json
-│       │   ├── task-changelog-YYYYMMDD-HHmmss.json
-│       │   ├── evidence-changelog-YYYYMMDD-HHmmss.json
-│       │   └── restore-log-YYYYMMDD-HHmmss.json
+│       ├── tasks.json              # Auto-created dengan seed data (tidak di-git)
+│       ├── restore-log.json        # History log restore & backup (terpisah)
 │       └── uploads/                # Upload evidence images (files)
 ├── know-me/
 │   ├── ARCHITECTURE.md
@@ -380,65 +373,6 @@ async function autoMigrate() {
 ```
 
 Memastikan semua migrasi pending tereksekusi sebelum server menerima koneksi.
-
-## Backup & Restore Mechanism
-
-### Struktur Folder
-
-```
-backend/data/
-├── tasks.json                    ← Production (original)
-├── task-changelog.json           ← Production
-├── evidence-changelog.json       ← Production
-├── restore-log.json              ← Production
-└── backup/
-    ├── task-20260802-055802.json
-    ├── task-changelog-20260802-055802.json
-    ├── evidence-changelog-20260802-055802.json
-    └── restore-log-20260802-055802.json
-```
-
-### Alur Backup (`POST /api/backup`)
-
-Ketika user klik **"KEPT ON IT"**, server menghasilkan **4 file** dengan timestamp yang sama di folder `backup/`:
-
-1. **`task-{timestamp}.json`** — Data tasks.json dengan semua gambar evidence di-encode ke base64 (`_imageData` field)
-2. **`task-changelog-{timestamp}.json`** — Copy dari `task-changelog.json` (production)
-3. **`evidence-changelog-{timestamp}.json`** — Copy dari `evidence-changelog.json` (production)
-4. **`restore-log-{timestamp}.json`** — Copy dari `restore-log.json` (production)
-
-Setelah file ditulis, aksi "BackedUp" dicatat di `restore-log.json`.
-
-### Alur Restore (`POST /api/restore`)
-
-Ketika user memilih file backup dan klik **"Restore"**:
-
-1. **Tasks** — File `task-{timestamp}.json` dibaca, gambar di-decode dari base64 ke folder `uploads/`, ditulis ulang ke `tasks.json` (production)
-2. **Timestamp diekstrak** dari filename (misal `20260802-055802`)
-3. **3 file log lain dicari** dengan timestamp yang sama di folder `backup/`:
-   - `task-changelog-{timestamp}.json` → di-copy ke `task-changelog.json`
-   - `evidence-changelog-{timestamp}.json` → di-copy ke `evidence-changelog.json`
-   - `restore-log-{timestamp}.json` → di-copy ke `restore-log.json`
-4. Semua file yang berhasil di-restore dicatat di history log dengan status "Restored"
-
-**Kesimpulan**: Dari 1 aksi restore pada file task, **semua data ter-restore otomatis** (task + 3 log) selama ke-4 file backup dengan timestamp yang sama ada di folder `backup/`.
-
-### Edge Case: Backup Lama
-
-Backup yang dibuat sebelum fitur backup log diaktifkan hanya memiliki `task-{timestamp}.json` **tanpa** 3 file log lainnya. Pada kasus ini:
-- Task: ✅ ter-restore
-- Task-changelog: ❌ tidak di-restore (file backup tidak ada)
-- Evidence-changelog: ❌ tidak di-restore
-- Restore-log: ❌ tidak di-restore
-
-### Restore Log
-
-History log disimpan di `restore-log.json` (production). Setiap aksi backup/restore dicatat dengan:
-- `status`: "BackedUp" | "Restored" | "Failed"
-- `filename`: Nama file yang di-backup/di-restore
-- `restoreAt`: Timestamp ISO 8601
-
-Frontend menampilkan log ini di panel Restore → "History Log Restore & Backup".
 
 ## Frontend Data Flow
 
