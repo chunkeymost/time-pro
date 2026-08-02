@@ -2,4 +2,6 @@
 /backend/package-lock.json
 /data/tasks.json
 backend/uploads/
+backend/.env
+backend/.env.local
 .gitignore

@@ -24,13 +24,17 @@ Storage dipilih via environment variable `STORAGE=mysql` — default JSON.
 # Install dependencies (dari root)
 npm install
 
+# Setup environment variables
+cd backend && cp .env.example .env   # Edit .env sesuai kebutuhan
+
 # Mode JSON (default, tanpa MySQL)
 cd backend && npm start
 
 # Mode MySQL
 cd backend && npm run db:migrate    # Buat tabel + seed kategori
 cd backend && npm run db:seed       # Import data JSON → MySQL
-STORAGE=mysql npm start             # Jalankan dengan MySQL
+# Set STORAGE=mysql di .env, lalu:
+cd backend && npm start
 
 # Auto-reload (development)
 cd backend && npm run dev
@@ -42,7 +46,7 @@ Buka `http://localhost:3000` di browser.
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | Vanilla HTML5, CSS3, JavaScript (ES6+) — single file + Bootstrap Icons (CDN) |
+| Frontend | Vanilla HTML5, CSS3, JavaScript (ES6+) — single file + Bootstrap Icons (CDN) + html2pdf.js (CDN) |
 | Backend | Node.js 20+, Express 4 |
 | Storage (default) | JSON file (`data/tasks.json`) |
 | Storage (opsional) | MySQL 8+ via `mysql2` |
@@ -75,14 +79,16 @@ Buka `http://localhost:3000` di browser.
 time-pro/
 ├── package.json                    # Root scripts (postinstall, start)
 ├── frontend/
-│   └── index.html                  # Frontend (single-page app)
+│   ├── index.html                  # Frontend (single-page app)
+│   └── kanban-fill.svg             # Favicon asset
 ├── backend/
-│   ├── Dockerfile                  # Docker build (container-ready)
+│   ├── .env.example                # Environment variable template (di-commit)
+│   ├── .env                        # Local environment variables (gitignored)
+│   ├── .gitignore                  # Ignore node_modules, data, .env, lockfile
 │   ├── server.js                   # Entry point + Express router + storage switching
 │   ├── package.json                # Dependencies + scripts
-│   ├── .gitignore                  # Ignore node_modules, data, lockfile
 │   ├── src/
-│   │   ├── config.js               # Konfigurasi path & database (mendukung MYSQL_URL)
+│   │   ├── config.js               # Konfigurasi (dotenv + MYSQL_URL + env var fallbacks)
 │   │   ├── schema/
 │   │   │   ├── migrate.js          # Migration runner — execute pending SQL
 │   │   │   └── migrations/
@@ -90,11 +96,14 @@ time-pro/
 │   │   │       ├── V2__seed_categories.sql
 │   │   │       ├── V3__create_evidences.sql
 │   │   │       ├── V4__update_evidences_add_type.sql
-│   │   │       └── V5__update_evidences_add_image_type.sql
+│   │   │       ├── V5__update_evidences_add_image_type.sql
+│   │   │       ├── V6__create_evidence_changelog.sql
+│   │   │       ├── V7__create_task_changelog.sql
+│   │   │       └── V8__create_restore_log.sql
 │   │   ├── storage/
 │   │   │   ├── JsonStorage.js      # File-based storage (sync, default)
 │   │   │   └── MysqlStorage.js     # Database-based storage (async)
-│   │   └── seed-from-json.js       # Import data tasks.json → MySQL
+│   │   └── seed-from-json.js       # Import data tasks.json + log history → MySQL
 │   └── data/
 │       ├── tasks.json              # Production data (auto-created)
 │       ├── task-changelog.json     # Production task change log
@@ -106,6 +115,8 @@ time-pro/
 │       │   ├── evidence-changelog-YYYYMMDD-HHmmss.json
 │       │   └── restore-log-YYYYMMDD-HHmmss.json
 │       └── uploads/                # Upload evidence images (files)
+├── installer/                      # Plug-and-play installer (full project copy)
+│   └── time-pro-live-install/
 ├── know-me/
 │   ├── ARCHITECTURE.md
 │   ├── BASE_DESIGN.md
@@ -173,20 +184,35 @@ Foreign Key: `category_id` → `categories(id)`
 
 ## Config (`config.js`)
 
-`config.js` mendukung dua cara koneksi MySQL:
+Config dimuat via **dotenv** — file `backend/.env` dibaca otomatis saat startup.
 
-1. **`MYSQL_URL`** — Connection URL lengkap (otomatis diparsing):
-   ```
-   mysql://user:password@host:3306/database
-   ```
-2. **Fallback env vars** — Jika `MYSQL_URL` tidak tersedia:
+**Prioritas konfigurasi:**
+1. **`MYSQL_URL`** — Connection URL lengkap (otomatis diparsing, prioritas tertinggi)
+2. **Env vars individual** — Jika `MYSQL_URL` tidak tersedia:
    ```
    MYSQL_HOST (default: localhost)
-   MYSQL_PORT (default: 8889)
+   MYSQL_PORT (default: 3306)
    MYSQL_USER (default: root)
-   MYSQL_PASSWORD (default: root)
+   MYSQL_PASSWORD (default: "")
    MYSQL_DATABASE (default: db_timepro)
    ```
+3. **`DATA_PATH`** — Override path file JSON storage (default: `backend/data/tasks.json`)
+4. **`PORT`** — Port server (default: 3000)
+5. **`STORAGE`** — Storage mode: `json` (default) atau `mysql`
+
+```env
+# backend/.env.example (template — di-commit ke git)
+PORT=3000
+STORAGE=json
+MYSQL_URL=
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_USER=root
+MYSQL_PASSWORD=
+MYSQL_DATABASE=db_timepro
+```
+
+> **Security**: File `.env` tidak di-commit ke git (sudah ada di `.gitignore`). Gunakan `.env.example` sebagai template.
 
 ### `app_metadata` — Key-value store untuk metadata aplikasi
 
@@ -218,9 +244,18 @@ delete(id)               → boolean           // soft delete (MySQL)
 addTodo(taskId, data)    → todo | null
 updateTodo(taskId, todoId, data) → todo | null
 deleteTodo(taskId, todoId)       → boolean   // soft delete (MySQL)
+addEvidence(taskId, evData)      → evidence | null
+updateEvidence(taskId, evId, evData) → evidence | null
+deleteEvidence(taskId, evId)     → boolean   // soft delete (MySQL)
 getCategories()          → [{ id, slug, name, color, sort_order }]  // MySQL only
 getMetadata()            → { version, lastSynced, updatedAt, title }
 updateMetadata(updates)  → { version, lastSynced, updatedAt, title }
+addTaskLog(taskId, action)       → void      // Log perubahan task
+getTaskLogs(taskId)              → [{ id, task_id, action, created_at }]
+addEvidenceLog(taskId, evidenceId, action) → void
+getEvidenceLogs(taskId)          → [{ id, task_id, evidence_id, action, created_at }]
+addRestoreLog(status, filename)  → void      // Log backup/restore
+getRestoreLogs()                 → [{ status, filename, restoreAt }]
 ```
 
 ## Storage Switching
@@ -257,10 +292,14 @@ Mengimport data dari `data/tasks.json` ke MySQL. Preserve ID asli dari JSON.
 Guard: mengecek `app_metadata.json_seeded_at`. Jika sudah pernah di-seed → skip.
 Force re-import: `npm run db:seed -- --force`
 
-**New behaviors:**
+**Behaviors:**
 - **Auto-create kategori** — Jika task memiliki `cat` slug yang belum ada di tabel `categories`, seed otomatis membuat kategori baru.
 - **Sync evidence** — Jika data sudah pernah di-seed, seed tetap melakukan sync evidence (INSERT IGNORE) untuk mengakomodasi penambahan tabel `evidences` via migrasi V3, V4 (tambah kolom `type`), dan V5 (perluas `type` ENUM, support image).
-- **Evidence `type` field** — Seed menambahkan `type: 'link'` default untuk evidence yang belum memiliki kolom `type` (kompatibel dengan V4).
+- **Import log history** — Seed juga mengimport data changelog dari 3 file JSON ke tabel MySQL:
+  - `task-changelog.json` → `task_changelog`
+  - `evidence-changelog.json` → `evidence_changelog`
+  - `restore-log.json` → `restore_log`
+  - Import log history berjalan setiap kali seed dijalankan (baik initial maupun re-seed).
 - **Force hapus evidence** — Force mode sekarang menghapus `evidences`, `todos`, dan `tasks` sebelum re-import.
 - **Preserve created_at** — Evidence di-seed dengan `created_at` asli dari JSON.
 
@@ -278,20 +317,21 @@ npm run db:seed -- --force   # Force re-import (hapus data lama)
 | `POST` | `/api/tasks` | Create task | 1 |
 | `PUT` | `/api/tasks/:id` | Update task | 1 |
 | `DELETE` | `/api/tasks/:id` | Delete task + cascading todos (soft delete on MySQL) | 1 |
+| `GET` | `/api/tasks/:id/changelog` | Get task change history logs | 2 |
 | `POST` | `/api/tasks/:id/todos` | Add todo to task | 1 |
 | `PUT` | `/api/tasks/:id/todos/:todoId` | Update todo | 1 |
 | `DELETE` | `/api/tasks/:id/todos/:todoId` | Delete todo (soft delete on MySQL) | 1 |
 | `POST` | `/api/tasks/:id/evidences` | Add evidence link to task | 1 |
 | `PUT` | `/api/tasks/:id/evidences/:evId` | Update evidence | 1 |
 | `DELETE` | `/api/tasks/:id/evidences/:evId` | Delete evidence (soft delete on MySQL) | 1 |
+| `GET` | `/api/tasks/:id/evidence-changelog` | Get evidence change history logs | 2 |
+| `POST` | `/api/tasks/:id/evidences/image` | Upload gambar evidence (multipart/form-data, field `file`) | 1 |
 | `POST` | `/api/backup` | Backup tasks.json ke file timestamp | 1 |
 | `GET` | `/api/backups` | List semua file backup di data/ | 1 |
 | `POST` | `/api/restore` | Restore data dari file backup tertentu | 1 |
-| `POST` | `/api/restore/upload` | Upload JSON data ke MySQL (khusus `STORAGE=mysql`) | 2 |
 | `GET` | `/api/restore-log` | Ambil history log restore & backup | 1 |
 | `GET` | `/api/metadata` | Ambil metadata (title, versi, lastSynced) | 1 |
 | `PUT` | `/api/metadata` | Update metadata (title) | 1 |
-| `POST` | `/api/tasks/:id/evidences/image` | Upload gambar evidence (multipart/form-data, field `file`) | 1 |
 | `POST` | `/api/sync/commit` | Sync JSON → MySQL | 3 (**stub** — placeholder only) |
 
 ## JSON File Structure (`data/tasks.json`)
@@ -354,18 +394,6 @@ Proses commit (JSON → MySQL) menggunakan `seed-from-json.js` sebagai dasar (ji
 2. Untuk setiap task: `INSERT ... ON DUPLICATE KEY UPDATE`
 3. Hapus todos lama, insert ulang dari JSON
 4. Update `metadata.lastSynced` di JSON dan `app_metadata` di MySQL
-
-## Restore Upload to MySQL
-
-`POST /api/restore/upload` — endpoint khusus untuk mengupload data JSON ke MySQL saat mode `STORAGE=mysql`.
-
-Flow:
-1. Terima `{ tasks, nextId, nextTodoId }` dari body request
-2. Map `task.cat` → `categories.slug` → `category_id`
-3. Auto-create kategori baru jika slug belum ada
-4. Transaction: `INSERT ... ON DUPLICATE KEY UPDATE` untuk tasks, todos, evidences
-5. Catat `json_seeded_at` di `app_metadata`
-6. Rollback penuh jika gagal
 
 ## Auto-Migration on Startup
 
@@ -439,6 +467,58 @@ History log disimpan di `restore-log.json` (production). Setiap aksi backup/rest
 - `restoreAt`: Timestamp ISO 8601
 
 Frontend menampilkan log ini di panel Restore → "History Log Restore & Backup".
+
+## Automatic Audit Trail / Changelog
+
+Setiap perubahan pada task, todo, dan evidence secara otomatis dicatat ke changelog file (JSON) dan tabel MySQL.
+
+### Logging Behavior
+
+| Aksi | Tabel/File | Format Log |
+|------|-----------|------------|
+| Update task (start, end, category, assignee) | `task_changelog` / `task-changelog.json` | `"Mengubah [field]: [old] → [new]"` |
+| Tambah todo | `task_changelog` / `task-changelog.json` | `"Menambahkan Sub Task: [text]"` |
+| Update todo (text, due, done) | `task_changelog` / `task-changelog.json` | `"Mengubah Sub Task (ID: [id]): [detail]"` |
+| Hapus todo | `task_changelog` / `task-changelog.json` | `"Menghapus Sub Task: [text]"` |
+| Tambah evidence | `evidence_changelog` / `evidence-changelog.json` | `"Menambahkan evidence [type]: [keterangan]"` |
+| Update evidence | `evidence_changelog` / `evidence-changelog.json` | `"Mengubah evidence (ID: [id]): [detail]"` |
+| Hapus evidence | `evidence_changelog` / `evidence-changelog.json` | `"Menghapus evidence (ID: [id]): [keterangan]"` |
+
+### MySQL Schema (V6/V7/V8)
+
+```sql
+-- V6: evidence_changelog
+CREATE TABLE evidence_changelog (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  task_id INT UNSIGNED NOT NULL,
+  evidence_id INT UNSIGNED NOT NULL,
+  action TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- V7: task_changelog
+CREATE TABLE task_changelog (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  task_id INT UNSIGNED NOT NULL,
+  action TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- V8: restore_log
+CREATE TABLE restore_log (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  status VARCHAR(50) NOT NULL,
+  filename VARCHAR(255) NOT NULL,
+  restore_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+```
+
+### Frontend Display
+
+- **Task Log**: Klik tombol log di modal task → `GET /api/tasks/:id/changelog` → tabel dengan kolom No., Aksi, Tanggal
+- **Evidence Log**: Tab "Log" di evidence panel → `GET /api/tasks/:id/evidence-changelog` → tabel serupa
 
 ## Frontend Data Flow
 

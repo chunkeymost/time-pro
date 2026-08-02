@@ -36,6 +36,7 @@ GET    /api/tasks/:id           → Get single task
 POST   /api/tasks              → Create task
 PUT    /api/tasks/:id          → Update task
 DELETE /api/tasks/:id          → Delete task + todos
+GET    /api/tasks/:id/changelog → Get task change history logs
 POST   /api/tasks/:id/todos    → Add todo
 PUT    /api/tasks/:id/todos/:todoId → Update todo
 DELETE /api/tasks/:id/todos/:todoId → Delete todo
@@ -43,12 +44,12 @@ POST   /api/tasks/:id/evidences    → Add evidence
 PUT    /api/tasks/:id/evidences/:evId → Update evidence
 POST   /api/tasks/:id/evidences/image → Upload evidence image
 DELETE /api/tasks/:id/evidences/:evId → Delete evidence
+GET    /api/tasks/:id/evidence-changelog → Get evidence change history logs
 GET    /api/metadata           → Get metadata (title, lastSynced, etc.)
 PUT    /api/metadata           → Update metadata (title)
 POST   /api/backup            → Backup tasks.json ke file timestamp
 GET    /api/backups           → List semua file backup
 POST   /api/restore           → Restore data dari backup
-POST   /api/restore/upload     → Upload JSON ke MySQL (STORAGE=mysql only)
 GET    /api/restore-log       → History log restore
 POST   /api/sync/commit        → (stub) Sync JSON → MySQL
 ```
@@ -70,6 +71,9 @@ Menambahkan MySQL sebagai storage engine alternatif (dapat dipilih via environme
 | `backend/src/schema/migrations/V3__create_evidences.sql` | Buat tabel evidences dengan soft delete |
 | `backend/src/schema/migrations/V4__update_evidences_add_type.sql` | Tambah kolom `type` ENUM('link','text') ke tabel evidences |
 | `backend/src/schema/migrations/V5__update_evidences_add_image_type.sql` | Perluas `type` ENUM('link','text','image'), support upload gambar evidence |
+| `backend/src/schema/migrations/V6__create_evidence_changelog.sql` | Buat tabel evidence_changelog untuk audit trail |
+| `backend/src/schema/migrations/V7__create_task_changelog.sql` | Buat tabel task_changelog untuk audit trail |
+| `backend/src/schema/migrations/V8__create_restore_log.sql` | Buat tabel restore_log untuk history backup/restore |
 | `backend/src/schema/migrate.js` | Migration runner — versioning & execute DDL |
 | `backend/src/storage/MysqlStorage.js` | Database-based storage dengan interface sama seperti JsonStorage |
 | `backend/src/seed-from-json.js` | Import data dari `backend/data/tasks.json` ke MySQL |
@@ -251,7 +255,7 @@ Fitur ringkasan laporan tugas berdasarkan periode tanggal (client-side, tanpa en
   - **Task Detail**: tabel tugas dengan progress bar dan status
   - **Todo**: daftar todo yang terkait dengan tugas dalam periode (jika ada)
   - **Evidence**: daftar evidence dengan link/image (jika ada)
-- **Export PDF** — tombol "Export PDF" di modal laporan menggunakan `window.print()` dengan CSS `@media print`
+- **Export PDF** — tombol "Export PDF" di modal laporan menggunakan `html2pdf.js` library (CDN) untuk generate PDF langsung dari elemen HTML
   - Output PDF menggunakan format tanggal `YYYY-MM-DD` (pemisah `-`)
   - Background hijau untuk tombol report
   - Text semua elemen menjadi hitam dalam mode print termasuk label bold
@@ -362,6 +366,16 @@ Dokumentasi design system sebagai acuan konsistensi UI:
 - JavaScript conventions: IIFE, API helper, utility functions, keyboard shortcuts
 - File structure dan backend stack
 
+### 📋 Audit Trail / Changelog
+
+Fitur automatic change tracking yang dicatat ke changelog file dan MySQL:
+
+- Setiap perubahan task (start, end, category, assignee) otomatis log ke `task-changelog.json` / `task_changelog` table
+- Perubahan todo (add/update/delete) juga log ke task changelog
+- Perubahan evidence (add/update/delete) log ke `evidence-changelog.json` / `evidence_changelog` table
+- Frontend menampilkan log via `GET /api/tasks/:id/changelog` dan `GET /api/tasks/:id/evidence-changelog`
+- Log history juga di-import saat seed ke MySQL (`importLogHistory()` di `seed-from-json.js`)
+
 ### 💾 Backup & Restore
 
 Fitur persistence, backup, dan restore data:
@@ -383,13 +397,17 @@ Fitur persistence, backup, dan restore data:
 # Install dependencies
 npm install
 
+# Setup environment variables
+cd backend && cp .env.example .env   # Edit .env sesuai kebutuhan
+
 # Phase 1: JSON Storage (default)
 cd backend && npm start            # node server.js
 
 # Phase 2: MySQL Storage
+# Edit .env: set STORAGE=mysql, isi MYSQL_HOST/PORT/USER/PASSWORD/DATABASE
 cd backend && npm run db:migrate   # Buat tabel + seed kategori
 cd backend && npm run db:seed      # Import data dari JSON ke MySQL
-STORAGE=mysql npm start            # Jalankan dengan MySQL
+cd backend && npm start            # Jalankan dengan MySQL
 
 # Development mode (auto-restart on changes)
 cd backend && npm run dev
@@ -397,17 +415,12 @@ cd backend && npm run dev
 
 Buka `http://localhost:3000` di browser.
 
-## Deployment (Docker)
+## Deployment
 
-Proyek dapat di-deploy menggunakan Docker:
+- Copy project ke server
+- Install dependencies: `npm install`
+- Copy `.env.example` → `.env` dan isi konfigurasi
+- Jalankan: `cd backend && npm start`
+- Server listening di port yang dikonfigurasi (default: 3000)
 
-```bash
-# Docker build dari backend/Dockerfile
-# Set environment variables:
-#   STORAGE=mysql
-#   MYSQL_URL=mysql://user:pass@host:3306/dbname
-```
-
-- `config.js` mendukung `MYSQL_URL` sebagai alternatif env vars individual
-- Server menjalankan auto-migration saat startup dalam mode MySQL
-- `backend/data/tasks.json` tidak di-track git (disimpan lokal)
+> **Catatan**: Dockerfile sudah dihapus. Gunakan installer di `installer/time-pro-live-install/` untuk deployment plug-and-play.

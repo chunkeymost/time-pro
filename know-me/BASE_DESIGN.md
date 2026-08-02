@@ -363,6 +363,7 @@ Grid size: 28px × 28px
 |---------|---------|-----|
 | Google Fonts | — | `https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap` |
 | Bootstrap Icons | 1.11.3 | `https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css` |
+| html2pdf.js | 0.10.1 | `https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js` |
 
 ---
 
@@ -452,14 +453,23 @@ const DOW_ID = ["Min","Sen","Sel","Rab","Kam","Jum","Sab"];
 ```
 time-pro/
 ├── frontend/
-│   └── index.html          ← Single-page app (HTML + CSS + JS inline)
+│   ├── index.html          ← Single-page app (HTML + CSS + JS inline)
+│   └── kanban-fill.svg     ← Favicon asset
 ├── backend/
+│   ├── .env.example        ← Environment variable template (di-commit)
+│   ├── .env                ← Local environment variables (gitignored)
 │   ├── server.js           ← Express server & API routes
 │   ├── package.json
+│   ├── .gitignore
 │   ├── data/
-│   │   └── tasks.json      ← JSON data file
+│   │   ├── tasks.json      ← JSON data file
+│   │   ├── task-changelog.json
+│   │   ├── evidence-changelog.json
+│   │   ├── restore-log.json
+│   │   ├── backup/         ← Timestamped backup files
+│   │   └── uploads/        ← Uploaded evidence images
 │   └── src/
-│       ├── config.js       ← Configuration
+│       ├── config.js       ← Configuration (dotenv + env vars)
 │       ├── storage/
 │       │   ├── JsonStorage.js
 │       │   └── MysqlStorage.js
@@ -468,11 +478,20 @@ time-pro/
 │       │   └── migrations/
 │       │       ├── V1__initial_schema.sql
 │       │       ├── V2__seed_categories.sql
-│       │       └── V3__create_evidences.sql
+│       │       ├── V3__create_evidences.sql
+│       │       ├── V4__update_evidences_add_type.sql
+│       │       ├── V5__update_evidences_add_image_type.sql
+│       │       ├── V6__create_evidence_changelog.sql
+│       │       ├── V7__create_task_changelog.sql
+│       │       └── V8__create_restore_log.sql
 │       └── seed-from-json.js
-└── know-me/
-    ├── ARCHITECTURE.md
-    ├── BASE_DESIGN.md       ← This file
-    ├── PLAN.md
-    └── SKILL.md
+├── installer/
+│   └── time-pro-live-install/
+├── know-me/
+│   ├── ARCHITECTURE.md
+│   ├── BASE_DESIGN.md       ← This file
+│   ├── DESIGN_BASE.md
+│   ├── PLAN.md
+│   └── SKILL.md
+└── README.md
 ```

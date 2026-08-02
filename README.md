@@ -8,13 +8,17 @@ Project management timeline / Gantt chart interaktif dengan backend Node.js + du
 # Install dependencies (dari root)
 npm install
 
+# Setup environment variables
+cd backend && cp .env.example .env   # Edit .env sesuai kebutuhan
+
 # Mode JSON (default, tanpa MySQL)
 cd backend && npm start
 
 # Mode MySQL
+# Edit .env: set STORAGE=mysql, isi MYSQL_HOST/PORT/USER/PASSWORD/DATABASE
 cd backend && npm run db:migrate    # Buat tabel + seed kategori
 cd backend && npm run db:seed       # Import data JSON → MySQL
-STORAGE=mysql npm start             # Jalankan dengan MySQL
+cd backend && npm start             # Jalankan dengan MySQL
 
 # Auto-reload (development)
 cd backend && npm run dev
@@ -22,28 +26,19 @@ cd backend && npm run dev
 
 Buka `http://localhost:3000` di browser.
 
-## Deployment (Docker)
-
-Proyek dapat di-deploy menggunakan Docker:
-
-```bash
-# Docker build dari backend/Dockerfile
-# Set environment variables:
-#   STORAGE=mysql
-#   MYSQL_URL=mysql://user:pass@host:3306/dbname
-```
-
 ### Environment Variables
+
+Semua konfigurasi diatur via file `.env` (gunakan `.env.example` sebagai template).
 
 | Variable | Default | Deskripsi |
 |----------|---------|-----------|
-| `PORT` | `3000` | Port server (baca dari env `PORT`) |
-| `STORAGE` | — | Set `mysql` untuk MySQL mode |
-| `MYSQL_URL` | — | MySQL connection URL (otomatis diparsing) |
-| `MYSQL_HOST` | `localhost` | MySQL host (fallback jika tanpa `MYSQL_URL`) |
-| `MYSQL_PORT` | `8889` | MySQL port |
+| `PORT` | `3000` | Port server |
+| `STORAGE` | `json` | Storage mode: `json` atau `mysql` |
+| `MYSQL_URL` | — | MySQL connection URL (otomatis diparsing, prioritas tertinggi) |
+| `MYSQL_HOST` | `localhost` | MySQL host |
+| `MYSQL_PORT` | `3306` | MySQL port |
 | `MYSQL_USER` | `root` | MySQL user |
-| `MYSQL_PASSWORD` | `root` | MySQL password |
+| `MYSQL_PASSWORD` | — | MySQL password |
 | `MYSQL_DATABASE` | `db_timepro` | MySQL database name |
 | `DATA_PATH` | `backend/data/tasks.json` | Path file JSON storage |
 
@@ -88,13 +83,6 @@ backend/src/schema/migrate.js          ← Migration runner
 backend/src/seed-from-json.js          ← Import JSON → MySQL
 ```
 
-**Deployment (Docker):**
-```
-Docker Container
-  ↕ MYSQL_URL
-MySQL Database
-```
-
 Lihat `know-me/ARCHITECTURE.md` untuk detail arsitektur.
 
 ### Auto-Migration
@@ -110,6 +98,7 @@ Jalan otomatis saat `STORAGE=mysql` — `server.js` menjalankan `migrate()` pada
 | `POST` | `/api/tasks` | Buat task baru |
 | `PUT` | `/api/tasks/:id` | Update task |
 | `DELETE` | `/api/tasks/:id` | Hapus task + todos |
+| `GET` | `/api/tasks/:id/changelog` | Ambil history perubahan task |
 | `POST` | `/api/tasks/:id/todos` | Tambah todo |
 | `PUT` | `/api/tasks/:id/todos/:todoId` | Update todo |
 | `DELETE` | `/api/tasks/:id/todos/:todoId` | Hapus todo |
@@ -117,16 +106,14 @@ Jalan otomatis saat `STORAGE=mysql` — `server.js` menjalankan `migrate()` pada
 | `POST` | `/api/tasks/:id/evidences/image` | Upload gambar evidence |
 | `PUT` | `/api/tasks/:id/evidences/:evId` | Update evidence |
 | `DELETE` | `/api/tasks/:id/evidences/:evId` | Hapus evidence |
+| `GET` | `/api/tasks/:id/evidence-changelog` | Ambil history perubahan evidence |
 | `POST` | `/api/backup` | Backup tasks.json ke file timestamp |
 | `GET` | `/api/backups` | List semua file backup di data/ |
 | `POST` | `/api/restore` | Restore data dari file backup |
-| `POST` | `/api/restore/upload` | Upload JSON data ke MySQL (khusus `STORAGE=mysql`) |
 | `GET` | `/api/restore-log` | Ambil history log restore & backup |
 | `GET` | `/api/metadata` | Ambil metadata (title, versi, lastSynced) |
 | `PUT` | `/api/metadata` | Update metadata (title) |
 | `POST` | `/api/sync/commit` | Sync JSON ke MySQL (stub) |
-| `GET` | `/api/metadata` | Ambil metadata (title, versi, lastSynced) |
-| `PUT` | `/api/metadata` | Update metadata (title) |
 
 ## Rencana Pengembangan
 
@@ -140,11 +127,11 @@ Lihat `know-me/PLAN.md` untuk detail rencana implementasi.
 
 ## Tech Stack
 
-- **Frontend:** Vanilla HTML5, CSS3, JavaScript (ES6+) — single file + Bootstrap Icons (CDN)
+- **Frontend:** Vanilla HTML5, CSS3, JavaScript (ES6+) — single file + Bootstrap Icons (CDN) + html2pdf.js (CDN)
 - **Backend:** Node.js 20+, Express 4
 - **Database:** MySQL 8+ via `mysql2` (opsional)
+- **Config:** dotenv (environment variables via `.env` file)
 - **Migration:** Custom runner (file-based SQL versioning)
-- **Deployment:** Docker (Dockerfile single-stage)
 - **Design System:** Dokumentasi di `know-me/BASE_DESIGN.md`
 
 ## Catatan
@@ -153,11 +140,13 @@ Lihat `know-me/PLAN.md` untuk detail rencana implementasi.
 - History restore & backup disimpan di `backend/data/restore-log.json` (terpisah dari data tugas)
 - File `frontend/index.html` tetap single-file; backend terpisah di `backend/server.js` + `backend/src/`
 - Bootstrap Icons dimuat dari CDN untuk ikon copy di notifikasi
+- html2pdf.js dimuat dari CDN untuk export PDF
 - Daftar tugas diurutkan ASC berdasarkan tanggal mulai
 - Sidebar diperluas `calc(350px + 7vw)` agar lebih lega
-- MySQL membutuhkan: `npm run db:migrate` (buat tabel) lalu `npm run db:seed` (import data) sebelum `STORAGE=mysql npm start`
+- MySQL membutuhkan: `npm run db:migrate` (buat tabel) lalu `npm run db:seed` (import data) sebelum set `STORAGE=mysql` di `.env`
 - `MYSQL_URL` otomatis diparsing oleh `config.js` — tidak perlu set `MYSQL_HOST` dll secara terpisah
 - Seed otomatis: jika ada kategori baru di JSON yang belum ada di DB, akan dibuat otomatis
+- Semua konfigurasi sensitif (password, credentials) diatur via `.env` — tidak di-commit ke git
 - Lihat `know-me/PLAN.md` untuk migration path lengkap
 - Lihat `know-me/BASE_DESIGN.md` untuk panduan design system dan konsistensi UI
 - Judul proyek bisa diedit langsung dengan mengklik teks judul di header — perubahan otomatis tersimpan ke server

@@ -74,8 +74,9 @@ Jangan gunakan skill ini jika pengguna secara eksplisit meminta file `.xlsx` (pa
 
 1. Pastikan Node.js 20+ terinstall
 2. `cd backend && npm install`
-3. `node backend/server.js` (atau `cd backend && npm run dev` untuk auto-reload)
-4. Buka `http://localhost:3000` di browser
+3. `cp .env.example .env` — edit `.env` sesuai kebutuhan
+4. `node backend/server.js` (atau `cd backend && npm run dev` untuk auto-reload)
+5. Buka `http://localhost:3000` di browser
 
 ## API Backend (Express + Dual Storage)
 
@@ -101,6 +102,7 @@ STORAGE=mysql npm start         # Jalankan dengan MySQL
 | `POST` | `/api/tasks` | Buat task baru |
 | `PUT` | `/api/tasks/:id` | Update task |
 | `DELETE` | `/api/tasks/:id` | Hapus task + todos |
+| `GET` | `/api/tasks/:id/changelog` | Ambil history perubahan task |
 | `POST` | `/api/tasks/:id/todos` | Tambah todo |
 | `PUT` | `/api/tasks/:id/todos/:todoId` | Update todo |
 | `DELETE` | `/api/tasks/:id/todos/:todoId` | Hapus todo |
@@ -108,10 +110,10 @@ STORAGE=mysql npm start         # Jalankan dengan MySQL
 | `PUT` | `/api/tasks/:id/evidences/:evId` | Update evidence |
 | `POST` | `/api/tasks/:id/evidences/image` | Upload gambar evidence |
 | `DELETE` | `/api/tasks/:id/evidences/:evId` | Hapus evidence |
+| `GET` | `/api/tasks/:id/evidence-changelog` | Ambil history perubahan evidence |
 | `POST` | `/api/backup` | Backup tasks.json ke file timestamp |
 | `GET` | `/api/backups` | List semua file backup di data/ |
 | `POST` | `/api/restore` | Restore data dari file backup |
-| `POST` | `/api/restore/upload` | Upload JSON data ke MySQL (khusus `STORAGE=mysql`) |
 | `GET` | `/api/restore-log` | Ambil history log restore & backup |
 | `GET` | `/api/metadata` | Ambil metadata (title, versi, lastSynced) |
 | `PUT` | `/api/metadata` | Update metadata (title) |
