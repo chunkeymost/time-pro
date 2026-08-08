@@ -301,7 +301,14 @@
       const line = document.createElement('div');
       line.className='today-line';
       line.style.left = (todayOffset*dayWidth)+'px';
-      document.querySelector('.timeline-group').appendChild(line);
+      line.style.height = Math.max(tasks.length*52, 52)+'px';
+      els.rows.appendChild(line);
+
+      const label = document.createElement('div');
+      label.className='today-label';
+      label.textContent='TODAY';
+      label.style.left = (todayOffset*dayWidth + dayWidth/2)+'px';
+      document.getElementById('ruler-scroll').appendChild(label);
     }
 
     tasks.forEach((t, idx) => {

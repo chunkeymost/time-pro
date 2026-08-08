@@ -416,7 +416,6 @@ body{
   flex-direction:column;
   min-width:0;
   min-height:0;
-  position:relative;
 }
 .timeline-wrap{
   overflow-x:auto;
@@ -497,27 +496,12 @@ body{
 
 .today-line{
   position:absolute;
-  top:56px;
-  bottom:0;
+  top:0; bottom:0;
   width:2px;
   background:var(--cut-line);
-  z-index:4;
+  z-index:2;
   pointer-events:none;
 }
-.today-line::before{
-  content:'TODAY';
-  position:absolute;
-  top:-35px;
-  left:50%;
-  transform:translateX(-50%);
-  font-family:'IBM Plex Mono', monospace;
-  font-size:9px;
-  letter-spacing:.08em;
-  color:var(--cut-line);
-  white-space:nowrap;
-  margin-left: 18.5px;
-}
-[data-theme="dark"] .today-line::before{ color:#fff; }
 .today-line::after{
   content:'';
   position:absolute;
@@ -527,6 +511,19 @@ body{
   border-right:4px solid transparent;
   border-top:6px solid var(--cut-line);
 }
+.today-label{
+  position:absolute;
+  top:20px;
+  font-family:'IBM Plex Mono', monospace;
+  font-size:9px;
+  letter-spacing:.08em;
+  color:var(--cut-line);
+  white-space:nowrap;
+  z-index:4;
+  text-align:center;
+  transform:translateX(-50%);
+}
+[data-theme="dark"] .today-label{ color:#fff; }
 
 .bar{
   position:absolute;
