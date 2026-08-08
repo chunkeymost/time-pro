@@ -1,3 +1,0 @@
-ALTER TABLE evidences
-  ADD COLUMN type ENUM('link', 'text') NOT NULL DEFAULT 'link' AFTER id,
-  MODIFY COLUMN link VARCHAR(500) NULL;
