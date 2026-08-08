@@ -250,7 +250,8 @@
       if(view==='week' && dayWidth>=28){
         const dayLbl = document.createElement('div');
         const isWeekend = d.getDay()===0 || d.getDay()===6;
-        dayLbl.className = 'ruler-day' + (isWeekend?' weekend':'');
+        const isToday = d.toDateString() === T.toDateString();
+        dayLbl.className = 'ruler-day' + (isWeekend?' weekend':'') + (isToday?' today':'');
         dayLbl.style.left = x+'px';
         dayLbl.textContent = d.getDate();
         rs.appendChild(dayLbl);

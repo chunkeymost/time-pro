@@ -463,6 +463,13 @@ body{
   text-align:center;
 }
 .ruler-day.weekend{ color:var(--gold); }
+.ruler-day.today{
+  background:var(--cut-line);
+  color:#fff;
+  border-radius:0px;
+  line-height:1.5;
+  padding:1px 5px;
+}
 .ruler-tick{
   position:absolute;
   bottom:0;
@@ -500,7 +507,7 @@ body{
 .today-line::before{
   content:'TODAY';
   position:absolute;
-  top:-32px;
+  top:-35px;
   left:50%;
   transform:translateX(-50%);
   font-family:'IBM Plex Mono', monospace;
