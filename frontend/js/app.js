@@ -300,8 +300,7 @@
       const line = document.createElement('div');
       line.className='today-line';
       line.style.left = (todayOffset*dayWidth)+'px';
-      line.style.height = Math.max(tasks.length*52, 52)+'px';
-      els.rows.appendChild(line);
+      document.querySelector('.timeline-group').appendChild(line);
     }
 
     tasks.forEach((t, idx) => {
