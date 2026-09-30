@@ -171,19 +171,46 @@
       <button class="modal-close" id="notif-close-btn">&times;</button>
     </div>
     <div class="modal-sub" id="notif-sub">Daftar aktivitas yang perlu diproses.</div>
-    <table class="todo-table" id="notif-table">
-      <thead>
-        <tr>
-          <th class="todo-num">No.</th>
-          <th>To Do List</th>
-          <th class="todo-due">Tanggal</th>
-          <th class="todo-due">Sisa Hari</th>
-          <th class="todo-status">Status</th>
-          <th class="todo-aksi">Aksi</th>
-        </tr>
-      </thead>
-      <tbody id="notif-body"></tbody>
-    </table>
+    
+    <!-- Hold Tasks Section -->
+    <div class="notif-section">
+      <h3 class="notif-section-title">
+        <i class="bi bi-pause-circle-fill"></i> Tugas Di-Hold (<span id="notif-hold-count" class="notif-count-badge">0</span>)
+      </h3>
+      <table class="todo-table">
+        <thead>
+          <tr>
+            <th class="todo-num">No.</th>
+            <th>To Do List</th>
+            <th class="todo-due">Tanggal</th>
+            <th class="todo-due">Sisa Hari</th>
+            <th class="todo-status">Status</th>
+            <th class="todo-aksi">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="notif-hold-body"></tbody>
+      </table>
+    </div>
+
+    <!-- Active Tasks Section -->
+    <div class="notif-section">
+      <h3 class="notif-section-title">
+        <i class="bi bi-list-check"></i> Tugas Aktif (<span id="notif-active-count" class="notif-count-badge">0</span>)
+      </h3>
+      <table class="todo-table">
+        <thead>
+          <tr>
+            <th class="todo-num">No.</th>
+            <th>To Do List</th>
+            <th class="todo-due">Tanggal</th>
+            <th class="todo-due">Sisa Hari</th>
+            <th class="todo-status">Status</th>
+            <th class="todo-aksi">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="notif-active-body"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 

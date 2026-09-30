@@ -100,8 +100,11 @@
     bellDot: document.getElementById('bell-dot'),
     holdBtn: document.getElementById('hold-btn'),
     notifOverlay: document.getElementById('notif-overlay'),
-    notifBody: document.getElementById('notif-body'),
     notifSub: document.getElementById('notif-sub'),
+    notifHoldBody: document.getElementById('notif-hold-body'),
+    notifActiveBody: document.getElementById('notif-active-body'),
+    notifHoldCount: document.getElementById('notif-hold-count'),
+    notifActiveCount: document.getElementById('notif-active-count'),
     evidenceOverlay: document.getElementById('evidence-overlay'),
     evidenceBody: document.getElementById('evidence-body'),
     evidenceSub: document.getElementById('evidence-sub'),
@@ -1040,11 +1043,10 @@
 
   /* ---------------- Notification Panel ---------------- */
   function openNotifPanel(){
-    const T = today();
     const allTodos = [];
     tasks.forEach(task => {
       (task.todos||[]).forEach(todo => {
-        allTodos.push({ ...todo, taskId: task.id, taskName: task.name });
+        allTodos.push({ ...todo, taskId: task.id, taskName: task.name, taskHeld: task.held });
       });
     });
 
@@ -1057,21 +1059,47 @@
 
     const ordered = sorted.filter(t => !t.done);
 
+    // Split into hold and non-hold
+    const holdTodos = ordered.filter(t => t.taskHeld === true);
+    const activeTodos = ordered.filter(t => t.taskHeld !== true);
+
+    // Update counts
+    els.notifHoldCount.textContent = holdTodos.length;
+    els.notifActiveCount.textContent = activeTodos.length;
+
+    // Clear both bodies
+    els.notifHoldBody.innerHTML = '';
+    els.notifActiveBody.innerHTML = '';
+
     if(ordered.length === 0){
-      els.notifBody.innerHTML = '<tr><td colspan="6" class="notif-empty">Semua aktivitas telah selesai.</td></tr>';
       els.notifSub.textContent = 'Tidak ada aktivitas yang perlu diproses.';
+      // Add empty messages to both sections
+      els.notifHoldBody.innerHTML = '<tr><td colspan="6" class="notif-empty">Tidak ada tugas di-hold.</td></tr>';
+      els.notifActiveBody.innerHTML = '<tr><td colspan="6" class="notif-empty">Tidak ada tugas aktif.</td></tr>';
       return;
     }
 
     els.notifSub.textContent = 'Daftar aktivitas yang perlu diproses.';
-    els.notifBody.innerHTML = '';
-    ordered.forEach((todo, i) => {
+
+    // Render hold todos
+    renderNotifTodos(holdTodos, els.notifHoldBody, 'Tidak ada tugas di-hold.');
+
+    // Render active todos
+    renderNotifTodos(activeTodos, els.notifActiveBody, 'Tidak ada tugas aktif.');
+  }
+
+  function renderNotifTodos(todos, tbody, emptyMessage){
+    if(todos.length === 0){
+      tbody.innerHTML = '<tr><td colspan="6" class="notif-empty">' + emptyMessage + '</td></tr>';
+      return;
+    }
+    todos.forEach((todo, i) => {
       let sisaHariText, sisaClass;
       if(!todo.due){
         sisaHariText = '—';
         sisaClass = '';
       } else {
-        const diff = dayDiff(T, todo.due);
+        const diff = dayDiff(today(), todo.due);
         if(diff < 0){
           sisaHariText = 'Overdue';
           sisaClass = 'overdue';
@@ -1118,7 +1146,7 @@
         navigator.clipboard.writeText(todo.text).then(() => showToast('Teks berhasil tercopy')).catch(() => showToast('Gagal copy teks', 'error'));
       });
 
-      els.notifBody.appendChild(tr);
+      tbody.appendChild(tr);
     });
   }
 

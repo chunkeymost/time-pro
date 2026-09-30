@@ -1011,6 +1011,30 @@ body{
 .overdue{ color:var(--status-risk); font-weight:600; }
 .notif-empty{ padding:16px 4px; color:var(--ink-faint); font-size:12px; }
 
+.notif-section{ margin-bottom:20px; }
+.notif-section:last-child{ margin-bottom:0; }
+.notif-section-title{
+  font-size:12px;
+  font-weight:600;
+  color:var(--ink-soft);
+  margin-bottom:8px;
+  padding-bottom:4px;
+  border-bottom:1px solid var(--paper-line);
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.notif-section-title i{ color:var(--purple); }
+.notif-count-badge{
+  background:var(--purple);
+  color:#fff;
+  font-size:10px;
+  padding:2px 6px;
+  border-radius:10px;
+  font-family:'IBM Plex Mono', monospace;
+}
+.notif-section-title .bi-exclamation-triangle{ color:var(--status-risk); }
+
 /* ---------- Evidence Panel ---------- */
 .overlay-left{
   justify-content:flex-start;
