@@ -121,6 +121,9 @@ class JsonStorage {
       assignee: taskData.assignee || '',
       progress: typeof taskData.progress === 'number' ? taskData.progress : 0,
       todos: [],
+      evidences: [],
+      held: false,
+      heldAt: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -153,6 +156,26 @@ class JsonStorage {
     data.tasks.splice(idx, 1);
     this._save(data);
     return true;
+  }
+
+  toggleHold(taskId) {
+    const data = this._load();
+    const task = data.tasks.find(t => t.id === taskId);
+    if (!task) return null;
+    
+    const now = new Date().toISOString();
+    const wasHeld = task.held === true;
+    task.held = !wasHeld;
+    task.heldAt = task.held ? now : null;
+    task.updatedAt = now;
+    
+    const action = task.held 
+      ? 'Tugas di-hold (dihentikan sementara)' 
+      : 'Tugas dibuka kembali (dilanjutkan)';
+    this.addTaskLog(taskId, action);
+    
+    this._save(data);
+    return { held: task.held, heldAt: task.heldAt };
   }
 
   addTodo(taskId, todoData) {

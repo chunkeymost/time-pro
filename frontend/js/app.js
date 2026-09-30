@@ -98,6 +98,7 @@
     todoSection: document.getElementById('todo-section'),
     bellBtn: document.getElementById('bell-btn'),
     bellDot: document.getElementById('bell-dot'),
+    holdBtn: document.getElementById('hold-btn'),
     notifOverlay: document.getElementById('notif-overlay'),
     notifBody: document.getElementById('notif-body'),
     notifSub: document.getElementById('notif-sub'),
@@ -228,6 +229,7 @@
     const doneTasks = tasks.filter(t => t.progress === 100).length;
     const openTodos = tasks.reduce((sum, t) => sum + (t.todos||[]).filter(td => !td.done).length, 0);
     const overdueTasks = tasks.filter(t => t.progress < 100 && t.end && t.end < today()).length;
+    const heldTasks = tasks.filter(t => t.held === true).length;
 
     els.overviewCards.innerHTML = `
       <div class="overview-card">
@@ -252,6 +254,14 @@
           <div class="overview-num">${overdueTasks}</div>
           <div class="overview-label">Task Overdue</div>
           <div class="overview-sub">${overdueTasks > 0 ? 'Melewati batas waktu' : 'Tidak ada keterlambatan'}</div>
+        </div>
+      </div>
+      <div class="overview-card">
+        <div class="overview-icon held"><i class="bi bi-pause-circle-fill"></i></div>
+        <div class="overview-body">
+          <div class="overview-num">${heldTasks}</div>
+          <div class="overview-label">Task Hold</div>
+          <div class="overview-sub">${heldTasks > 0 ? 'Sedang di-hold' : 'Tidak ada tugas di-hold'}</div>
         </div>
       </div>
     `;
@@ -387,7 +397,7 @@
 
     visibleTasks.forEach((t, idx) => {
       const bar = document.createElement('div');
-      bar.className = 'bar ' + (CATS[t.cat] ?? CATS.lainnya).cls;
+      bar.className = 'bar ' + (CATS[t.cat] ?? CATS.lainnya).cls + (t.held ? ' held' : '');
       bar.dataset.id = t.id;
       const left = dayDiff(range.start, t.start)*dayWidth;
       const width = (dayDiff(t.start,t.end)+1)*dayWidth - 4;
@@ -409,6 +419,13 @@
       pct.className='pct';
       pct.textContent = t.progress+'%';
       bar.appendChild(pct);
+
+      if (t.held) {
+        const holdBadge = document.createElement('span');
+        holdBadge.className = 'hold-badge';
+        holdBadge.innerHTML = '<i class="bi bi-pause-circle-fill"></i>';
+        bar.appendChild(holdBadge);
+      }
 
       const hLeft = document.createElement('div');
       hLeft.className='handle left';
@@ -494,12 +511,14 @@
       const row = document.createElement('div');
       const isDone = t.progress === 100;
       const isOverdue = !isDone && t.end && t.end < today();
-      row.className = 'sidebar-row' + (t.id===selectedId ? ' selected':'') + (isDone ? ' done':'') + (isOverdue ? ' overdue':'');
+      const isHeld = t.held === true;
+      row.className = 'sidebar-row' + (t.id===selectedId ? ' selected':'') + (isDone ? ' done':'') + (isOverdue ? ' overdue':'') + (isHeld ? ' held':'');
       row.innerHTML = `
         <div class="sidebar-row-top">
           <span class="name">${escapeHtml(t.name)}</span>
           ${isDone ? '<span class="done-flag">🏁</span>' : ''}
           ${isOverdue ? '<span class="overdue-flag"><i class="bi bi-bell-fill"></i></span>' : ''}
+          ${isHeld ? '<span class="held-flag"><i class="bi bi-pause-circle-fill"></i></span>' : ''}
         </div>
         <span class="meta"><span class="tag-dot ${(CATS[t.cat] ?? CATS.lainnya).cls}"></span>${(CATS[t.cat] ?? CATS.lainnya).label} · ${t.progress}% · ${countWeekdays(t.start,t.end)} Hari Pengerjaan</span>
       `;
@@ -898,9 +917,21 @@
     if(task){
       els.todoDate.min = fmt(task.start);
       els.todoDate.max = fmt(task.end);
+      // Update hold button based on task.held status
+      if (task.held) {
+        els.holdBtn.textContent = 'Open Again';
+        els.holdBtn.classList.add('btn-success');
+        els.holdBtn.classList.remove('btn-ghost');
+      } else {
+        els.holdBtn.textContent = 'Hold';
+        els.holdBtn.classList.add('btn-ghost');
+        els.holdBtn.classList.remove('btn-success');
+      }
+      els.holdBtn.style.display = '';
     } else {
       els.todoDate.min = '';
       els.todoDate.max = '';
+      els.holdBtn.style.display = 'none';
     }
     renderTodos(task);
     updateProgressSlider(task);
@@ -1389,6 +1420,39 @@
 
   document.getElementById('evidence-btn').addEventListener('click', ()=>{
     if(editingId) openEvidencePanel(editingId);
+  });
+
+  els.holdBtn.addEventListener('click', async ()=>{
+    if(!editingId) return;
+    const task = tasks.find(t => t.id === editingId);
+    if(!task) return;
+    
+    try {
+      const result = await api.put('/api/tasks/'+editingId+'/hold');
+      task.held = result.held;
+      task.heldAt = result.heldAt;
+      
+      // Update button text and style
+      if (result.held) {
+        els.holdBtn.textContent = 'Open Again';
+        els.holdBtn.classList.add('btn-success');
+        els.holdBtn.classList.remove('btn-ghost');
+        showToast('Tugas di-hold (dihentikan sementara)');
+      } else {
+        els.holdBtn.textContent = 'Hold';
+        els.holdBtn.classList.add('btn-ghost');
+        els.holdBtn.classList.remove('btn-success');
+        showToast('Tugas dibuka kembali (dilanjutkan)');
+      }
+      
+      // Reload task log to show the new entry
+      loadTaskLog(editingId);
+      renderSidebar();
+      renderAll(false);
+    } catch (e) {
+      console.error('Failed to toggle hold:', e);
+      showToast('Gagal mengubah status hold', 'error');
+    }
   });
 
   /* ---------------- Notification Panel Events ---------------- */

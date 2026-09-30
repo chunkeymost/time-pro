@@ -151,6 +151,17 @@ app.delete('/api/tasks/:id', async (req, res) => {
   }
 });
 
+app.put('/api/tasks/:id/hold', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const result = await storage.toggleHold(id);
+    if (!result) return res.status(404).json({ error: 'Task not found' });
+    res.json({ held: result.held, heldAt: result.heldAt });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ---------- Backup ---------- */
 
 function copyIfExist(src, dest) {
