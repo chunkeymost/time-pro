@@ -26,6 +26,9 @@
     const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
     return `${y}-${m}-${day}`;
   }
+  function dateLabel(){
+    return fmt(today()).split('-').reverse().join('-');
+  }
   function parseDate(str){
     const parts = str.split('-').map(Number);
     if(parts.length!==3 || parts.some(isNaN)) return null;
@@ -123,6 +126,7 @@
     evidenceLogSection: document.getElementById('evidence-log-section'),
     evidenceLogBody: document.getElementById('evidence-log-body'),
     dailyTaskOverlay: document.getElementById('daily-task-overlay'),
+    dailyTaskTitle: document.getElementById('daily-task-title'),
     dailyTaskCloseBtn: document.getElementById('daily-task-close-btn'),
     dailyTaskContent: document.getElementById('daily-task-content'),
     dailyTaskBody: document.getElementById('daily-task-body'),
@@ -281,7 +285,7 @@
         <div class="overview-icon daily"><i class="bi bi-calendar-day"></i></div>
         <div class="overview-body">
           <div class="overview-num">${dailyDone}/${dailyTotal}</div>
-          <div class="overview-label">Daily Task</div>
+          <div class="overview-label">Daily Task ${dateLabel()}</div>
           <div class="overview-sub">${dailyDone} selesai dari ${dailyTotal} tugas</div>
         </div>
       </div>
@@ -1264,8 +1268,14 @@
   let dailyTasks = [];
   let dailyTaskChart = null;
 
+  function updateDateLabels(){
+    if(els.dailyTaskTitle) els.dailyTaskTitle.textContent = 'DAILY TASK ' + dateLabel();
+    renderOverviewCards();
+  }
+
   function openDailyTaskPanel(){
     els.dailyTaskOverlay.classList.add('open');
+    updateDateLabels();
     loadDailyTasks();
   }
 
@@ -2095,6 +2105,16 @@
   /* ---------------- Init ---------------- */
   loadTasks();
   loadDailyTasks();
+
+  // Update date labels when the day rolls over (checked every 30s)
+  let lastDateKey = fmt(today());
+  setInterval(() => {
+    const key = fmt(today());
+    if(key !== lastDateKey){
+      lastDateKey = key;
+      updateDateLabels();
+    }
+  }, 30000);
 
   // Daily Task card click handler (delegated)
   els.overviewCards.addEventListener('click', (e) => {
