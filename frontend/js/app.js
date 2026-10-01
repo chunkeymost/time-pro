@@ -1290,6 +1290,7 @@
       const isInProgress = statusClass === 'in_progress';
       const isDone = statusClass === 'done';
       const isStopped = statusClass === 'stopped';
+      const showStart = isHold || isStopped;
       
       const statusActions = dailyTaskTab === 'archive' ? `
         <div class="status-actions">
@@ -1305,8 +1306,8 @@
         </div>
       ` : `
         <div class="status-actions">
-          <button class="status-action-btn hold-toggle ${isHold ? 'active' : ''}" data-id="${dt.id}" data-status="hold" data-toggle-status="${isHold ? 'in_progress' : 'hold'}" title="${isHold ? 'Start' : 'Hold'}">
-            <i class="bi ${isHold ? 'bi-play-circle-fill' : 'bi-pause-circle-fill'}"></i>
+          <button class="status-action-btn hold-toggle ${showStart ? 'active' : ''}" data-id="${dt.id}" data-status="hold" data-toggle-status="${showStart ? 'in_progress' : 'hold'}" title="${showStart ? 'Start' : 'Hold'}">
+            <i class="bi ${showStart ? 'bi-play-circle-fill' : 'bi-pause-circle-fill'}"></i>
           </button>
           <button class="status-action-btn done ${isDone ? 'active' : ''}" data-id="${dt.id}" data-status="done" title="Done">
             <i class="bi bi-check-circle-fill"></i>
