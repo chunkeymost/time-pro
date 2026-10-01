@@ -409,6 +409,7 @@ body{
 .overview-icon.subtasks{ background:rgba(47,107,163,0.12); color:var(--status-progress); }
 .overview-icon.overdue{ background:rgba(181,72,47,0.12); color:var(--status-risk); }
 .overview-icon.held{ background:rgba(124,58,237,0.12); color:var(--purple); }
+.overview-icon.daily{ background:rgba(116,185,255,0.12); color:var(--sky); }
 .overview-body{ display:flex; flex-direction:column; gap:2px; min-width:0; }
 .overview-num{
   font-family:'Space Grotesk', sans-serif;
@@ -1067,6 +1068,25 @@ body{
 }
 .overlay.open .evidence-modal{
   transform:translateX(0);
+}
+
+/* ---------- Bottom Sheet Panel (Daily Task) ---------- */
+.overlay-bottom{
+  justify-content:center;
+  align-items:flex-end;
+}
+.bottom-modal{
+  width:100%;
+  max-width:100vw;
+  height:auto;
+  max-height:70vh;
+  box-shadow:0 -4px 24px rgba(15,30,50,.25);
+  border-radius:16px 16px 0 0;
+  transform:translateY(100%);
+  transition:transform .25s ease;
+}
+.overlay-bottom.open .bottom-modal{
+  transform:translateY(0);
 }
 /* Evidence type toggle */
 .evidence-type-toggle{

@@ -122,6 +122,9 @@
     evidenceAddBtn: document.getElementById('evidence-add-btn'),
     evidenceLogSection: document.getElementById('evidence-log-section'),
     evidenceLogBody: document.getElementById('evidence-log-body'),
+    dailyTaskOverlay: document.getElementById('daily-task-overlay'),
+    dailyTaskCloseBtn: document.getElementById('daily-task-close-btn'),
+    dailyTaskContent: document.getElementById('daily-task-content'),
     imgPreviewOverlay: document.getElementById('img-preview-overlay'),
     imgPreviewImg: document.getElementById('img-preview-img'),
     reportOverlay: document.getElementById('report-overlay'),
@@ -261,12 +264,20 @@
           <div class="overview-sub">${overdueTasks > 0 ? 'Melewati batas waktu' : 'Tidak ada keterlambatan'}</div>
         </div>
       </div>
-      <div class="overview-card">
+      <div class="overview-card" id="card-task-hold">
         <div class="overview-icon held"><i class="bi bi-pause-circle-fill"></i></div>
         <div class="overview-body">
           <div class="overview-num">${heldTasks}</div>
           <div class="overview-label">Task Hold</div>
           <div class="overview-sub">${heldTasks > 0 ? 'Sedang di-hold' : 'Tidak ada tugas di-hold'}</div>
+        </div>
+      </div>
+      <div class="overview-card" id="card-daily-task">
+        <div class="overview-icon daily"><i class="bi bi-calendar-day"></i></div>
+        <div class="overview-body">
+          <div class="overview-num">—</div>
+          <div class="overview-label">Daily Task</div>
+          <div class="overview-sub">Kelola tugas harian</div>
         </div>
       </div>
     `;
@@ -1231,6 +1242,15 @@
     els.evidenceImageKetInput.value = '';
   }
 
+  /* ---------------- Daily Task Panel ---------------- */
+  function openDailyTaskPanel(){
+    els.dailyTaskOverlay.classList.add('open');
+  }
+
+  function closeDailyTaskPanel(){
+    els.dailyTaskOverlay.classList.remove('open');
+  }
+
   function renderEvidences(){
     els.evidenceBody.innerHTML = '';
     const task = tasks.find(t => t.id === evidenceTaskId);
@@ -1537,11 +1557,19 @@
 
   document.getElementById('evidence-close-btn').addEventListener('click', closeEvidencePanel);
 
+  /* ---------------- Daily Task Panel Events ---------------- */
+  els.dailyTaskOverlay.addEventListener('click', (e)=>{
+    if(e.target === els.dailyTaskOverlay) closeDailyTaskPanel();
+  });
+
+  els.dailyTaskCloseBtn.addEventListener('click', closeDailyTaskPanel);
+
   document.addEventListener('keydown', (e)=>{
     if(e.key==='Escape' && els.confirmOverlay.classList.contains('open')){ closeConfirm(); return; }
     if(e.key==='Escape' && els.overlay.classList.contains('open')) closeModal();
     if(e.key==='Escape' && els.notifOverlay.classList.contains('open')) els.notifOverlay.classList.remove('open');
     if(e.key==='Escape' && els.evidenceOverlay.classList.contains('open')) closeEvidencePanel();
+    if(e.key==='Escape' && els.dailyTaskOverlay.classList.contains('open')) closeDailyTaskPanel();
     if(e.key==='Escape' && els.imgPreviewOverlay.classList.contains('open')) closeImagePreview();
   });
 
@@ -1826,5 +1854,13 @@
 
   /* ---------------- Init ---------------- */
   loadTasks();
+
+  // Daily Task card click handler (delegated)
+  els.overviewCards.addEventListener('click', (e) => {
+    const card = e.target.closest('#card-daily-task');
+    if (card) {
+      openDailyTaskPanel();
+    }
+  });
 
 })();
