@@ -1911,3 +1911,132 @@ body{
   border:1px dashed var(--paper-line-strong);
   border-radius:7px;
 }
+
+/* ---------- Daily Task Panel ---------- */
+.daily-task-grid{
+  display:grid;
+  grid-template-columns:1fr 320px;
+  gap:16px;
+  align-items:start;
+}
+.daily-task-left{
+  min-width:0;
+}
+.daily-task-table-wrapper{
+  overflow-x:auto;
+}
+.daily-task-table{
+  table-layout:fixed;
+}
+.daily-task-table td,
+.daily-task-table th{
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.daily-task-table .todo-num{ width:40px; }
+.daily-task-table .todo-status{ width:110px; }
+.daily-task-table .todo-act{ width:50px; }
+
+/* Status badges */
+.status-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  padding:3px 8px;
+  border-radius:12px;
+  font-size:11px;
+  font-weight:600;
+  font-family:'IBM Plex Mono', monospace;
+  text-transform:capitalize;
+}
+.status-badge.hold{ background:rgba(124,58,237,0.12); color:var(--purple); }
+.status-badge.in_progress{ background:rgba(47,107,163,0.12); color:var(--status-progress); }
+.status-badge.done{ background:rgba(63,143,99,0.12); color:var(--status-done); }
+
+/* Take out button */
+.takeout-btn{
+  background:none; border:none;
+  color:var(--ink-faint);
+  cursor:pointer;
+  font-size:16px;
+  line-height:1;
+  padding:4px;
+  border-radius:4px;
+  transition:all .15s;
+}
+.takeout-btn:hover{ background:rgba(181,72,47,0.1); color:var(--status-risk); }
+
+/* Right side: Chart */
+.daily-task-right{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:12px;
+}
+.chart-container{
+  position:relative;
+  width:100%;
+  max-width:300px;
+}
+#daily-task-chart{
+  display:block;
+  margin:0 auto;
+}
+.chart-legend{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  margin-top:8px;
+  font-size:12px;
+  font-family:'IBM Plex Mono', monospace;
+}
+.chart-legend-item{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.chart-legend-color{
+  width:12px;
+  height:12px;
+  border-radius:3px;
+  flex-shrink:0;
+}
+.chart-legend-label{
+  color:var(--ink);
+}
+.chart-legend-value{
+  margin-left:auto;
+  color:var(--ink-soft);
+  font-weight:600;
+}
+
+/* Empty state for chart */
+.chart-empty{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  height:280px;
+  color:var(--ink-faint);
+  text-align:center;
+  padding:20px;
+}
+.chart-empty i{
+  font-size:48px;
+  margin-bottom:12px;
+  opacity:0.5;
+}
+
+/* Responsive */
+@media (max-width: 768px){
+  .daily-task-grid{
+    grid-template-columns:1fr;
+  }
+  .daily-task-right{
+    width:100%;
+  }
+  .chart-container{
+    max-width:100%;
+  }
+}

@@ -125,6 +125,9 @@
     dailyTaskOverlay: document.getElementById('daily-task-overlay'),
     dailyTaskCloseBtn: document.getElementById('daily-task-close-btn'),
     dailyTaskContent: document.getElementById('daily-task-content'),
+    dailyTaskBody: document.getElementById('daily-task-body'),
+    dailyTaskChart: document.getElementById('daily-task-chart'),
+    dailyTaskLegend: document.getElementById('daily-task-legend'),
     imgPreviewOverlay: document.getElementById('img-preview-overlay'),
     imgPreviewImg: document.getElementById('img-preview-img'),
     reportOverlay: document.getElementById('report-overlay'),
@@ -1243,12 +1246,148 @@
   }
 
   /* ---------------- Daily Task Panel ---------------- */
+  let dailyTasks = [];
+  let dailyTaskChart = null;
+
   function openDailyTaskPanel(){
     els.dailyTaskOverlay.classList.add('open');
+    loadDailyTasks();
   }
 
   function closeDailyTaskPanel(){
     els.dailyTaskOverlay.classList.remove('open');
+  }
+
+  async function loadDailyTasks(){
+    try {
+      const res = await api.get('/api/daily-tasks');
+      dailyTasks = res.dailyTasks || [];
+    } catch(e) {
+      console.error('Failed to load daily tasks:', e);
+      dailyTasks = [];
+    }
+    renderDailyTasks();
+    renderDailyTaskChart();
+  }
+
+  function renderDailyTasks(){
+    els.dailyTaskBody.innerHTML = '';
+    if(dailyTasks.length === 0){
+      els.dailyTaskBody.innerHTML = '<tr><td colspan="4" class="notif-empty">Belum ada tugas harian.</td></tr>';
+      return;
+    }
+    dailyTasks.forEach((dt, i) => {
+      const tr = document.createElement('tr');
+      const statusClass = dt.status || 'in_progress';
+      const statusLabel = statusClass === 'hold' ? 'Hold' : statusClass === 'in_progress' ? 'In Progress' : 'Done';
+      tr.innerHTML = `
+        <td class="todo-num">${i+1}</td>
+        <td>${escapeHtml(dt.taskName)}</td>
+        <td class="todo-status">
+          <span class="status-badge ${statusClass}">${statusLabel}</span>
+        </td>
+        <td class="todo-act">
+          <button class="takeout-btn" data-id="${dt.id}" title="Take Out"><i class="bi bi-box-arrow-left"></i></button>
+        </td>
+      `;
+      tr.querySelector('.takeout-btn').addEventListener('click', async function(){
+        const id = parseInt(this.dataset.id, 10);
+        try {
+          await api.del('/api/daily-tasks/'+id);
+          loadDailyTasks();
+        } catch(e) {
+          console.error('Failed to take out daily task:', e);
+        }
+      });
+      els.dailyTaskBody.appendChild(tr);
+    });
+  }
+
+  function renderDailyTaskChart(){
+    const ctx = els.dailyTaskChart?.getContext('2d');
+    if(!ctx) return;
+
+    // Count statuses
+    const counts = { hold: 0, in_progress: 0, done: 0 };
+    dailyTasks.forEach(dt => {
+      const s = dt.status || 'in_progress';
+      if(counts[s] !== undefined) counts[s]++;
+    });
+
+    const total = counts.hold + counts.in_progress + counts.done;
+
+    if(total === 0){
+      // Show empty state
+      els.dailyTaskLegend.innerHTML = '';
+      if(dailyTaskChart) { dailyTaskChart.destroy(); dailyTaskChart = null; }
+      ctx.clearRect(0, 0, els.dailyTaskChart.width, els.dailyTaskChart.height);
+      ctx.font = '14px Inter, sans-serif';
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ink-faint').trim() || '#8B9CB3';
+      ctx.textAlign = 'center';
+      ctx.fillText('Belum ada data', els.dailyTaskChart.width/2, els.dailyTaskChart.height/2);
+      return;
+    }
+
+    // Destroy existing chart
+    if(dailyTaskChart) dailyTaskChart.destroy();
+
+    const colors = {
+      hold: getComputedStyle(document.documentElement).getPropertyValue('--purple').trim() || '#7C3AED',
+      in_progress: getComputedStyle(document.documentElement).getPropertyValue('--status-progress').trim() || '#2F6BA3',
+      done: getComputedStyle(document.documentElement).getPropertyValue('--status-done').trim() || '#3F8F63',
+    };
+
+    dailyTaskChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Hold', 'In Progress', 'Done'],
+        datasets: [{
+          data: [counts.hold, counts.in_progress, counts.done],
+          backgroundColor: [colors.hold, colors.in_progress, colors.done],
+          borderWidth: 0,
+          borderRadius: 4,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        cutout: '65%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const value = context.raw;
+                const percent = total > 0 ? Math.round((value / total) * 100) : 0;
+                return context.label + ': ' + value + ' (' + percent + '%)';
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // Render custom legend
+    renderDailyTaskLegend(counts, total, colors);
+  }
+
+  function renderDailyTaskLegend(counts, total, colors){
+    const labels = [
+      { key: 'hold', label: 'Hold' },
+      { key: 'in_progress', label: 'In Progress' },
+      { key: 'done', label: 'Done' }
+    ];
+    els.dailyTaskLegend.innerHTML = labels.map(l => {
+      const count = counts[l.key] || 0;
+      const percent = total > 0 ? Math.round((count / total) * 100) : 0;
+      return `
+        <div class="chart-legend-item">
+          <span class="chart-legend-color" style="background:${colors[l.key]}"></span>
+          <span class="chart-legend-label">${l.label}</span>
+          <span class="chart-legend-value">${count} (${percent}%)</span>
+        </div>
+      `;
+    }).join('');
   }
 
   function renderEvidences(){

@@ -548,6 +548,50 @@ app.delete('/api/holidays/:id', async (req, res) => {
   }
 });
 
+/* ---------- Daily Tasks ---------- */
+
+app.get('/api/daily-tasks', async (req, res) => {
+  try {
+    const dailyTasks = await storage.getDailyTasks();
+    res.json({ dailyTasks });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/daily-tasks', async (req, res) => {
+  try {
+    const { taskId, taskName, status, date } = req.body;
+    if (!taskName) return res.status(400).json({ error: 'taskName is required' });
+    const dt = await storage.createDailyTask({ taskId, taskName, status: status || 'in_progress', date });
+    res.status(201).json({ dailyTask: dt });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/daily-tasks/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const dt = await storage.updateDailyTask(id, req.body);
+    if (!dt) return res.status(404).json({ error: 'Daily task not found' });
+    res.json({ dailyTask: dt });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/daily-tasks/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const ok = await storage.deleteDailyTask(id);
+    if (!ok) return res.status(404).json({ error: 'Daily task not found' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ---------- Metadata ---------- */
 
 app.get('/api/metadata', async (req, res) => {

@@ -9,7 +9,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-<link rel="stylesheet" href="css/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
 <div class="app">
@@ -295,11 +296,31 @@
       <button class="modal-close" id="daily-task-close-btn">&times;</button>
     </div>
     <div class="modal-sub" id="daily-task-sub">Kelola tugas harian Anda.</div>
-    <div id="daily-task-content">
-      <!-- Daily Task content will be added here -->
-      <div class="daily-task-empty">
-        <p style="color:var(--ink-soft);font-size:14px;text-align:center;">Belum ada konten Daily Task.</p>
-        <p style="color:var(--ink-faint);font-size:12px;text-align:center;margin-top:8px;">Panel ini akan dikembangkan untuk manajemen tugas harian.</p>
+    <div id="daily-task-content" class="daily-task-grid">
+      <!-- Left: Table List -->
+      <div class="daily-task-left">
+        <div class="daily-task-table-wrapper">
+          <table class="todo-table daily-task-table">
+            <thead>
+              <tr>
+                <th class="todo-num">No.</th>
+                <th>Task</th>
+                <th class="todo-status">Status</th>
+                <th class="todo-act">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="daily-task-body">
+              <tr><td colspan="4" class="notif-empty">Belum ada tugas harian.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <!-- Right: Circular Chart -->
+      <div class="daily-task-right">
+        <div class="chart-container">
+          <canvas id="daily-task-chart" width="280" height="280"></canvas>
+          <div class="chart-legend" id="daily-task-legend"></div>
+        </div>
       </div>
     </div>
   </div>

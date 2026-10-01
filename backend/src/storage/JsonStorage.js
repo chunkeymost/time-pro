@@ -363,6 +363,78 @@ class JsonStorage {
     this._save(data);
     return data.metadata;
   }
+
+  /* ---------- Daily Tasks ---------- */
+  _getDailyTasksPath() {
+    return path.join(path.dirname(this.filePath), 'daily-tasks.json');
+  }
+
+  _loadDailyTasks() {
+    try {
+      const p = this._getDailyTasksPath();
+      if (!fs.existsSync(p)) {
+        const seed = { dailyTasks: [], nextId: 1 };
+        fs.writeFileSync(p, JSON.stringify(seed, null, 2), 'utf-8');
+        return seed;
+      }
+      const raw = fs.readFileSync(p, 'utf-8');
+      return JSON.parse(raw);
+    } catch (err) {
+      console.error('Failed to load daily tasks:', err.message);
+      const seed = { dailyTasks: [], nextId: 1 };
+      fs.writeFileSync(this._getDailyTasksPath(), JSON.stringify(seed, null, 2), 'utf-8');
+      return seed;
+    }
+  }
+
+  _saveDailyTasks(data) {
+    fs.writeFileSync(this._getDailyTasksPath(), JSON.stringify(data, null, 2), 'utf-8');
+  }
+
+  getDailyTasks() {
+    const data = this._loadDailyTasks();
+    return data.dailyTasks || [];
+  }
+
+  createDailyTask(dtData) {
+    const data = this._loadDailyTasks();
+    const dt = {
+      id: data.nextId++,
+      taskId: dtData.taskId || null,
+      taskName: dtData.taskName || '',
+      status: dtData.status || 'in_progress',
+      date: dtData.date || new Date().toISOString().split('T')[0],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    data.dailyTasks.push(dt);
+    this._saveDailyTasks(data);
+    return dt;
+  }
+
+  updateDailyTask(id, dtData) {
+    const data = this._loadDailyTasks();
+    const idx = data.dailyTasks.findIndex(t => t.id === id);
+    if (idx === -1) return null;
+    const dt = data.dailyTasks[idx];
+    if (dtData.taskId !== undefined) dt.taskId = dtData.taskId;
+    if (dtData.taskName !== undefined) dt.taskName = dtData.taskName;
+    if (dtData.status !== undefined) dt.status = dtData.status;
+    if (dtData.date !== undefined) dt.date = dtData.date;
+    dt.updatedAt = new Date().toISOString();
+    data.dailyTasks[idx] = dt;
+    this._saveDailyTasks(data);
+    return dt;
+  }
+
+  deleteDailyTask(id) {
+    const data = this._loadDailyTasks();
+    const idx = data.dailyTasks.findIndex(t => t.id === id);
+    if (idx === -1) return false;
+    data.dailyTasks.splice(idx, 1);
+    this._saveDailyTasks(data);
+    return true;
+  }
 }
 
 module.exports = JsonStorage;
