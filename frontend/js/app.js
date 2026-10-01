@@ -1018,20 +1018,7 @@
         renderAll(false);
         if(editingId) loadTaskLog(editingId);
       });
-      tr.querySelector('.todo-dup-btn').addEventListener('click', async function(){
-        const text = todo.text;
-        const dueStr = todo.due ? fmt(todo.due) : null;
-        try {
-          const result = await api.post('/api/tasks/'+task.id+'/todos', { text, due: dueStr });
-          task.todos.push({ id: result.todo.id, text: result.todo.text, done: false, due: result.todo.due ? parseDate(result.todo.due) : null });
-          renderTodos(task);
-          updateProgressFromTodos(task);
-          updateProgressSlider(task);
-          updateBellDot();
-          renderAll(false);
-          if(editingId) loadTaskLog(editingId);
-        } catch(e) { console.error('Duplicate todo failed:', e); }
-      });
+
       tr.querySelector('.todo-del-btn').addEventListener('click', function(){
         api.del('/api/tasks/'+task.id+'/todos/'+todo.id).catch(e => console.error('Delete todo failed:', e));
         task.todos = task.todos.filter(t=>t.id!==todo.id);
@@ -1248,14 +1235,23 @@
   /* ---------------- Daily Task Panel ---------------- */
   let dailyTasks = [];
   let dailyTaskChart = null;
+  let dailyTaskTab = 'activity'; // 'activity' | 'archive'
 
   function openDailyTaskPanel(){
     els.dailyTaskOverlay.classList.add('open');
+    dailyTaskTab = 'activity';
+    updateDailyTaskTabs();
     loadDailyTasks();
   }
 
   function closeDailyTaskPanel(){
     els.dailyTaskOverlay.classList.remove('open');
+  }
+
+  function updateDailyTaskTabs(){
+    document.querySelectorAll('.daily-task-tab').forEach(tab => {
+      tab.classList.toggle('active', tab.dataset.tab === dailyTaskTab);
+    });
   }
 
   async function loadDailyTasks(){
@@ -1272,14 +1268,55 @@
 
   function renderDailyTasks(){
     els.dailyTaskBody.innerHTML = '';
-    if(dailyTasks.length === 0){
-      els.dailyTaskBody.innerHTML = '<tr><td colspan="4" class="notif-empty">Belum ada tugas harian.</td></tr>';
+
+    const filteredTasks = dailyTasks.filter(dt => {
+      const s = dt.status || 'in_progress';
+      if(dailyTaskTab === 'activity') return s !== 'done';
+      return s === 'done';
+    });
+
+    if(filteredTasks.length === 0){
+      const emptyMsg = dailyTaskTab === 'activity' ? 'Tidak ada tugas aktif.' : 'Belum ada riwayat tugas selesai.';
+      els.dailyTaskBody.innerHTML = '<tr><td colspan="4" class="notif-empty">'+emptyMsg+'</td></tr>';
       return;
     }
-    dailyTasks.forEach((dt, i) => {
+    filteredTasks.forEach((dt, i) => {
       const tr = document.createElement('tr');
       const statusClass = dt.status || 'in_progress';
-      const statusLabel = statusClass === 'hold' ? 'Hold' : statusClass === 'in_progress' ? 'In Progress' : 'Done';
+      const statusLabel = statusClass === 'hold' ? 'Hold' : statusClass === 'in_progress' ? 'In Progress' : statusClass === 'stopped' ? 'Stop' : 'Done';
+      
+      // Determine button states
+      const isHold = statusClass === 'hold';
+      const isInProgress = statusClass === 'in_progress';
+      const isDone = statusClass === 'done';
+      const isStopped = statusClass === 'stopped';
+      
+      const statusActions = dailyTaskTab === 'archive' ? `
+        <div class="status-actions">
+          <button class="status-action-btn hold" data-id="${dt.id}" data-status="hold" title="Reopen as Hold">
+            <i class="bi bi-pause-circle-fill"></i>
+          </button>
+          <button class="status-action-btn in_progress" data-id="${dt.id}" data-status="in_progress" title="Reopen as In Progress">
+            <i class="bi bi-play-circle-fill"></i>
+          </button>
+          <button class="status-action-btn stop" data-id="${dt.id}" data-del="true" title="Delete">
+            <i class="bi bi-trash-fill"></i>
+          </button>
+        </div>
+      ` : `
+        <div class="status-actions">
+          <button class="status-action-btn hold-toggle ${isHold ? 'active' : ''}" data-id="${dt.id}" data-status="hold" data-toggle-status="${isHold ? 'in_progress' : 'hold'}" title="${isHold ? 'Start' : 'Hold'}">
+            <i class="bi ${isHold ? 'bi-play-circle-fill' : 'bi-pause-circle-fill'}"></i>
+          </button>
+          <button class="status-action-btn done ${isDone ? 'active' : ''}" data-id="${dt.id}" data-status="done" title="Done">
+            <i class="bi bi-check-circle-fill"></i>
+          </button>
+          <button class="status-action-btn stop ${isStopped ? 'active' : ''}" data-id="${dt.id}" data-status="stopped" title="Stop">
+            <i class="bi bi-stop-circle-fill"></i>
+          </button>
+        </div>
+      `;
+
       tr.innerHTML = `
         <td class="todo-num">${i+1}</td>
         <td>${escapeHtml(dt.taskName)}</td>
@@ -1287,18 +1324,48 @@
           <span class="status-badge ${statusClass}">${statusLabel}</span>
         </td>
         <td class="todo-act">
-          <button class="takeout-btn" data-id="${dt.id}" title="Take Out"><i class="bi bi-box-arrow-left"></i></button>
+          ${statusActions}
         </td>
       `;
-      tr.querySelector('.takeout-btn').addEventListener('click', async function(){
-        const id = parseInt(this.dataset.id, 10);
-        try {
-          await api.del('/api/daily-tasks/'+id);
-          loadDailyTasks();
-        } catch(e) {
-          console.error('Failed to take out daily task:', e);
-        }
+      
+      // Add click handlers for all status buttons
+      tr.querySelectorAll('.status-action-btn').forEach(btn => {
+        btn.addEventListener('click', async function(){
+          const id = parseInt(this.dataset.id, 10);
+          // Handle delete button (archive tab only)
+          if (this.dataset.del === 'true') {
+            try {
+              await api.del('/api/daily-tasks/'+id);
+              loadDailyTasks();
+            } catch(e) {
+              console.error('Failed to delete daily task:', e);
+            }
+            return;
+          }
+          let newStatus = this.dataset.status;
+          // Handle hold-toggle button (Hold/Start)
+          if (this.classList.contains('hold-toggle')) {
+            newStatus = this.dataset.toggleStatus;
+          }
+          try {
+            await api.put('/api/daily-tasks/'+id, { status: newStatus });
+            // Auto-switch to archive when marking done from activity tab
+            if(newStatus === 'done' && dailyTaskTab === 'activity'){
+              dailyTaskTab = 'archive';
+              updateDailyTaskTabs();
+            }
+            // Auto-switch to activity when reopening from archive
+            if(newStatus !== 'done' && dailyTaskTab === 'archive'){
+              dailyTaskTab = 'activity';
+              updateDailyTaskTabs();
+            }
+            loadDailyTasks();
+          } catch(e) {
+            console.error('Failed to update daily task status:', e);
+          }
+        });
       });
+      
       els.dailyTaskBody.appendChild(tr);
     });
   }
@@ -1307,14 +1374,21 @@
     const ctx = els.dailyTaskChart?.getContext('2d');
     if(!ctx) return;
 
+    // Filter tasks by current tab
+    const filteredTasks = dailyTasks.filter(dt => {
+      const s = dt.status || 'in_progress';
+      if(dailyTaskTab === 'activity') return s !== 'done';
+      return s === 'done';
+    });
+
     // Count statuses
-    const counts = { hold: 0, in_progress: 0, done: 0 };
-    dailyTasks.forEach(dt => {
+    const counts = { hold: 0, in_progress: 0, done: 0, stopped: 0 };
+    filteredTasks.forEach(dt => {
       const s = dt.status || 'in_progress';
       if(counts[s] !== undefined) counts[s]++;
     });
 
-    const total = counts.hold + counts.in_progress + counts.done;
+    const total = counts.hold + counts.in_progress + counts.done + counts.stopped;
 
     if(total === 0){
       // Show empty state
@@ -1324,7 +1398,8 @@
       ctx.font = '14px Inter, sans-serif';
       ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ink-faint').trim() || '#8B9CB3';
       ctx.textAlign = 'center';
-      ctx.fillText('Belum ada data', els.dailyTaskChart.width/2, els.dailyTaskChart.height/2);
+      const emptyMsg = dailyTaskTab === 'activity' ? 'Tidak ada tugas aktif' : 'Belum ada riwayat';
+      ctx.fillText(emptyMsg, els.dailyTaskChart.width/2, els.dailyTaskChart.height/2);
       return;
     }
 
@@ -1335,15 +1410,16 @@
       hold: getComputedStyle(document.documentElement).getPropertyValue('--purple').trim() || '#7C3AED',
       in_progress: getComputedStyle(document.documentElement).getPropertyValue('--status-progress').trim() || '#2F6BA3',
       done: getComputedStyle(document.documentElement).getPropertyValue('--status-done').trim() || '#3F8F63',
+      stopped: getComputedStyle(document.documentElement).getPropertyValue('--status-risk').trim() || '#B5482F',
     };
 
     dailyTaskChart = new Chart(ctx, {
       type: 'doughnut',
       data: {
-        labels: ['Hold', 'In Progress', 'Done'],
+        labels: ['Hold', 'In Progress', 'Done', 'Stop'],
         datasets: [{
-          data: [counts.hold, counts.in_progress, counts.done],
-          backgroundColor: [colors.hold, colors.in_progress, colors.done],
+          data: [counts.hold, counts.in_progress, counts.done, counts.stopped],
+          backgroundColor: [colors.hold, colors.in_progress, colors.done, colors.stopped],
           borderWidth: 0,
           borderRadius: 4,
         }]
@@ -1375,7 +1451,8 @@
     const labels = [
       { key: 'hold', label: 'Hold' },
       { key: 'in_progress', label: 'In Progress' },
-      { key: 'done', label: 'Done' }
+      { key: 'done', label: 'Done' },
+      { key: 'stopped', label: 'Stop' }
     ];
     els.dailyTaskLegend.innerHTML = labels.map(l => {
       const count = counts[l.key] || 0;
@@ -1702,6 +1779,15 @@
   });
 
   els.dailyTaskCloseBtn.addEventListener('click', closeDailyTaskPanel);
+
+  document.querySelectorAll('.daily-task-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      dailyTaskTab = tab.dataset.tab;
+      updateDailyTaskTabs();
+      renderDailyTasks();
+      renderDailyTaskChart();
+    });
+  });
 
   document.addEventListener('keydown', (e)=>{
     if(e.key==='Escape' && els.confirmOverlay.classList.contains('open')){ closeConfirm(); return; }
