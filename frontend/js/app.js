@@ -241,6 +241,8 @@
     const openTodos = tasks.reduce((sum, t) => sum + (t.todos||[]).filter(td => !td.done).length, 0);
     const overdueTasks = tasks.filter(t => t.progress < 100 && t.end && t.end < today()).length;
     const heldTasks = tasks.filter(t => t.held === true).length;
+    const dailyTotal = dailyTasks.length;
+    const dailyDone = dailyTasks.filter(t => t.status === 'done').length;
 
     els.overviewCards.innerHTML = `
       <div class="overview-card">
@@ -278,9 +280,9 @@
       <div class="overview-card" id="card-daily-task">
         <div class="overview-icon daily"><i class="bi bi-calendar-day"></i></div>
         <div class="overview-body">
-          <div class="overview-num">—</div>
+          <div class="overview-num">${dailyDone}/${dailyTotal}</div>
           <div class="overview-label">Daily Task</div>
-          <div class="overview-sub">Kelola tugas harian</div>
+          <div class="overview-sub">${dailyDone} selesai dari ${dailyTotal} tugas</div>
         </div>
       </div>
     `;
@@ -1255,6 +1257,7 @@
     }
     renderDailyTasks();
     renderDailyTaskChart();
+    renderOverviewCards();
   }
 
   function renderDailyTasks(){
@@ -2065,6 +2068,7 @@
 
   /* ---------------- Init ---------------- */
   loadTasks();
+  loadDailyTasks();
 
   // Daily Task card click handler (delegated)
   els.overviewCards.addEventListener('click', (e) => {
