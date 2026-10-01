@@ -990,7 +990,10 @@
         <td><span class="todo-text${todo.done?' done':''}">${escapeHtml(todo.text)}</span></td>
         <td class="todo-due" style="font-size:11px;font-family:'IBM Plex Mono',monospace;">${todo.due ? fmt(todo.due) : '—'}</td>
         <td class="todo-status"><input type="checkbox" class="todo-cb" data-todo-id="${todo.id}"${todo.done?' checked':''}></td>
-        <td class="todo-del"><button class="todo-del-btn" data-todo-id="${todo.id}">&times;</button></td>
+        <td class="todo-act">
+          <button class="todo-dup-btn" data-todo-id="${todo.id}" title="Duplicate"><i class="bi bi-files"></i></button>
+          <button class="todo-del-btn" data-todo-id="${todo.id}">&times;</button>
+        </td>
       `;
       tr.querySelector('.todo-cb').addEventListener('change', function(){
         todo.done = this.checked;
@@ -1000,6 +1003,20 @@
         updateBellDot();
         renderAll(false);
         if(editingId) loadTaskLog(editingId);
+      });
+      tr.querySelector('.todo-dup-btn').addEventListener('click', async function(){
+        const text = todo.text;
+        const dueStr = todo.due ? fmt(todo.due) : null;
+        try {
+          const result = await api.post('/api/tasks/'+task.id+'/todos', { text, due: dueStr });
+          task.todos.push({ id: result.todo.id, text: result.todo.text, done: false, due: result.todo.due ? parseDate(result.todo.due) : null });
+          renderTodos(task);
+          updateProgressFromTodos(task);
+          updateProgressSlider(task);
+          updateBellDot();
+          renderAll(false);
+          if(editingId) loadTaskLog(editingId);
+        } catch(e) { console.error('Duplicate todo failed:', e); }
       });
       tr.querySelector('.todo-del-btn').addEventListener('click', function(){
         api.del('/api/tasks/'+task.id+'/todos/'+todo.id).catch(e => console.error('Delete todo failed:', e));

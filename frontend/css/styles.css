@@ -981,6 +981,7 @@ body{
 .todo-due{ width:90px; }
 .todo-status{ width:40px; text-align:center !important; }
 .todo-del{ width:28px; }
+.todo-act{ width:60px; text-align:center !important; }
 .todo-aksi{ width:40px; text-align:center !important; padding-left:12px !important; }
 .todo-table tbody tr:hover{ background:var(--paper); }
 .todo-text{
@@ -1006,6 +1007,18 @@ body{
 }
 .todo-table tbody tr:hover .todo-del-btn{ opacity:1; }
 .todo-del-btn:hover{ color:var(--status-risk); }
+.todo-dup-btn{
+  background:none; border:none;
+  color:var(--ink-faint);
+  cursor:pointer;
+  font-size:16px;
+  line-height:1;
+  padding:2px;
+  opacity:0;
+  transition:opacity .15s;
+}
+.todo-table tbody tr:hover .todo-dup-btn{ opacity:1; }
+.todo-dup-btn:hover{ color:var(--purple); }
 .todo-copy-btn{
   background:none; border:none;
   color:var(--ink-faint);
