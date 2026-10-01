@@ -1114,16 +1114,16 @@
     els.notifSub.textContent = 'Daftar aktivitas yang perlu diproses.';
 
     // Render hold todos
-    renderNotifTodos(holdTodos, els.notifHoldBody, 'Tidak ada tugas di-hold.');
+    renderNotifTodos(holdTodos, els.notifHoldBody, 'Tidak ada tugas di-hold.', false);
 
     // Render active todos
-    renderNotifTodos(activeTodos, els.notifActiveBody, 'Tidak ada tugas aktif.');
+    renderNotifTodos(activeTodos, els.notifActiveBody, 'Tidak ada tugas aktif.', true);
 
     // Open the panel
     els.notifOverlay.classList.add('open');
   }
 
-  function renderNotifTodos(todos, tbody, emptyMessage){
+  function renderNotifTodos(todos, tbody, emptyMessage, showAdd){
     if(todos.length === 0){
       tbody.innerHTML = '<tr><td colspan="6" class="notif-empty">' + emptyMessage + '</td></tr>';
       return;
@@ -1148,8 +1148,11 @@
       }
 
       const tr = document.createElement('tr');
+      const numCell = showAdd
+        ? `<td class="todo-num"><span class="todo-num-label">${i+1}</span><button class="todo-add-btn" title="Tambahkan ke Daily Task"><i class="bi bi-plus-lg"></i></button></td>`
+        : `<td class="todo-num">${i+1}</td>`;
       tr.innerHTML = `
-        <td class="todo-num">${i+1}</td>
+        ${numCell}
         <td><span class="todo-text${todo.done?' done':''}">${escapeHtml(todo.text)}</span></td>
         <td class="todo-due" style="font-size:11px;font-family:'IBM Plex Mono',monospace;">${todo.due ? fmt(todo.due) : '—'}</td>
         <td class="todo-due" style="font-size:11px;font-family:'IBM Plex Mono',monospace;${sisaClass ? 'color:var(--status-risk);font-weight:600;' : ''}">${sisaHariText}</td>
@@ -1180,6 +1183,14 @@
       tr.querySelector('.todo-copy-btn').addEventListener('click', function(){
         navigator.clipboard.writeText(todo.text).then(() => showToast('Teks berhasil tercopy')).catch(() => showToast('Gagal copy teks', 'error'));
       });
+
+      const addBtn = tr.querySelector('.todo-add-btn');
+      if(addBtn){
+        addBtn.addEventListener('click', function(e){
+          e.stopPropagation();
+          showToast('Aksi belum tersedia');
+        });
+      }
 
       tbody.appendChild(tr);
     });

@@ -988,7 +988,25 @@ body{
   border-bottom:1px solid var(--paper-line);
   vertical-align:middle;
 }
-.todo-num{ width:32px; }
+.todo-num{ width:32px; position:relative; }
+.notif-section .todo-table .todo-num{ text-align:center; }
+.todo-num-label{ transition:opacity .15s; }
+.todo-add-btn{
+  position:absolute;
+  top:50%; left:50%;
+  transform:translate(-50%,-50%);
+  width:22px; height:22px;
+  background:none; border:none;
+  color:var(--ink-faint);
+  cursor:pointer;
+  font-size:14px; line-height:1;
+  padding:0;
+  opacity:0;
+  transition:opacity .15s;
+}
+.todo-table tbody tr:hover .todo-num-label{ opacity:0; }
+.todo-table tbody tr:hover .todo-add-btn{ opacity:1; }
+.todo-add-btn:hover{ color:var(--purple); }
 .todo-due{ width:90px; }
 .todo-status{ width:40px; text-align:center !important; }
 .todo-del{ width:28px; }
