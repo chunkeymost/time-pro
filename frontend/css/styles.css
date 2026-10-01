@@ -416,9 +416,9 @@ body{
   0%,100%{ background:var(--surface); box-shadow:var(--shadow); }
   50%{ background:rgba(63,143,99,0.24); box-shadow:var(--shadow), 0 0 24px rgba(63,143,99,1); }
 }
-#card-daily-task{ animation:daily-bg-pulse 2.5s ease-in-out infinite; }
+#card-daily-task.pulse-active{ animation:daily-bg-pulse 2.5s ease-in-out infinite; }
 @media (prefers-reduced-motion:reduce){
-  #card-daily-task{ animation:none; }
+  #card-daily-task.pulse-active{ animation:none; }
 }
 .overview-body{ display:flex; flex-direction:column; gap:2px; min-width:0; }
 .overview-num{

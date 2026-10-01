@@ -286,6 +286,8 @@
         </div>
       </div>
     `;
+    const pulseActive = dailyTotal > 0 && dailyDone < dailyTotal;
+    document.getElementById('card-daily-task')?.classList.toggle('pulse-active', pulseActive);
   }
 
   /* ---------------- Legend ---------------- */
