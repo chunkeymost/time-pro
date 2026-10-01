@@ -435,6 +435,73 @@ class JsonStorage {
     this._saveDailyTasks(data);
     return true;
   }
+
+  _getDailyHistoryPath() {
+    return path.join(path.dirname(this.filePath), 'daily-tasks-history.json');
+  }
+
+  _loadDailyHistory() {
+    try {
+      const p = this._getDailyHistoryPath();
+      if (!fs.existsSync(p)) return [];
+      const raw = fs.readFileSync(p, 'utf-8');
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+      console.error('Failed to load daily task history:', err.message);
+      return [];
+    }
+  }
+
+  _saveDailyHistory(history) {
+    fs.writeFileSync(this._getDailyHistoryPath(), JSON.stringify(history, null, 2), 'utf-8');
+  }
+
+  _localDateKey(d = new Date()) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  ensureDailyRollover() {
+    const data = this._loadDailyTasks();
+    const todayKey = this._localDateKey();
+
+    // First run: just record today, nothing to close yet
+    if (!data.lastSnapshotDate) {
+      data.lastSnapshotDate = todayKey;
+      this._saveDailyTasks(data);
+      return null;
+    }
+
+    // Same day: nothing to do
+    if (data.lastSnapshotDate === todayKey) return null;
+
+    // Day changed: snapshot the closing day's list (only if it has rows)
+    let snapshot = null;
+    const rows = data.dailyTasks || [];
+    if (rows.length > 0) {
+      snapshot = {
+        date: data.lastSnapshotDate,
+        snapshotAt: new Date().toISOString(),
+        dailyTasks: rows,
+      };
+      const history = this._loadDailyHistory();
+      history.unshift(snapshot);
+      this._saveDailyHistory(history);
+    }
+
+    // Reset active list for the new day (nextId is preserved)
+    data.dailyTasks = [];
+    data.lastSnapshotDate = todayKey;
+    this._saveDailyTasks(data);
+    return snapshot;
+  }
+
+  getDailyTaskHistory() {
+    return this._loadDailyHistory();
+  }
 }
 
 module.exports = JsonStorage;

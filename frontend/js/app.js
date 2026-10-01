@@ -2113,6 +2113,7 @@
     if(key !== lastDateKey){
       lastDateKey = key;
       updateDateLabels();
+      loadDailyTasks();
     }
   }, 30000);
 
