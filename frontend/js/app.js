@@ -1366,6 +1366,34 @@
     renderOverviewCards();
   }
 
+  async function syncTodoWithDailyStatus(dt, newStatus){
+    const wantDone = newStatus === 'done';
+    const task = tasks.find(t => t.id === dt.taskId);
+    const todo = task && (task.todos||[]).find(td => td.text === dt.taskName);
+    if(!task || !todo){
+      showToast('Todo "'+ (dt.taskName || '') +'" tidak ditemukan di task', 'info');
+      return;
+    }
+    if(!!todo.done === wantDone) return;
+    todo.done = wantDone;
+    try {
+      await api.put('/api/tasks/'+task.id+'/todos/'+todo.id, { done: todo.done });
+    } catch(e){
+      console.error('Sync todo from daily status failed:', e);
+      showToast('Gagal memperbarui todo: '+e.message, 'error');
+      todo.done = !wantDone;
+      return;
+    }
+    updateProgressFromTodos(task);
+    updateBellDot();
+    if(els.notifOverlay.classList.contains('open')) openNotifPanel();
+    if(editingId === task.id){
+      renderTodos(task);
+      loadTaskLog(editingId);
+    }
+    renderAll(false);
+  }
+
   function renderDailyTasks(){
     els.dailyTaskBody.innerHTML = '';
 
@@ -1441,8 +1469,10 @@
           if (this.classList.contains('hold-toggle')) {
             newStatus = this.dataset.toggleStatus;
           }
+          const dt = dailyTasks.find(d => d.id === id);
           try {
             await api.put('/api/daily-tasks/'+id, { status: newStatus });
+            if(dt) await syncTodoWithDailyStatus(dt, newStatus);
             loadDailyTasks();
           } catch(e) {
             console.error('Failed to update daily task status:', e);

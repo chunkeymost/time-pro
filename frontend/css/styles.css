@@ -468,6 +468,7 @@ body{
 }
 .toast.success{ background:var(--status-done); }
 .toast.error{ background:var(--status-risk); }
+.toast.info{ background:#2563EB; }
 @keyframes toast-in{
   from{ opacity:0; transform:translateY(12px); }
   to{ opacity:1; transform:translateY(0); }
