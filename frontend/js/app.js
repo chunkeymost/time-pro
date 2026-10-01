@@ -1186,9 +1186,22 @@
 
       const addBtn = tr.querySelector('.todo-add-btn');
       if(addBtn){
-        addBtn.addEventListener('click', function(e){
+        addBtn.addEventListener('click', async function(e){
           e.stopPropagation();
-          showToast('Aksi belum tersedia');
+          const dup = dailyTasks.some(dt => dt.taskId === todo.taskId && dt.taskName === todo.text);
+          if(dup){ showToast('Sudah ada di Daily Task', 'error'); return; }
+          try {
+            await api.post('/api/daily-tasks', {
+              taskId: todo.taskId,
+              taskName: todo.text,
+              status: 'hold'
+            });
+            await loadDailyTasks();
+            showToast('Ditambahkan ke Daily Task');
+          } catch(err){
+            console.error('Failed to add daily task:', err);
+            showToast('Gagal menambahkan', 'error');
+          }
         });
       }
 
