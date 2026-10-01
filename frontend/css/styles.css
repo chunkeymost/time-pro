@@ -409,7 +409,17 @@ body{
 .overview-icon.subtasks{ background:rgba(47,107,163,0.12); color:var(--status-progress); }
 .overview-icon.overdue{ background:rgba(181,72,47,0.12); color:var(--status-risk); }
 .overview-icon.held{ background:rgba(124,58,237,0.12); color:var(--purple); }
-.overview-icon.daily{ background:rgba(116,185,255,0.12); color:var(--sky); }
+.overview-icon.daily{ background:rgba(63,143,99,0.15); color:var(--status-done); }
+
+/* Daily Task card glow */
+@keyframes daily-bg-pulse{
+  0%,100%{ background:var(--surface); box-shadow:var(--shadow); }
+  50%{ background:rgba(63,143,99,0.24); box-shadow:var(--shadow), 0 0 24px rgba(63,143,99,1); }
+}
+#card-daily-task{ animation:daily-bg-pulse 2.5s ease-in-out infinite; }
+@media (prefers-reduced-motion:reduce){
+  #card-daily-task{ animation:none; }
+}
 .overview-body{ display:flex; flex-direction:column; gap:2px; min-width:0; }
 .overview-num{
   font-family:'Space Grotesk', sans-serif;
