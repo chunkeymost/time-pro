@@ -148,6 +148,9 @@
     holSaveBtn: document.getElementById('hol-save-btn'),
     holCancelEditBtn: document.getElementById('hol-cancel-edit-btn'),
     holidayList: document.getElementById('holiday-list'),
+    dailyHistoryOverlay: document.getElementById('daily-history-overlay'),
+    dailyHistoryList: document.getElementById('daily-history-list'),
+    dailyHistoryCloseBtn: document.getElementById('daily-history-close-btn'),
   };
 
   /* ---------------- API helper ---------------- */
@@ -309,6 +312,9 @@
       `</label>` +
       `<button type="button" class="holiday-btn" id="holiday-manage-btn" title="Kelola Hari Libur">` +
         `Add Holiday` +
+      `</button>` +
+      `<button type="button" class="daily-history-btn" id="daily-history-btn" title="History Daily Task">` +
+        `<i class="bi bi-archive"></i> History Daily` +
       `</button>`;
   }
 
@@ -676,6 +682,7 @@
   });
   document.getElementById('legend').addEventListener('click', (e)=>{
     if(e.target.closest('#holiday-manage-btn')) openHolidayModal();
+    if(e.target.closest('#daily-history-btn')) openDailyHistoryModal();
   });
 
   /* ---------------- Holiday management ---------------- */
@@ -807,6 +814,69 @@
 
   document.getElementById('holiday-close-btn').addEventListener('click', closeHolidayModal);
   els.holidayOverlay.addEventListener('click', (e)=>{ if(e.target===els.holidayOverlay) closeHolidayModal(); });
+
+  /* ---------------- Daily history modal ---------------- */
+  const DAILY_STATUS_LABEL = { hold:'Hold', in_progress:'In Progress', done:'Done', stopped:'Stop' };
+
+  function openDailyHistoryModal(){
+    els.dailyHistoryOverlay.classList.add('open');
+    loadDailyHistory();
+  }
+  function closeDailyHistoryModal(){
+    els.dailyHistoryOverlay.classList.remove('open');
+  }
+
+  async function loadDailyHistory(){
+    els.dailyHistoryList.innerHTML = '<div class="daily-history-empty">Memuat history...</div>';
+    let history = [];
+    try {
+      const res = await api.get('/api/daily-tasks/history');
+      history = res.history || [];
+    } catch(err){
+      console.error('Failed to load daily history:', err);
+      els.dailyHistoryList.innerHTML = '<div class="daily-history-empty">Gagal memuat history daily task.</div>';
+      return;
+    }
+    renderDailyHistory(history);
+  }
+
+  function renderDailyHistory(history){
+    if(!history.length){
+      els.dailyHistoryList.innerHTML = '<div class="daily-history-empty">Belum ada history daily task.</div>';
+      return;
+    }
+
+    els.dailyHistoryList.innerHTML = history.map((snap, idx) => {
+      const rows = snap.dailyTasks || [];
+      const done = rows.filter(r => (r.status||'in_progress') === 'done').length;
+      const items = rows.map(r => {
+        const st = r.status || 'in_progress';
+        const label = DAILY_STATUS_LABEL[st] || st;
+        return `<div class="daily-history-item">` +
+          `<span class="daily-history-item-name">${escapeHtml(r.taskName || '')}</span>` +
+          `<span class="status-badge ${st}">${label}</span>` +
+        `</div>`;
+      }).join('') || '<div class="daily-history-empty">Tidak ada task pada tanggal ini.</div>';
+
+      return `<div class="daily-history-day" data-idx="${idx}">` +
+        `<div class="daily-history-day-head">` +
+          `<i class="bi bi-chevron-right daily-history-chevron"></i>` +
+          `<i class="bi bi-calendar-day daily-history-cal"></i>` +
+          `<span class="daily-history-date">${fmtDisplayDate(snap.date || '')}</span>` +
+          `<span class="daily-history-day-summary">${done}/${rows.length} Done</span>` +
+        `</div>` +
+        `<div class="daily-history-items">${items}</div>` +
+      `</div>`;
+    }).join('');
+  }
+
+  els.dailyHistoryList.addEventListener('click', (e)=>{
+    const head = e.target.closest('.daily-history-day-head');
+    if(!head) return;
+    head.parentElement.classList.toggle('expanded');
+  });
+  els.dailyHistoryCloseBtn.addEventListener('click', closeDailyHistoryModal);
+  els.dailyHistoryOverlay.addEventListener('click', (e)=>{ if(e.target===els.dailyHistoryOverlay) closeDailyHistoryModal(); });
 
   /* ---------------- Toast ---------------- */
   function showToast(msg, type='success'){
