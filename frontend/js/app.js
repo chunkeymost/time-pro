@@ -1235,23 +1235,14 @@
   /* ---------------- Daily Task Panel ---------------- */
   let dailyTasks = [];
   let dailyTaskChart = null;
-  let dailyTaskTab = 'activity'; // 'activity' | 'archive'
 
   function openDailyTaskPanel(){
     els.dailyTaskOverlay.classList.add('open');
-    dailyTaskTab = 'activity';
-    updateDailyTaskTabs();
     loadDailyTasks();
   }
 
   function closeDailyTaskPanel(){
     els.dailyTaskOverlay.classList.remove('open');
-  }
-
-  function updateDailyTaskTabs(){
-    document.querySelectorAll('.daily-task-tab').forEach(tab => {
-      tab.classList.toggle('active', tab.dataset.tab === dailyTaskTab);
-    });
   }
 
   async function loadDailyTasks(){
@@ -1269,30 +1260,23 @@
   function renderDailyTasks(){
     els.dailyTaskBody.innerHTML = '';
 
-    const filteredTasks = dailyTasks.filter(dt => {
-      const s = dt.status || 'in_progress';
-      if(dailyTaskTab === 'activity') return s !== 'done';
-      return s === 'done';
-    });
-
-    if(filteredTasks.length === 0){
-      const emptyMsg = dailyTaskTab === 'activity' ? 'Tidak ada tugas aktif.' : 'Belum ada riwayat tugas selesai.';
-      els.dailyTaskBody.innerHTML = '<tr><td colspan="4" class="notif-empty">'+emptyMsg+'</td></tr>';
+    if(dailyTasks.length === 0){
+      els.dailyTaskBody.innerHTML = '<tr><td colspan="4" class="notif-empty">Belum ada tugas harian.</td></tr>';
       return;
     }
-    filteredTasks.forEach((dt, i) => {
+
+    dailyTasks.forEach((dt, i) => {
       const tr = document.createElement('tr');
       const statusClass = dt.status || 'in_progress';
       const statusLabel = statusClass === 'hold' ? 'Hold' : statusClass === 'in_progress' ? 'In Progress' : statusClass === 'stopped' ? 'Stop' : 'Done';
-      
+
       // Determine button states
       const isHold = statusClass === 'hold';
-      const isInProgress = statusClass === 'in_progress';
       const isDone = statusClass === 'done';
       const isStopped = statusClass === 'stopped';
       const showStart = isHold || isStopped;
-      
-      const statusActions = dailyTaskTab === 'archive' ? `
+
+      const statusActions = isDone ? `
         <div class="status-actions">
           <button class="status-action-btn hold" data-id="${dt.id}" data-status="hold" title="Reopen as Hold">
             <i class="bi bi-pause-circle-fill"></i>
@@ -1309,7 +1293,7 @@
           <button class="status-action-btn hold-toggle ${showStart ? 'active' : ''}" data-id="${dt.id}" data-status="hold" data-toggle-status="${showStart ? 'in_progress' : 'hold'}" title="${showStart ? 'Start' : 'Hold'}">
             <i class="bi ${showStart ? 'bi-play-circle-fill' : 'bi-pause-circle-fill'}"></i>
           </button>
-          <button class="status-action-btn done ${isDone ? 'active' : ''}" data-id="${dt.id}" data-status="done" title="Done">
+          <button class="status-action-btn done" data-id="${dt.id}" data-status="done" title="Done">
             <i class="bi bi-check-circle-fill"></i>
           </button>
           <button class="status-action-btn stop ${isStopped ? 'active' : ''}" data-id="${dt.id}" data-status="stopped" title="Stop">
@@ -1328,12 +1312,12 @@
           ${statusActions}
         </td>
       `;
-      
+
       // Add click handlers for all status buttons
       tr.querySelectorAll('.status-action-btn').forEach(btn => {
         btn.addEventListener('click', async function(){
           const id = parseInt(this.dataset.id, 10);
-          // Handle delete button (archive tab only)
+          // Handle delete button
           if (this.dataset.del === 'true') {
             try {
               await api.del('/api/daily-tasks/'+id);
@@ -1350,23 +1334,13 @@
           }
           try {
             await api.put('/api/daily-tasks/'+id, { status: newStatus });
-            // Auto-switch to archive when marking done from activity tab
-            if(newStatus === 'done' && dailyTaskTab === 'activity'){
-              dailyTaskTab = 'archive';
-              updateDailyTaskTabs();
-            }
-            // Auto-switch to activity when reopening from archive
-            if(newStatus !== 'done' && dailyTaskTab === 'archive'){
-              dailyTaskTab = 'activity';
-              updateDailyTaskTabs();
-            }
             loadDailyTasks();
           } catch(e) {
             console.error('Failed to update daily task status:', e);
           }
         });
       });
-      
+
       els.dailyTaskBody.appendChild(tr);
     });
   }
@@ -1375,16 +1349,9 @@
     const ctx = els.dailyTaskChart?.getContext('2d');
     if(!ctx) return;
 
-    // Filter tasks by current tab
-    const filteredTasks = dailyTasks.filter(dt => {
-      const s = dt.status || 'in_progress';
-      if(dailyTaskTab === 'activity') return s !== 'done';
-      return s === 'done';
-    });
-
     // Count statuses
     const counts = { hold: 0, in_progress: 0, done: 0, stopped: 0 };
-    filteredTasks.forEach(dt => {
+    dailyTasks.forEach(dt => {
       const s = dt.status || 'in_progress';
       if(counts[s] !== undefined) counts[s]++;
     });
@@ -1399,7 +1366,7 @@
       ctx.font = '14px Inter, sans-serif';
       ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ink-faint').trim() || '#8B9CB3';
       ctx.textAlign = 'center';
-      const emptyMsg = dailyTaskTab === 'activity' ? 'Tidak ada tugas aktif' : 'Belum ada riwayat';
+      const emptyMsg = 'Belum ada data tugas';
       ctx.fillText(emptyMsg, els.dailyTaskChart.width/2, els.dailyTaskChart.height/2);
       return;
     }
@@ -1780,15 +1747,6 @@
   });
 
   els.dailyTaskCloseBtn.addEventListener('click', closeDailyTaskPanel);
-
-  document.querySelectorAll('.daily-task-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      dailyTaskTab = tab.dataset.tab;
-      updateDailyTaskTabs();
-      renderDailyTasks();
-      renderDailyTaskChart();
-    });
-  });
 
   document.addEventListener('keydown', (e)=>{
     if(e.key==='Escape' && els.confirmOverlay.classList.contains('open')){ closeConfirm(); return; }

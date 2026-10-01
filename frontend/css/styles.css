@@ -1913,35 +1913,6 @@ body{
 }
 
 /* ---------- Daily Task Panel ---------- */
-.daily-task-tabs{
-  display:flex;
-  border-bottom:1px solid var(--paper-line-strong);
-  margin-bottom:12px;
-}
-.daily-task-tab{
-  flex:1;
-  padding:10px;
-  background:none;
-  border:none;
-  cursor:pointer;
-  font-family:'IBM Plex Mono', monospace;
-  font-size:12px;
-  font-weight:500;
-  color:var(--ink-soft);
-  border-bottom:2px solid transparent;
-  margin-bottom:-1px;
-  transition:all .15s;
-}
-.daily-task-tab.active{
-  color:var(--ink);
-  border-bottom-color:var(--gold);
-  font-weight:600;
-}
-.daily-task-tab:hover:not(.active){
-  color:var(--ink);
-  background:var(--paper);
-}
-
 .daily-task-grid{
   display:grid;
   grid-template-columns:1fr 320px;
