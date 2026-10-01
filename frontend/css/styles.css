@@ -328,7 +328,7 @@ body{
   font-size:11.5px;
   color:var(--ink-soft);
 }
-.legend-label{font-weight:600; color:var(--ink); margin-right:4px;}
+.legend-label{font-weight:600; color:var(--ink); margin-right:4px; display:flex; align-items:center;}
 .legend-item{display:flex; align-items:center; gap:7px;}
 .legend-dot{width:9px; height:9px; display:inline-block;}
 
