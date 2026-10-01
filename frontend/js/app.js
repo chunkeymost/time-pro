@@ -1381,6 +1381,32 @@
       stopped: getComputedStyle(document.documentElement).getPropertyValue('--status-risk').trim() || '#B5482F',
     };
 
+    const done = counts.done;
+    const notDone = total - done;
+
+    const centerTextPlugin = {
+      id: 'centerText',
+      afterDraw(chart) {
+        const { ctx, chartArea: { top, bottom, left, right } } = chart;
+        const centerX = (left + right) / 2;
+        const centerY = (top + bottom) / 2;
+
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        ctx.font = '12px Inter, sans-serif';
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ink-faint').trim() || '#8B9CB3';
+        ctx.fillText('Total', centerX, centerY - 12);
+
+        ctx.font = 'bold 22px Inter, sans-serif';
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim() || '#1A1F2E';
+        ctx.fillText(done + '/' + notDone, centerX, centerY + 14);
+
+        ctx.restore();
+      }
+    };
+
     dailyTaskChart = new Chart(ctx, {
       type: 'doughnut',
       data: {
@@ -1408,7 +1434,8 @@
             }
           }
         }
-      }
+      },
+      plugins: [centerTextPlugin]
     });
 
     // Render custom legend
