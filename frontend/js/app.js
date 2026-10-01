@@ -65,6 +65,7 @@
   let view = "week"; // "week" | "month"
   let dayWidth = 40;
   let showFinished = localStorage.getItem('showFinished') !== 'false';
+  let modalSource = null; // 'notification' | 'sidebar' | 'new' | null
 
   const els = {
     title: document.getElementById('project-title'),
@@ -99,6 +100,7 @@
     bellBtn: document.getElementById('bell-btn'),
     bellDot: document.getElementById('bell-dot'),
     holdBtn: document.getElementById('hold-btn'),
+    backBtn: document.getElementById('back-btn'),
     notifOverlay: document.getElementById('notif-overlay'),
     notifSub: document.getElementById('notif-sub'),
     notifHoldBody: document.getElementById('notif-hold-body'),
@@ -902,8 +904,9 @@
   /* ---------------- Modal logic ---------------- */
   let editingId = null;
 
-  function openModal(task){
+  function openModal(task, source = null){
     editingId = task ? task.id : null;
+    modalSource = source;
     els.modalTitle.textContent = task ? 'Ubah Tugas' : 'Tugas Baru';
     els.modalSub.textContent = task ? 'Perbarui detail atau geser jadwal tugas ini.' : 'Isi detail tugas di bawah ini.';
     els.fName.value = task ? task.name : '';
@@ -936,6 +939,12 @@
       els.todoDate.max = '';
       els.holdBtn.style.display = 'none';
     }
+    // Show/hide back button based on source
+    if (modalSource === 'notification') {
+      els.backBtn.style.display = '';
+    } else {
+      els.backBtn.style.display = 'none';
+    }
     renderTodos(task);
     updateProgressSlider(task);
     updateProgressFromTodos(task);
@@ -958,6 +967,7 @@
     cancelTodoEdit();
     editingId = null;
     selectedId = null;
+    modalSource = null;
     renderSidebar();
     closeEvidencePanel();
   }
@@ -1086,6 +1096,9 @@
 
     // Render active todos
     renderNotifTodos(activeTodos, els.notifActiveBody, 'Tidak ada tugas aktif.');
+
+    // Open the panel
+    els.notifOverlay.classList.add('open');
   }
 
   function renderNotifTodos(todos, tbody, emptyMessage){
@@ -1139,7 +1152,7 @@
       tr.querySelector('.todo-text').addEventListener('click', function(){
         els.notifOverlay.classList.remove('open');
         const task = tasks.find(t => t.id === todo.taskId);
-        if(task) openModal(task);
+        if(task) openModal(task, 'notification');
       });
 
       tr.querySelector('.todo-copy-btn').addEventListener('click', function(){
@@ -1397,6 +1410,10 @@
 
   document.getElementById('cancel-btn').addEventListener('click', closeModal);
   document.getElementById('close-btn').addEventListener('click', closeModal);
+  document.getElementById('back-btn').addEventListener('click', ()=>{
+    closeModal();
+    openNotifPanel();
+  });
   els.overlay.addEventListener('click', (e)=>{ if(e.target===els.overlay) closeModal(); });
   els.confirmOverlay.addEventListener('click', (e)=>{ if(e.target===els.confirmOverlay) closeConfirm(); });
 
@@ -1486,7 +1503,6 @@
   /* ---------------- Notification Panel Events ---------------- */
   els.bellBtn.addEventListener('click', ()=>{
     openNotifPanel();
-    els.notifOverlay.classList.add('open');
   });
 
   els.notifOverlay.addEventListener('click', (e)=>{
