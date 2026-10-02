@@ -1107,6 +1107,22 @@
         renderAll(false);
         if(editingId) loadTaskLog(editingId);
       });
+
+      tr.querySelector('.todo-dup-btn').addEventListener('click', async function(){
+        const newTodo = await api.post('/api/tasks/'+task.id+'/todos', {
+          text: todo.text,
+          due: todo.due ? fmt(todo.due) : null
+        }).catch(e => { showToast('Gagal duplikasi: '+e.message, 'error'); throw e; });
+        const created = newTodo.todo;
+        task.todos.push({ ...created, due: created.due ? parseDate(created.due) : null, done: false });
+        updateProgressFromTodos(task);
+        renderTodos(task);
+        updateBellDot();
+        renderAll(false);
+        if(editingId) loadTaskLog(editingId);
+        showToast('Sub Task diduplikasi');
+      });
+
       tr.querySelector('.todo-text').addEventListener('click', function(){
         editingTodoId = todo.id;
         els.todoInput.value = todo.text;
