@@ -1064,6 +1064,29 @@ body{
 .overdue{ color:var(--status-risk); font-weight:600; }
 .notif-empty{ padding:16px 4px; color:var(--ink-faint); font-size:12px; }
 
+.notif-row-in-daily {
+  background: rgba(40, 167, 69, 0.06) !important;
+}
+.notif-row-in-daily:hover {
+  background: rgba(40, 167, 69, 0.1) !important;
+}
+.daily-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: default;
+}
+.daily-badge i {
+  color: #28a745;
+  font-size: 14px;
+}
+.daily-badge:hover {
+  background: rgba(40, 167, 69, 0.1);
+}
+
 .notif-section{ margin-bottom:20px; }
 .notif-section:last-child{ margin-bottom:0; }
 .notif-section-title{

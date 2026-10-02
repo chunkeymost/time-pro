@@ -1237,9 +1237,16 @@
         }
       }
 
+      const inDaily = dailyTasks.some(dt => dt.taskId === todo.taskId && dt.taskName === todo.text);
+
       const tr = document.createElement('tr');
+      if(inDaily && showAdd) tr.classList.add('notif-row-in-daily');
       const numCell = showAdd
-        ? `<td class="todo-num"><span class="todo-num-label">${i+1}</span><button class="todo-add-btn" title="Tambahkan ke Daily Task"><i class="bi bi-plus-lg"></i></button></td>`
+        ? `<td class="todo-num"><span class="todo-num-label">${i+1}</span>` +
+          (inDaily
+            ? `<span class="daily-badge" title="Sudah di Daily Task"><i class="bi bi-check-circle-fill"></i></span>`
+            : `<button class="todo-add-btn" title="Tambahkan ke Daily Task"><i class="bi bi-plus-lg"></i></button>`)
+          + `</td>`
         : `<td class="todo-num">${i+1}</td>`;
       tr.innerHTML = `
         ${numCell}
@@ -1287,6 +1294,7 @@
               status: 'hold'
             });
             await loadDailyTasks();
+            openNotifPanel();
             showToast('Ditambahkan ke Daily Task');
           } catch(err){
             console.error('Failed to add daily task:', err);
@@ -1475,6 +1483,7 @@
             try {
               await api.del('/api/daily-tasks/'+id);
               loadDailyTasks();
+              if (els.notifOverlay.classList.contains('open')) openNotifPanel();
             } catch(e) {
               console.error('Failed to delete daily task:', e);
             }
@@ -1490,6 +1499,7 @@
             await api.put('/api/daily-tasks/'+id, { status: newStatus });
             if(dt) await syncTodoWithDailyStatus(dt, newStatus);
             loadDailyTasks();
+            if (els.notifOverlay.classList.contains('open')) openNotifPanel();
           } catch(e) {
             console.error('Failed to update daily task status:', e);
           }
