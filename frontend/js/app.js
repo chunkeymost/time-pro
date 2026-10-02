@@ -132,6 +132,7 @@
     dailyTaskBody: document.getElementById('daily-task-body'),
     dailyTaskChart: document.getElementById('daily-task-chart'),
     dailyTaskLegend: document.getElementById('daily-task-legend'),
+    dailyTaskDragHandle: document.getElementById('daily-task-drag-handle'),
     imgPreviewOverlay: document.getElementById('img-preview-overlay'),
     imgPreviewImg: document.getElementById('img-preview-img'),
     reportOverlay: document.getElementById('report-overlay'),
@@ -1371,10 +1372,68 @@
     els.dailyTaskOverlay.classList.add('open');
     updateDateLabels();
     loadDailyTasks();
+    setupDailyTaskResize();
   }
 
   function closeDailyTaskPanel(){
     els.dailyTaskOverlay.classList.remove('open');
+  }
+
+  function setupDailyTaskResize(){
+    const modal = els.dailyTaskOverlay.querySelector('.bottom-modal');
+    const handle = els.dailyTaskDragHandle;
+    if(!modal || !handle) return;
+
+    let startY = 0;
+    let startHeight = 0;
+    const MIN_HEIGHT = 200;
+    const MAX_HEIGHT = window.innerHeight * 0.9;
+
+    function loadSavedHeight(){
+      const saved = localStorage.getItem('dailyTaskHeight');
+      if(saved){
+        const h = parseInt(saved, 10);
+        if(h >= MIN_HEIGHT && h <= MAX_HEIGHT){
+          modal.style.height = h + 'px';
+        }
+      }
+    }
+
+    function onMouseDown(e){
+      const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+      startY = clientY;
+      startHeight = modal.offsetHeight;
+      modal.classList.add('resizing');
+      handle.classList.add('dragging');
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+      document.addEventListener('touchmove', onMouseMove, { passive: false });
+      document.addEventListener('touchend', onMouseUp);
+      e.preventDefault();
+    }
+
+    function onMouseMove(e){
+      const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+      const deltaY = startY - clientY;
+      let newHeight = startHeight + deltaY;
+      newHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, newHeight));
+      modal.style.height = newHeight + 'px';
+    }
+
+    function onMouseUp(){
+      modal.classList.remove('resizing');
+      handle.classList.remove('dragging');
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.removeEventListener('touchmove', onMouseMove);
+      document.removeEventListener('touchend', onMouseUp);
+      localStorage.setItem('dailyTaskHeight', modal.offsetHeight.toString());
+    }
+
+    handle.addEventListener('mousedown', onMouseDown);
+    handle.addEventListener('touchstart', onMouseDown, { passive: false });
+
+    loadSavedHeight();
   }
 
   async function loadDailyTasks(){
