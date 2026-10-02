@@ -1243,7 +1243,7 @@
       const tr = document.createElement('tr');
       if(inDaily && showAdd) tr.classList.add('notif-row-in-daily');
       const numCell = showAdd
-        ? `<td class="todo-num"><span class="todo-num-label">${i+1}</span>` +
+        ? `<td class="todo-num">` +
           (inDaily
             ? `<span class="daily-badge" title="Sudah di Daily Task"><i class="bi bi-check-circle-fill"></i></span>`
             : `<button class="todo-add-btn" title="Tambahkan ke Daily Task"><i class="bi bi-plus-lg"></i></button>`)
