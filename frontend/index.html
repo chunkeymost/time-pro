@@ -9,7 +9,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-<link rel="stylesheet" href="css/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
 <div class="app">
@@ -75,6 +76,7 @@
   <div class="modal">
     <div class="modal-head">
       <h2 id="modal-title">Tugas Baru</h2>
+      <button class="modal-back" id="back-btn" style="display:none;" title="Kembali ke Notifikasi"><i class="bi bi-arrow-left"></i></button>
       <button class="modal-close" id="close-btn">&times;</button>
     </div>
     <div class="modal-sub" id="modal-sub">Isi detail tugas di bawah ini.</div>
@@ -132,14 +134,17 @@
       </div>
       <table class="todo-table" id="todo-table">
         <thead>
-          <tr><th class="todo-num">No.</th><th>To Do List</th><th class="todo-due">Tanggal</th><th class="todo-status">Status</th><th class="todo-del"></th></tr>
+          <tr><th class="todo-num">No.</th><th>To Do List</th><th class="todo-due">Tanggal</th><th class="todo-status">Status</th><th class="todo-act">Aksi</th></tr>
         </thead>
         <tbody id="todo-body"></tbody>
       </table>
     </div>
 
     <div class="modal-actions">
-      <button class="link-danger" id="delete-btn" style="visibility:hidden;">Hapus Tugas</button>
+      <div class="modal-actions-left">
+        <button class="link-danger" id="delete-btn" style="visibility:hidden;">Hapus Tugas</button>
+        <button class="btn btn-ghost" id="hold-btn">Hold</button>
+      </div>
       <div class="modal-actions-right">
         <button class="btn btn-ghost" id="cancel-btn">Batal</button>
         <button class="btn btn-primary" id="save-btn">Simpan</button>
@@ -168,19 +173,46 @@
       <button class="modal-close" id="notif-close-btn">&times;</button>
     </div>
     <div class="modal-sub" id="notif-sub">Daftar aktivitas yang perlu diproses.</div>
-    <table class="todo-table" id="notif-table">
-      <thead>
-        <tr>
-          <th class="todo-num">No.</th>
-          <th>To Do List</th>
-          <th class="todo-due">Tanggal</th>
-          <th class="todo-due">Sisa Hari</th>
-          <th class="todo-status">Status</th>
-          <th class="todo-aksi">Aksi</th>
-        </tr>
-      </thead>
-      <tbody id="notif-body"></tbody>
-    </table>
+    
+    <!-- Hold Tasks Section -->
+    <div class="notif-section">
+      <h3 class="notif-section-title">
+        <i class="bi bi-pause-circle-fill"></i> Tugas Di-Hold (<span id="notif-hold-count" class="notif-count-badge">0</span>)
+      </h3>
+      <table class="todo-table">
+        <thead>
+          <tr>
+            <th class="todo-num">No.</th>
+            <th>To Do List</th>
+            <th class="todo-due">Tanggal</th>
+            <th class="todo-due">Sisa Hari</th>
+            <th class="todo-status">Status</th>
+            <th class="todo-aksi">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="notif-hold-body"></tbody>
+      </table>
+    </div>
+
+    <!-- Active Tasks Section -->
+    <div class="notif-section">
+      <h3 class="notif-section-title">
+        <i class="bi bi-list-check"></i> Tugas Aktif (<span id="notif-active-count" class="notif-count-badge">0</span>)
+      </h3>
+      <table class="todo-table">
+        <thead>
+          <tr>
+            <th class="todo-num">No.</th>
+            <th>To Do List</th>
+            <th class="todo-due">Tanggal</th>
+            <th class="todo-due">Sisa Hari</th>
+            <th class="todo-status">Status</th>
+            <th class="todo-aksi">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="notif-active-body"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -252,8 +284,47 @@
         </table>
       </div>
     </div>
+</div>
   </div>
 </div>
+
+<!-- Daily Task sidepeek -->
+<div class="overlay overlay-bottom" id="daily-task-overlay">
+  <div class="modal bottom-modal">
+    <div class="modal-head">
+      <h2 id="daily-task-title">DAILY TASK</h2>
+      <button class="modal-close" id="daily-task-close-btn">&times;</button>
+    </div>
+    <div class="modal-sub" id="daily-task-sub">Kelola tugas harian Anda.</div>
+    <div id="daily-task-content" class="daily-task-grid">
+      <!-- Left: Table List -->
+      <div class="daily-task-left">
+        <div class="daily-task-table-wrapper">
+          <table class="todo-table daily-task-table">
+            <thead>
+              <tr>
+                <th class="todo-num">No.</th>
+                <th>Task</th>
+                <th class="todo-status">Status</th>
+                <th class="todo-act">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="daily-task-body">
+              <tr><td colspan="4" class="notif-empty">Belum ada tugas harian.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <!-- Right: Circular Chart -->
+      <div class="daily-task-right" style="margin-top: -60px;">
+        <h2 class="chart-title">Status Tugas Hari Ini</h2>
+        <div class="chart-container" style="margin-top: 10px;">
+          <canvas id="daily-task-chart" width="280" height="280"></canvas>
+          <div class="chart-legend" id="daily-task-legend"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Report modal -->
@@ -357,6 +428,18 @@
 
     <div class="holiday-list-head"><i class="bi bi-list-ul"></i> Daftar Hari Libur</div>
     <div class="holiday-list" id="holiday-list"></div>
+  </div>
+</div>
+
+<!-- Daily history modal -->
+<div class="overlay" id="daily-history-overlay">
+  <div class="modal daily-history-modal">
+    <div class="modal-head">
+      <h2>History Daily</h2>
+      <button class="modal-close" id="daily-history-close-btn">&times;</button>
+    </div>
+    <div class="modal-sub">Arsip daily task per tanggal yang sudah di-snapshot saat pergantian hari.</div>
+    <div class="daily-history-list" id="daily-history-list"></div>
   </div>
 </div>
 

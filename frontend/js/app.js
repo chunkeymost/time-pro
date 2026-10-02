@@ -26,6 +26,9 @@
     const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
     return `${y}-${m}-${day}`;
   }
+  function dateLabel(){
+    return fmt(today()).split('-').reverse().join('-');
+  }
   function parseDate(str){
     const parts = str.split('-').map(Number);
     if(parts.length!==3 || parts.some(isNaN)) return null;
@@ -65,6 +68,7 @@
   let view = "week"; // "week" | "month"
   let dayWidth = 40;
   let showFinished = localStorage.getItem('showFinished') !== 'false';
+  let modalSource = null; // 'notification' | 'sidebar' | 'new' | null
 
   const els = {
     title: document.getElementById('project-title'),
@@ -98,9 +102,14 @@
     todoSection: document.getElementById('todo-section'),
     bellBtn: document.getElementById('bell-btn'),
     bellDot: document.getElementById('bell-dot'),
+    holdBtn: document.getElementById('hold-btn'),
+    backBtn: document.getElementById('back-btn'),
     notifOverlay: document.getElementById('notif-overlay'),
-    notifBody: document.getElementById('notif-body'),
     notifSub: document.getElementById('notif-sub'),
+    notifHoldBody: document.getElementById('notif-hold-body'),
+    notifActiveBody: document.getElementById('notif-active-body'),
+    notifHoldCount: document.getElementById('notif-hold-count'),
+    notifActiveCount: document.getElementById('notif-active-count'),
     evidenceOverlay: document.getElementById('evidence-overlay'),
     evidenceBody: document.getElementById('evidence-body'),
     evidenceSub: document.getElementById('evidence-sub'),
@@ -116,6 +125,13 @@
     evidenceAddBtn: document.getElementById('evidence-add-btn'),
     evidenceLogSection: document.getElementById('evidence-log-section'),
     evidenceLogBody: document.getElementById('evidence-log-body'),
+    dailyTaskOverlay: document.getElementById('daily-task-overlay'),
+    dailyTaskTitle: document.getElementById('daily-task-title'),
+    dailyTaskCloseBtn: document.getElementById('daily-task-close-btn'),
+    dailyTaskContent: document.getElementById('daily-task-content'),
+    dailyTaskBody: document.getElementById('daily-task-body'),
+    dailyTaskChart: document.getElementById('daily-task-chart'),
+    dailyTaskLegend: document.getElementById('daily-task-legend'),
     imgPreviewOverlay: document.getElementById('img-preview-overlay'),
     imgPreviewImg: document.getElementById('img-preview-img'),
     reportOverlay: document.getElementById('report-overlay'),
@@ -132,6 +148,9 @@
     holSaveBtn: document.getElementById('hol-save-btn'),
     holCancelEditBtn: document.getElementById('hol-cancel-edit-btn'),
     holidayList: document.getElementById('holiday-list'),
+    dailyHistoryOverlay: document.getElementById('daily-history-overlay'),
+    dailyHistoryList: document.getElementById('daily-history-list'),
+    dailyHistoryCloseBtn: document.getElementById('daily-history-close-btn'),
   };
 
   /* ---------------- API helper ---------------- */
@@ -228,6 +247,9 @@
     const doneTasks = tasks.filter(t => t.progress === 100).length;
     const openTodos = tasks.reduce((sum, t) => sum + (t.todos||[]).filter(td => !td.done).length, 0);
     const overdueTasks = tasks.filter(t => t.progress < 100 && t.end && t.end < today()).length;
+    const heldTasks = tasks.filter(t => t.held === true).length;
+    const dailyTotal = dailyTasks.length;
+    const dailyDone = dailyTasks.filter(t => t.status === 'done').length;
 
     els.overviewCards.innerHTML = `
       <div class="overview-card">
@@ -254,7 +276,25 @@
           <div class="overview-sub">${overdueTasks > 0 ? 'Melewati batas waktu' : 'Tidak ada keterlambatan'}</div>
         </div>
       </div>
+      <div class="overview-card" id="card-task-hold">
+        <div class="overview-icon held"><i class="bi bi-pause-circle-fill"></i></div>
+        <div class="overview-body">
+          <div class="overview-num">${heldTasks}</div>
+          <div class="overview-label">Task Hold</div>
+          <div class="overview-sub">${heldTasks > 0 ? 'Sedang di-hold' : 'Tidak ada tugas di-hold'}</div>
+        </div>
+      </div>
+      <div class="overview-card" id="card-daily-task">
+        <div class="overview-icon daily"><i class="bi bi-calendar-day"></i></div>
+        <div class="overview-body">
+          <div class="overview-num">${dailyDone}/${dailyTotal}</div>
+          <div class="overview-label">Daily Task ${dateLabel()}</div>
+          <div class="overview-sub">${dailyDone} selesai dari ${dailyTotal} tugas</div>
+        </div>
+      </div>
     `;
+    const pulseActive = dailyTotal > 0 && dailyDone < dailyTotal;
+    document.getElementById('card-daily-task')?.classList.toggle('pulse-active', pulseActive);
   }
 
   /* ---------------- Legend ---------------- */
@@ -272,6 +312,9 @@
       `</label>` +
       `<button type="button" class="holiday-btn" id="holiday-manage-btn" title="Kelola Hari Libur">` +
         `Add Holiday` +
+      `</button>` +
+      `<button type="button" class="daily-history-btn" id="daily-history-btn" title="History Daily Task">` +
+        `History Daily` +
       `</button>`;
   }
 
@@ -387,7 +430,7 @@
 
     visibleTasks.forEach((t, idx) => {
       const bar = document.createElement('div');
-      bar.className = 'bar ' + (CATS[t.cat] ?? CATS.lainnya).cls;
+      bar.className = 'bar ' + (CATS[t.cat] ?? CATS.lainnya).cls + (t.held ? ' held' : '');
       bar.dataset.id = t.id;
       const left = dayDiff(range.start, t.start)*dayWidth;
       const width = (dayDiff(t.start,t.end)+1)*dayWidth - 4;
@@ -409,6 +452,13 @@
       pct.className='pct';
       pct.textContent = t.progress+'%';
       bar.appendChild(pct);
+
+      if (t.held) {
+        const holdBadge = document.createElement('span');
+        holdBadge.className = 'hold-badge';
+        holdBadge.innerHTML = '<i class="bi bi-pause-circle-fill"></i>';
+        bar.appendChild(holdBadge);
+      }
 
       const hLeft = document.createElement('div');
       hLeft.className='handle left';
@@ -494,12 +544,14 @@
       const row = document.createElement('div');
       const isDone = t.progress === 100;
       const isOverdue = !isDone && t.end && t.end < today();
-      row.className = 'sidebar-row' + (t.id===selectedId ? ' selected':'') + (isDone ? ' done':'') + (isOverdue ? ' overdue':'');
+      const isHeld = t.held === true;
+      row.className = 'sidebar-row' + (t.id===selectedId ? ' selected':'') + (isDone ? ' done':'') + (isOverdue ? ' overdue':'') + (isHeld ? ' held':'');
       row.innerHTML = `
         <div class="sidebar-row-top">
           <span class="name">${escapeHtml(t.name)}</span>
           ${isDone ? '<span class="done-flag">🏁</span>' : ''}
           ${isOverdue ? '<span class="overdue-flag"><i class="bi bi-bell-fill"></i></span>' : ''}
+          ${isHeld ? '<span class="held-flag"><i class="bi bi-pause-circle-fill"></i></span>' : ''}
         </div>
         <span class="meta"><span class="tag-dot ${(CATS[t.cat] ?? CATS.lainnya).cls}"></span>${(CATS[t.cat] ?? CATS.lainnya).label} · ${t.progress}% · ${countWeekdays(t.start,t.end)} Hari Pengerjaan</span>
       `;
@@ -630,6 +682,7 @@
   });
   document.getElementById('legend').addEventListener('click', (e)=>{
     if(e.target.closest('#holiday-manage-btn')) openHolidayModal();
+    if(e.target.closest('#daily-history-btn')) openDailyHistoryModal();
   });
 
   /* ---------------- Holiday management ---------------- */
@@ -762,6 +815,69 @@
   document.getElementById('holiday-close-btn').addEventListener('click', closeHolidayModal);
   els.holidayOverlay.addEventListener('click', (e)=>{ if(e.target===els.holidayOverlay) closeHolidayModal(); });
 
+  /* ---------------- Daily history modal ---------------- */
+  const DAILY_STATUS_LABEL = { hold:'Hold', in_progress:'In Progress', done:'Done', stopped:'Stop' };
+
+  function openDailyHistoryModal(){
+    els.dailyHistoryOverlay.classList.add('open');
+    loadDailyHistory();
+  }
+  function closeDailyHistoryModal(){
+    els.dailyHistoryOverlay.classList.remove('open');
+  }
+
+  async function loadDailyHistory(){
+    els.dailyHistoryList.innerHTML = '<div class="daily-history-empty">Memuat history...</div>';
+    let history = [];
+    try {
+      const res = await api.get('/api/daily-tasks/history');
+      history = res.history || [];
+    } catch(err){
+      console.error('Failed to load daily history:', err);
+      els.dailyHistoryList.innerHTML = '<div class="daily-history-empty">Gagal memuat history daily task.</div>';
+      return;
+    }
+    renderDailyHistory(history);
+  }
+
+  function renderDailyHistory(history){
+    if(!history.length){
+      els.dailyHistoryList.innerHTML = '<div class="daily-history-empty">Belum ada history daily task.</div>';
+      return;
+    }
+
+    els.dailyHistoryList.innerHTML = history.map((snap, idx) => {
+      const rows = snap.dailyTasks || [];
+      const done = rows.filter(r => (r.status||'in_progress') === 'done').length;
+      const items = rows.map(r => {
+        const st = r.status || 'in_progress';
+        const label = DAILY_STATUS_LABEL[st] || st;
+        return `<div class="daily-history-item">` +
+          `<span class="daily-history-item-name">${escapeHtml(r.taskName || '')}</span>` +
+          `<span class="status-badge ${st}">${label}</span>` +
+        `</div>`;
+      }).join('') || '<div class="daily-history-empty">Tidak ada task pada tanggal ini.</div>';
+
+      return `<div class="daily-history-day" data-idx="${idx}">` +
+        `<div class="daily-history-day-head">` +
+          `<i class="bi bi-chevron-right daily-history-chevron"></i>` +
+          `<i class="bi bi-calendar-day daily-history-cal"></i>` +
+          `<span class="daily-history-date">${fmtDisplayDate(snap.date || '')}</span>` +
+          `<span class="daily-history-day-summary">${done}/${rows.length} Done</span>` +
+        `</div>` +
+        `<div class="daily-history-items">${items}</div>` +
+      `</div>`;
+    }).join('');
+  }
+
+  els.dailyHistoryList.addEventListener('click', (e)=>{
+    const head = e.target.closest('.daily-history-day-head');
+    if(!head) return;
+    head.parentElement.classList.toggle('expanded');
+  });
+  els.dailyHistoryCloseBtn.addEventListener('click', closeDailyHistoryModal);
+  els.dailyHistoryOverlay.addEventListener('click', (e)=>{ if(e.target===els.dailyHistoryOverlay) closeDailyHistoryModal(); });
+
   /* ---------------- Toast ---------------- */
   function showToast(msg, type='success'){
     const el = document.createElement('div');
@@ -880,8 +996,9 @@
   /* ---------------- Modal logic ---------------- */
   let editingId = null;
 
-  function openModal(task){
+  function openModal(task, source = null){
     editingId = task ? task.id : null;
+    modalSource = source;
     els.modalTitle.textContent = task ? 'Ubah Tugas' : 'Tugas Baru';
     els.modalSub.textContent = task ? 'Perbarui detail atau geser jadwal tugas ini.' : 'Isi detail tugas di bawah ini.';
     els.fName.value = task ? task.name : '';
@@ -898,9 +1015,27 @@
     if(task){
       els.todoDate.min = fmt(task.start);
       els.todoDate.max = fmt(task.end);
+      // Update hold button based on task.held status
+      if (task.held) {
+        els.holdBtn.textContent = 'Open Again';
+        els.holdBtn.classList.add('btn-success');
+        els.holdBtn.classList.remove('btn-ghost');
+      } else {
+        els.holdBtn.textContent = 'Hold';
+        els.holdBtn.classList.add('btn-ghost');
+        els.holdBtn.classList.remove('btn-success');
+      }
+      els.holdBtn.style.display = '';
     } else {
       els.todoDate.min = '';
       els.todoDate.max = '';
+      els.holdBtn.style.display = 'none';
+    }
+    // Show/hide back button based on source
+    if (modalSource === 'notification') {
+      els.backBtn.style.display = '';
+    } else {
+      els.backBtn.style.display = 'none';
     }
     renderTodos(task);
     updateProgressSlider(task);
@@ -924,6 +1059,7 @@
     cancelTodoEdit();
     editingId = null;
     selectedId = null;
+    modalSource = null;
     renderSidebar();
     closeEvidencePanel();
   }
@@ -946,7 +1082,10 @@
         <td><span class="todo-text${todo.done?' done':''}">${escapeHtml(todo.text)}</span></td>
         <td class="todo-due" style="font-size:11px;font-family:'IBM Plex Mono',monospace;">${todo.due ? fmt(todo.due) : '—'}</td>
         <td class="todo-status"><input type="checkbox" class="todo-cb" data-todo-id="${todo.id}"${todo.done?' checked':''}></td>
-        <td class="todo-del"><button class="todo-del-btn" data-todo-id="${todo.id}">&times;</button></td>
+        <td class="todo-act">
+          <button class="todo-dup-btn" data-todo-id="${todo.id}" title="Duplicate"><i class="bi bi-files"></i></button>
+          <button class="todo-del-btn" data-todo-id="${todo.id}">&times;</button>
+        </td>
       `;
       tr.querySelector('.todo-cb').addEventListener('change', function(){
         todo.done = this.checked;
@@ -957,6 +1096,7 @@
         renderAll(false);
         if(editingId) loadTaskLog(editingId);
       });
+
       tr.querySelector('.todo-del-btn').addEventListener('click', function(){
         api.del('/api/tasks/'+task.id+'/todos/'+todo.id).catch(e => console.error('Delete todo failed:', e));
         task.todos = task.todos.filter(t=>t.id!==todo.id);
@@ -967,6 +1107,22 @@
         renderAll(false);
         if(editingId) loadTaskLog(editingId);
       });
+
+      tr.querySelector('.todo-dup-btn').addEventListener('click', async function(){
+        const newTodo = await api.post('/api/tasks/'+task.id+'/todos', {
+          text: todo.text,
+          due: todo.due ? fmt(todo.due) : null
+        }).catch(e => { showToast('Gagal duplikasi: '+e.message, 'error'); throw e; });
+        const created = newTodo.todo;
+        task.todos.push({ ...created, due: created.due ? parseDate(created.due) : null, done: false });
+        updateProgressFromTodos(task);
+        renderTodos(task);
+        updateBellDot();
+        renderAll(false);
+        if(editingId) loadTaskLog(editingId);
+        showToast('Sub Task diduplikasi');
+      });
+
       tr.querySelector('.todo-text').addEventListener('click', function(){
         editingTodoId = todo.id;
         els.todoInput.value = todo.text;
@@ -1009,11 +1165,10 @@
 
   /* ---------------- Notification Panel ---------------- */
   function openNotifPanel(){
-    const T = today();
     const allTodos = [];
     tasks.forEach(task => {
       (task.todos||[]).forEach(todo => {
-        allTodos.push({ ...todo, taskId: task.id, taskName: task.name });
+        allTodos.push({ ...todo, taskId: task.id, taskName: task.name, taskHeld: task.held });
       });
     });
 
@@ -1026,21 +1181,50 @@
 
     const ordered = sorted.filter(t => !t.done);
 
+    // Split into hold and non-hold
+    const holdTodos = ordered.filter(t => t.taskHeld === true);
+    const activeTodos = ordered.filter(t => t.taskHeld !== true);
+
+    // Update counts
+    els.notifHoldCount.textContent = holdTodos.length;
+    els.notifActiveCount.textContent = activeTodos.length;
+
+    // Clear both bodies
+    els.notifHoldBody.innerHTML = '';
+    els.notifActiveBody.innerHTML = '';
+
     if(ordered.length === 0){
-      els.notifBody.innerHTML = '<tr><td colspan="6" class="notif-empty">Semua aktivitas telah selesai.</td></tr>';
       els.notifSub.textContent = 'Tidak ada aktivitas yang perlu diproses.';
+      // Add empty messages to both sections
+      els.notifHoldBody.innerHTML = '<tr><td colspan="6" class="notif-empty">Tidak ada tugas di-hold.</td></tr>';
+      els.notifActiveBody.innerHTML = '<tr><td colspan="6" class="notif-empty">Tidak ada tugas aktif.</td></tr>';
       return;
     }
 
     els.notifSub.textContent = 'Daftar aktivitas yang perlu diproses.';
-    els.notifBody.innerHTML = '';
-    ordered.forEach((todo, i) => {
+
+    // Render hold todos
+    renderNotifTodos(holdTodos, els.notifHoldBody, 'Tidak ada tugas di-hold.', false);
+
+    // Render active todos
+    renderNotifTodos(activeTodos, els.notifActiveBody, 'Tidak ada tugas aktif.', true);
+
+    // Open the panel
+    els.notifOverlay.classList.add('open');
+  }
+
+  function renderNotifTodos(todos, tbody, emptyMessage, showAdd){
+    if(todos.length === 0){
+      tbody.innerHTML = '<tr><td colspan="6" class="notif-empty">' + emptyMessage + '</td></tr>';
+      return;
+    }
+    todos.forEach((todo, i) => {
       let sisaHariText, sisaClass;
       if(!todo.due){
         sisaHariText = '—';
         sisaClass = '';
       } else {
-        const diff = dayDiff(T, todo.due);
+        const diff = dayDiff(today(), todo.due);
         if(diff < 0){
           sisaHariText = 'Overdue';
           sisaClass = 'overdue';
@@ -1053,9 +1237,19 @@
         }
       }
 
+      const inDaily = dailyTasks.some(dt => dt.taskId === todo.taskId && dt.taskName === todo.text);
+
       const tr = document.createElement('tr');
+      if(inDaily && showAdd) tr.classList.add('notif-row-in-daily');
+      const numCell = showAdd
+        ? `<td class="todo-num"><span class="todo-num-label">${i+1}</span>` +
+          (inDaily
+            ? `<span class="daily-badge" title="Sudah di Daily Task"><i class="bi bi-check-circle-fill"></i></span>`
+            : `<button class="todo-add-btn" title="Tambahkan ke Daily Task"><i class="bi bi-plus-lg"></i></button>`)
+          + `</td>`
+        : `<td class="todo-num">${i+1}</td>`;
       tr.innerHTML = `
-        <td class="todo-num">${i+1}</td>
+        ${numCell}
         <td><span class="todo-text${todo.done?' done':''}">${escapeHtml(todo.text)}</span></td>
         <td class="todo-due" style="font-size:11px;font-family:'IBM Plex Mono',monospace;">${todo.due ? fmt(todo.due) : '—'}</td>
         <td class="todo-due" style="font-size:11px;font-family:'IBM Plex Mono',monospace;${sisaClass ? 'color:var(--status-risk);font-weight:600;' : ''}">${sisaHariText}</td>
@@ -1080,14 +1274,36 @@
       tr.querySelector('.todo-text').addEventListener('click', function(){
         els.notifOverlay.classList.remove('open');
         const task = tasks.find(t => t.id === todo.taskId);
-        if(task) openModal(task);
+        if(task) openModal(task, 'notification');
       });
 
       tr.querySelector('.todo-copy-btn').addEventListener('click', function(){
         navigator.clipboard.writeText(todo.text).then(() => showToast('Teks berhasil tercopy')).catch(() => showToast('Gagal copy teks', 'error'));
       });
 
-      els.notifBody.appendChild(tr);
+      const addBtn = tr.querySelector('.todo-add-btn');
+      if(addBtn){
+        addBtn.addEventListener('click', async function(e){
+          e.stopPropagation();
+          const dup = dailyTasks.some(dt => dt.taskId === todo.taskId && dt.taskName === todo.text);
+          if(dup){ showToast('Sudah ada di Daily Task', 'error'); return; }
+          try {
+            await api.post('/api/daily-tasks', {
+              taskId: todo.taskId,
+              taskName: todo.text,
+              status: 'hold'
+            });
+            await loadDailyTasks();
+            openNotifPanel();
+            showToast('Ditambahkan ke Daily Task');
+          } catch(err){
+            console.error('Failed to add daily task:', err);
+            showToast('Gagal menambahkan', 'error');
+          }
+        });
+      }
+
+      tbody.appendChild(tr);
     });
   }
 
@@ -1140,6 +1356,275 @@
     els.evidenceTextInput.value = '';
     els.evidenceFileInput.value = '';
     els.evidenceImageKetInput.value = '';
+  }
+
+  /* ---------------- Daily Task Panel ---------------- */
+  let dailyTasks = [];
+  let dailyTaskChart = null;
+
+  function updateDateLabels(){
+    if(els.dailyTaskTitle) els.dailyTaskTitle.textContent = 'DAILY TASK ' + dateLabel();
+    renderOverviewCards();
+  }
+
+  function openDailyTaskPanel(){
+    els.dailyTaskOverlay.classList.add('open');
+    updateDateLabels();
+    loadDailyTasks();
+  }
+
+  function closeDailyTaskPanel(){
+    els.dailyTaskOverlay.classList.remove('open');
+  }
+
+  async function loadDailyTasks(){
+    try {
+      const res = await api.get('/api/daily-tasks');
+      dailyTasks = res.dailyTasks || [];
+    } catch(e) {
+      console.error('Failed to load daily tasks:', e);
+      dailyTasks = [];
+    }
+    renderDailyTasks();
+    renderDailyTaskChart();
+    renderOverviewCards();
+  }
+
+  async function syncTodoWithDailyStatus(dt, newStatus){
+    const wantDone = newStatus === 'done';
+    const task = tasks.find(t => t.id === dt.taskId);
+    const todo = task && (task.todos||[]).find(td => td.text === dt.taskName);
+    if(!task || !todo){
+      showToast('Todo "'+ (dt.taskName || '') +'" tidak ditemukan di task', 'info');
+      return;
+    }
+    if(!!todo.done === wantDone) return;
+    todo.done = wantDone;
+    try {
+      await api.put('/api/tasks/'+task.id+'/todos/'+todo.id, { done: todo.done });
+    } catch(e){
+      console.error('Sync todo from daily status failed:', e);
+      showToast('Gagal memperbarui todo: '+e.message, 'error');
+      todo.done = !wantDone;
+      return;
+    }
+    updateProgressFromTodos(task);
+    updateBellDot();
+    if(els.notifOverlay.classList.contains('open')) openNotifPanel();
+    if(editingId === task.id){
+      renderTodos(task);
+      loadTaskLog(editingId);
+    }
+    renderAll(false);
+  }
+
+  function renderDailyTasks(){
+    els.dailyTaskBody.innerHTML = '';
+
+    if(dailyTasks.length === 0){
+      els.dailyTaskBody.innerHTML = '<tr><td colspan="4" class="notif-empty">Belum ada tugas harian.</td></tr>';
+      return;
+    }
+
+    dailyTasks.forEach((dt, i) => {
+      const tr = document.createElement('tr');
+      const statusClass = dt.status || 'in_progress';
+      const statusLabel = statusClass === 'hold' ? 'Hold' : statusClass === 'in_progress' ? 'In Progress' : statusClass === 'stopped' ? 'Stop' : 'Done';
+
+      // Determine button states
+      const isHold = statusClass === 'hold';
+      const isDone = statusClass === 'done';
+      const isStopped = statusClass === 'stopped';
+      const showStart = isHold || isStopped;
+
+      const statusActions = isDone ? `
+        <div class="status-actions">
+          <button class="status-action-btn hold" data-id="${dt.id}" data-status="hold" title="Reopen as Hold">
+            <i class="bi bi-pause-circle-fill"></i>
+          </button>
+          <button class="status-action-btn in_progress" data-id="${dt.id}" data-status="in_progress" title="Reopen as In Progress">
+            <i class="bi bi-play-circle-fill"></i>
+          </button>
+          <button class="status-action-btn stop" data-id="${dt.id}" data-del="true" title="Delete">
+            <i class="bi bi-trash-fill"></i>
+          </button>
+        </div>
+      ` : `
+        <div class="status-actions">
+          <button class="status-action-btn hold-toggle ${showStart ? 'active' : ''}" data-id="${dt.id}" data-status="hold" data-toggle-status="${showStart ? 'in_progress' : 'hold'}" title="${showStart ? 'Start' : 'Hold'}">
+            <i class="bi ${showStart ? 'bi-play-circle-fill' : 'bi-pause-circle-fill'}"></i>
+          </button>
+          <button class="status-action-btn done" data-id="${dt.id}" data-status="done" title="Done">
+            <i class="bi bi-check-circle-fill"></i>
+          </button>
+          <button class="status-action-btn stop ${isStopped ? 'active' : ''}" data-id="${dt.id}" data-status="stopped" title="Stop">
+            <i class="bi bi-stop-circle-fill"></i>
+          </button>
+        </div>
+      `;
+
+      tr.innerHTML = `
+        <td class="todo-num">${i+1}</td>
+        <td>${escapeHtml(dt.taskName)}</td>
+        <td class="todo-status">
+          <span class="status-badge ${statusClass}">${statusLabel}</span>
+        </td>
+        <td class="todo-act">
+          ${statusActions}
+        </td>
+      `;
+
+      // Add click handlers for all status buttons
+      tr.querySelectorAll('.status-action-btn').forEach(btn => {
+        btn.addEventListener('click', async function(){
+          const id = parseInt(this.dataset.id, 10);
+          // Handle delete button
+          if (this.dataset.del === 'true') {
+            try {
+              await api.del('/api/daily-tasks/'+id);
+              loadDailyTasks();
+              if (els.notifOverlay.classList.contains('open')) openNotifPanel();
+            } catch(e) {
+              console.error('Failed to delete daily task:', e);
+            }
+            return;
+          }
+          let newStatus = this.dataset.status;
+          // Handle hold-toggle button (Hold/Start)
+          if (this.classList.contains('hold-toggle')) {
+            newStatus = this.dataset.toggleStatus;
+          }
+          const dt = dailyTasks.find(d => d.id === id);
+          try {
+            await api.put('/api/daily-tasks/'+id, { status: newStatus });
+            if(dt) await syncTodoWithDailyStatus(dt, newStatus);
+            loadDailyTasks();
+            if (els.notifOverlay.classList.contains('open')) openNotifPanel();
+          } catch(e) {
+            console.error('Failed to update daily task status:', e);
+          }
+        });
+      });
+
+      els.dailyTaskBody.appendChild(tr);
+    });
+  }
+
+  function renderDailyTaskChart(){
+    const ctx = els.dailyTaskChart?.getContext('2d');
+    if(!ctx) return;
+
+    // Count statuses
+    const counts = { hold: 0, in_progress: 0, done: 0, stopped: 0 };
+    dailyTasks.forEach(dt => {
+      const s = dt.status || 'in_progress';
+      if(counts[s] !== undefined) counts[s]++;
+    });
+
+    const total = counts.hold + counts.in_progress + counts.done + counts.stopped;
+
+    if(total === 0){
+      // Show empty state
+      els.dailyTaskLegend.innerHTML = '';
+      if(dailyTaskChart) { dailyTaskChart.destroy(); dailyTaskChart = null; }
+      ctx.clearRect(0, 0, els.dailyTaskChart.width, els.dailyTaskChart.height);
+      ctx.font = '14px Inter, sans-serif';
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ink-faint').trim() || '#8B9CB3';
+      ctx.textAlign = 'center';
+      const emptyMsg = 'Belum ada data tugas';
+      ctx.fillText(emptyMsg, els.dailyTaskChart.width/2, els.dailyTaskChart.height/2);
+      return;
+    }
+
+    // Destroy existing chart
+    if(dailyTaskChart) dailyTaskChart.destroy();
+
+    const colors = {
+      hold: getComputedStyle(document.documentElement).getPropertyValue('--purple').trim() || '#7C3AED',
+      in_progress: getComputedStyle(document.documentElement).getPropertyValue('--status-progress').trim() || '#2F6BA3',
+      done: getComputedStyle(document.documentElement).getPropertyValue('--status-done').trim() || '#3F8F63',
+      stopped: getComputedStyle(document.documentElement).getPropertyValue('--status-risk').trim() || '#B5482F',
+    };
+
+    const done = counts.done;
+    const notDone = total - done;
+
+    const centerTextPlugin = {
+      id: 'centerText',
+      afterDraw(chart) {
+        const { ctx, chartArea: { top, bottom, left, right } } = chart;
+        const centerX = (left + right) / 2;
+        const centerY = (top + bottom) / 2;
+
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        ctx.font = '12px Inter, sans-serif';
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ink-faint').trim() || '#8B9CB3';
+        ctx.fillText('Total', centerX, centerY - 12);
+
+        ctx.font = 'bold 22px Inter, sans-serif';
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim() || '#1A1F2E';
+        ctx.fillText(done + '/' + notDone, centerX, centerY + 14);
+
+        ctx.restore();
+      }
+    };
+
+    dailyTaskChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Hold', 'In Progress', 'Done', 'Stop'],
+        datasets: [{
+          data: [counts.hold, counts.in_progress, counts.done, counts.stopped],
+          backgroundColor: [colors.hold, colors.in_progress, colors.done, colors.stopped],
+          borderWidth: 0,
+          borderRadius: 4,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        cutout: '65%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const value = context.raw;
+                const percent = total > 0 ? Math.round((value / total) * 100) : 0;
+                return context.label + ': ' + value + ' (' + percent + '%)';
+              }
+            }
+          }
+        }
+      },
+      plugins: [centerTextPlugin]
+    });
+
+    // Render custom legend
+    renderDailyTaskLegend(counts, total, colors);
+  }
+
+  function renderDailyTaskLegend(counts, total, colors){
+    const labels = [
+      { key: 'hold', label: 'Hold' },
+      { key: 'in_progress', label: 'In Progress' },
+      { key: 'done', label: 'Done' },
+      { key: 'stopped', label: 'Stop' }
+    ];
+    els.dailyTaskLegend.innerHTML = labels.map(l => {
+      const count = counts[l.key] || 0;
+      const percent = total > 0 ? Math.round((count / total) * 100) : 0;
+      return `
+        <div class="chart-legend-item">
+          <span class="chart-legend-color" style="background:${colors[l.key]}"></span>
+          <span class="chart-legend-label">${l.label}</span>
+          <span class="chart-legend-value">${count} (${percent}%)</span>
+        </div>
+      `;
+    }).join('');
   }
 
   function renderEvidences(){
@@ -1338,6 +1823,10 @@
 
   document.getElementById('cancel-btn').addEventListener('click', closeModal);
   document.getElementById('close-btn').addEventListener('click', closeModal);
+  document.getElementById('back-btn').addEventListener('click', ()=>{
+    closeModal();
+    openNotifPanel();
+  });
   els.overlay.addEventListener('click', (e)=>{ if(e.target===els.overlay) closeModal(); });
   els.confirmOverlay.addEventListener('click', (e)=>{ if(e.target===els.confirmOverlay) closeConfirm(); });
 
@@ -1391,10 +1880,42 @@
     if(editingId) openEvidencePanel(editingId);
   });
 
+  els.holdBtn.addEventListener('click', async ()=>{
+    if(!editingId) return;
+    const task = tasks.find(t => t.id === editingId);
+    if(!task) return;
+    
+    try {
+      const result = await api.put('/api/tasks/'+editingId+'/hold');
+      task.held = result.held;
+      task.heldAt = result.heldAt;
+      
+      // Update button text and style
+      if (result.held) {
+        els.holdBtn.textContent = 'Open Again';
+        els.holdBtn.classList.add('btn-success');
+        els.holdBtn.classList.remove('btn-ghost');
+        showToast('Tugas di-hold (dihentikan sementara)');
+      } else {
+        els.holdBtn.textContent = 'Hold';
+        els.holdBtn.classList.add('btn-ghost');
+        els.holdBtn.classList.remove('btn-success');
+        showToast('Tugas dibuka kembali (dilanjutkan)');
+      }
+      
+      // Reload task log to show the new entry
+      loadTaskLog(editingId);
+      renderSidebar();
+      renderAll(false);
+    } catch (e) {
+      console.error('Failed to toggle hold:', e);
+      showToast('Gagal mengubah status hold', 'error');
+    }
+  });
+
   /* ---------------- Notification Panel Events ---------------- */
   els.bellBtn.addEventListener('click', ()=>{
     openNotifPanel();
-    els.notifOverlay.classList.add('open');
   });
 
   els.notifOverlay.addEventListener('click', (e)=>{
@@ -1412,11 +1933,19 @@
 
   document.getElementById('evidence-close-btn').addEventListener('click', closeEvidencePanel);
 
+  /* ---------------- Daily Task Panel Events ---------------- */
+  els.dailyTaskOverlay.addEventListener('click', (e)=>{
+    if(e.target === els.dailyTaskOverlay) closeDailyTaskPanel();
+  });
+
+  els.dailyTaskCloseBtn.addEventListener('click', closeDailyTaskPanel);
+
   document.addEventListener('keydown', (e)=>{
     if(e.key==='Escape' && els.confirmOverlay.classList.contains('open')){ closeConfirm(); return; }
     if(e.key==='Escape' && els.overlay.classList.contains('open')) closeModal();
     if(e.key==='Escape' && els.notifOverlay.classList.contains('open')) els.notifOverlay.classList.remove('open');
     if(e.key==='Escape' && els.evidenceOverlay.classList.contains('open')) closeEvidencePanel();
+    if(e.key==='Escape' && els.dailyTaskOverlay.classList.contains('open')) closeDailyTaskPanel();
     if(e.key==='Escape' && els.imgPreviewOverlay.classList.contains('open')) closeImagePreview();
   });
 
@@ -1701,5 +2230,25 @@
 
   /* ---------------- Init ---------------- */
   loadTasks();
+  loadDailyTasks();
+
+  // Update date labels when the day rolls over (checked every 30s)
+  let lastDateKey = fmt(today());
+  setInterval(() => {
+    const key = fmt(today());
+    if(key !== lastDateKey){
+      lastDateKey = key;
+      updateDateLabels();
+      loadDailyTasks();
+    }
+  }, 30000);
+
+  // Daily Task card click handler (delegated)
+  els.overviewCards.addEventListener('click', (e) => {
+    const card = e.target.closest('#card-daily-task');
+    if (card) {
+      openDailyTaskPanel();
+    }
+  });
 
 })();

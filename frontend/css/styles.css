@@ -244,6 +244,26 @@ body{
 #backup-btn:hover{ background:#D35400; border-color:#D35400; }
 #backup-btn:disabled{ background:#CCC; border-color:#CCC; color:#999; cursor:not-allowed; opacity:0.6; }
 
+.btn-success{
+  background:var(--status-done);
+  border-color:var(--status-done);
+  color:#fff;
+}
+.btn-success:hover{ background:#2e7d32; border-color:#2e7d32; }
+
+#hold-btn{
+  background:#E67E22;
+  border-color:#E67E22;
+  color:#fff;
+}
+#hold-btn:hover{ background:#D35400; border-color:#D35400; }
+
+#hold-btn.btn-success{
+  background:var(--purple);
+  border-color:var(--purple);
+}
+#hold-btn.btn-success:hover{ background:var(--purple-hover); border-color:var(--purple-hover); }
+
 .theme-toggle{
   font-size:18px;
   padding:8px 12px;
@@ -308,7 +328,7 @@ body{
   font-size:11.5px;
   color:var(--ink-soft);
 }
-.legend-label{font-weight:600; color:var(--ink); margin-right:4px;}
+.legend-label{font-weight:600; color:var(--ink); margin-right:4px; display:flex; align-items:center;}
 .legend-item{display:flex; align-items:center; gap:7px;}
 .legend-dot{width:9px; height:9px; display:inline-block;}
 
@@ -388,6 +408,18 @@ body{
 .overview-icon.tasks{ background:rgba(63,143,99,0.12); color:var(--status-done); }
 .overview-icon.subtasks{ background:rgba(47,107,163,0.12); color:var(--status-progress); }
 .overview-icon.overdue{ background:rgba(181,72,47,0.12); color:var(--status-risk); }
+.overview-icon.held{ background:rgba(124,58,237,0.12); color:var(--purple); }
+.overview-icon.daily{ background:rgba(63,143,99,0.15); color:var(--status-done); }
+
+/* Daily Task card glow */
+@keyframes daily-bg-pulse{
+  0%,100%{ background:var(--surface); box-shadow:var(--shadow); }
+  50%{ background:rgba(63,143,99,0.24); box-shadow:var(--shadow), 0 0 24px rgba(63,143,99,1); }
+}
+#card-daily-task.pulse-active{ animation:daily-bg-pulse 2.5s ease-in-out infinite; }
+@media (prefers-reduced-motion:reduce){
+  #card-daily-task.pulse-active{ animation:none; }
+}
 .overview-body{ display:flex; flex-direction:column; gap:2px; min-width:0; }
 .overview-num{
   font-family:'Space Grotesk', sans-serif;
@@ -436,6 +468,7 @@ body{
 }
 .toast.success{ background:var(--status-done); }
 .toast.error{ background:var(--status-risk); }
+.toast.info{ background:#2563EB; }
 @keyframes toast-in{
   from{ opacity:0; transform:translateY(12px); }
   to{ opacity:1; transform:translateY(0); }
@@ -495,7 +528,11 @@ body{
 .sidebar-row.overdue.selected{ background:rgba(181,72,47,0.18); }
 .sidebar-row.overdue .name{ color:var(--status-risk); }
 .sidebar-row.overdue .meta{ color:var(--status-risk); }
+.sidebar-row.held{ background:rgba(124,58,237,0.1); }
+.sidebar-row.held:hover{ background:rgba(124,58,237,0.16); }
+.sidebar-row.held.selected{ background:rgba(124,58,237,0.18); }
 .overdue-flag{ flex-shrink:0; font-size:14px; color:var(--status-risk); }
+.held-flag{ flex-shrink:0; font-size:14px; color:var(--purple); }
 .sidebar-row-top{ display:flex; align-items:center; gap:6px; }
 .sidebar-row-top .name{ flex:1; min-width:0; }
 .done-flag{ flex-shrink:0; font-size:14px; }
@@ -687,6 +724,24 @@ body{
 .handle.left{ left:0; }
 .handle.right{ right:0; }
 
+.bar.held .hold-badge{
+  position:absolute;
+  top:-8px;
+  right:-8px;
+  width:24px;
+  height:24px;
+  background:var(--purple);
+  color:#fff;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:14px;
+  box-shadow:0 2px 6px rgba(124,58,237,0.4);
+  z-index:4;
+  border:2px solid var(--surface);
+}
+
 .cat-desain{ background:var(--status-progress); }
 .cat-pengembangan{ background:var(--ink); }
 .cat-pengujian{ background:var(--status-done); }
@@ -760,6 +815,16 @@ body{
   line-height:1;
 }
 .modal-close:hover{ color:var(--ink); }
+.modal-back{
+  background:none; border:none;
+  font-size:18px;
+  color:var(--ink-soft);
+  cursor:pointer;
+  padding:4px 8px;
+  line-height:1;
+  margin-right:8px;
+}
+.modal-back:hover{ color:var(--ink); }
 .modal .modal-sub{
   font-size:12px;
   color:var(--ink-soft);
@@ -820,6 +885,7 @@ body{
   border-radius:8px;
 }
 .link-danger:hover{ background:rgba(181,72,47,0.2); }
+.modal-actions-left{ display:flex; gap:8px; align-items:center; }
 .modal-actions-right{ display:flex; gap:8px; }
 
 /* ---------- Confirm dialog ---------- */
@@ -923,10 +989,29 @@ body{
   border-bottom:1px solid var(--paper-line);
   vertical-align:middle;
 }
-.todo-num{ width:32px; }
+.todo-num{ width:32px; position:relative; }
+.notif-section .todo-table .todo-num{ text-align:center; }
+.todo-num-label{ transition:opacity .15s; }
+.todo-add-btn{
+  position:absolute;
+  top:50%; left:50%;
+  transform:translate(-50%,-50%);
+  width:22px; height:22px;
+  background:none; border:none;
+  color:var(--ink-faint);
+  cursor:pointer;
+  font-size:14px; line-height:1;
+  padding:0;
+  opacity:0;
+  transition:opacity .15s;
+}
+.todo-table tbody tr:hover .todo-num-label{ opacity:0; }
+.todo-table tbody tr:hover .todo-add-btn{ opacity:1; }
+.todo-add-btn:hover{ color:var(--purple); }
 .todo-due{ width:90px; }
 .todo-status{ width:40px; text-align:center !important; }
 .todo-del{ width:28px; }
+.todo-act{ width:60px; text-align:center !important; }
 .todo-aksi{ width:40px; text-align:center !important; padding-left:12px !important; }
 .todo-table tbody tr:hover{ background:var(--paper); }
 .todo-text{
@@ -952,6 +1037,18 @@ body{
 }
 .todo-table tbody tr:hover .todo-del-btn{ opacity:1; }
 .todo-del-btn:hover{ color:var(--status-risk); }
+.todo-dup-btn{
+  background:none; border:none;
+  color:var(--ink-faint);
+  cursor:pointer;
+  font-size:16px;
+  line-height:1;
+  padding:2px;
+  opacity:0;
+  transition:opacity .15s;
+}
+.todo-table tbody tr:hover .todo-dup-btn{ opacity:1; }
+.todo-dup-btn:hover{ color:var(--purple); }
 .todo-copy-btn{
   background:none; border:none;
   color:var(--ink-faint);
@@ -967,6 +1064,53 @@ body{
 .overdue{ color:var(--status-risk); font-weight:600; }
 .notif-empty{ padding:16px 4px; color:var(--ink-faint); font-size:12px; }
 
+.notif-row-in-daily {
+  background: rgba(40, 167, 69, 0.06) !important;
+}
+.notif-row-in-daily:hover {
+  background: rgba(40, 167, 69, 0.1) !important;
+}
+.daily-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: default;
+}
+.daily-badge i {
+  color: #28a745;
+  font-size: 14px;
+}
+.daily-badge:hover {
+  background: rgba(40, 167, 69, 0.1);
+}
+
+.notif-section{ margin-bottom:20px; }
+.notif-section:last-child{ margin-bottom:0; }
+.notif-section-title{
+  font-size:12px;
+  font-weight:600;
+  color:var(--ink-soft);
+  margin-bottom:8px;
+  padding-bottom:4px;
+  border-bottom:1px solid var(--paper-line);
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.notif-section-title i{ color:var(--purple); }
+.notif-count-badge{
+  background:var(--purple);
+  color:#fff;
+  font-size:10px;
+  padding:2px 6px;
+  border-radius:10px;
+  font-family:'IBM Plex Mono', monospace;
+}
+.notif-section-title .bi-exclamation-triangle{ color:var(--status-risk); }
+
 /* ---------- Evidence Panel ---------- */
 .overlay-left{
   justify-content:flex-start;
@@ -976,6 +1120,28 @@ body{
 }
 .overlay.open .evidence-modal{
   transform:translateX(0);
+}
+
+/* ---------- Bottom Sheet Panel (Daily Task) ---------- */
+.overlay-bottom{
+  justify-content:center;
+  align-items:flex-end;
+}
+.bottom-modal{
+  width:100%;
+  max-width:100vw;
+  height:auto;
+  max-height:70vh;
+  box-shadow:0 -4px 24px rgba(15,30,50,.25);
+  border-radius:16px 16px 0 0;
+  transform:translateY(100%);
+  transition:transform .25s ease;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+.overlay-bottom.open .bottom-modal{
+  transform:translateY(0);
 }
 /* Evidence type toggle */
 .evidence-type-toggle{
@@ -1713,6 +1879,104 @@ body{
   color:#fff;
 }
 
+/* ---------- Daily History Button (Legend) ---------- */
+.daily-history-btn{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  font-family:'IBM Plex Mono', monospace;
+  font-size:11.5px;
+  font-weight:600;
+  padding:5px 12px;
+  border-radius:7px;
+  border:1px solid #2563EB;
+  background:#2563EB;
+  color:#fff;
+  cursor:pointer;
+  transition:all .15s;
+  white-space:nowrap;
+}
+.daily-history-btn:hover{
+  background:#1D4ED8;
+  border-color:#1D4ED8;
+  color:#fff;
+}
+
+/* ---------- Daily History Modal ---------- */
+.daily-history-modal{ width:min(590px, 94vw); }
+.daily-history-list{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  max-height:min(52vh, 420px);
+  overflow-y:auto;
+  margin-top:14px;
+}
+.daily-history-empty{
+  padding:18px 6px;
+  text-align:center;
+  color:var(--ink-faint);
+  font-size:12px;
+}
+.daily-history-day{
+  border:1px solid var(--paper-line);
+  border-radius:7px;
+  background:var(--surface);
+}
+.daily-history-day-head{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:9px 11px;
+  cursor:pointer;
+  font-family:'IBM Plex Mono', monospace;
+  font-size:11.5px;
+  font-weight:600;
+  color:var(--ink);
+  user-select:none;
+}
+.daily-history-day-head:hover{ background:rgba(37,99,235,0.05); }
+.daily-history-chevron{
+  font-size:11px;
+  color:var(--ink-faint);
+  transition:transform .15s;
+}
+.daily-history-day.expanded .daily-history-chevron{ transform:rotate(90deg); color:#2563EB; }
+.daily-history-cal{ color:#2563EB; }
+.daily-history-date{ flex:1; min-width:0; }
+.daily-history-day-summary{
+  font-size:10.5px;
+  font-weight:600;
+  background:rgba(37,99,235,0.1);
+  color:#2563EB;
+  padding:2px 7px;
+  border-radius:999px;
+}
+.daily-history-items{
+  display:none;
+  flex-direction:column;
+  gap:4px;
+  padding:0 11px 10px;
+}
+.daily-history-day.expanded .daily-history-items{ display:flex; }
+.daily-history-item{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  padding:6px 9px;
+  border:1px solid var(--paper-line);
+  border-radius:6px;
+  background:rgba(139,156,179,0.05);
+  font-size:12px;
+}
+.daily-history-item-name{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
 /* ---------- Holiday Column ---------- */
 .holiday-col{
   background:rgba(139,156,179,0.06);
@@ -1799,4 +2063,211 @@ body{
   color:var(--ink-soft);
   border:1px dashed var(--paper-line-strong);
   border-radius:7px;
+}
+
+/* ---------- Daily Task Panel ---------- */
+.daily-task-grid{
+  display:grid;
+  grid-template-columns:1fr 320px;
+  gap:16px;
+  flex:1;
+  min-height:0;
+}
+.daily-task-left{
+  min-width:0;
+  min-height:0;
+  height:100%;
+  display:flex;
+  flex-direction:column;
+}
+.daily-task-table-wrapper{
+  overflow:auto;
+  min-height:0;
+  flex:1;
+}
+.daily-task-table thead th{
+  position:sticky;
+  top:0;
+  background:var(--surface);
+  z-index:1;
+}
+.daily-task-table{
+  table-layout:fixed;
+}
+.daily-task-table td,
+.daily-task-table th{
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.daily-task-table .todo-act{
+  overflow:visible;
+  white-space:normal;
+}
+.daily-task-table .todo-num{ width:40px; }
+.daily-task-table .todo-status{ width:110px; }
+.daily-task-table .todo-act{ width:180px; }
+
+/* Status badges */
+.status-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  padding:3px 8px;
+  border-radius:12px;
+  font-size:11px;
+  font-weight:600;
+  font-family:'IBM Plex Mono', monospace;
+  text-transform:capitalize;
+}
+.status-badge.hold{ background:rgba(124,58,237,0.12); color:var(--purple); }
+.status-badge.in_progress{ background:rgba(47,107,163,0.12); color:var(--status-progress); }
+.status-badge.done{ background:rgba(63,143,99,0.12); color:var(--status-done); }
+.status-badge.stopped{ background:rgba(181,72,47,0.12); color:var(--status-risk); }
+
+/* Take out button */
+.takeout-btn{
+  background:none; border:none;
+  color:var(--ink-faint);
+  cursor:pointer;
+  font-size:16px;
+  line-height:1;
+  padding:4px;
+  border-radius:4px;
+  transition:all .15s;
+}
+.takeout-btn:hover{ background:rgba(181,72,47,0.1); color:var(--status-risk); }
+
+/* Status Action Buttons */
+.status-actions{
+  display:flex;
+  gap:4px;
+  justify-content:center;
+  flex-wrap:wrap;
+}
+.status-action-btn{
+  background:none; border:none;
+  cursor:pointer;
+  padding:4px 8px;
+  border-radius:4px;
+  font-size:16px;
+  color:var(--ink-faint);
+  transition:all .15s;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.status-action-btn:hover{
+  background:var(--paper);
+  color:var(--ink);
+}
+.status-action-btn.active{
+  color:var(--ink);
+  background:var(--gold-soft);
+}
+.status-action-btn.hold{ color:var(--purple); }
+.status-action-btn.hold.active{ background:rgba(124,58,237,0.12); color:var(--purple); }
+.status-action-btn.in_progress{ color:var(--status-progress); }
+.status-action-btn.in_progress.active{ background:rgba(47,107,163,0.12); color:var(--status-progress); }
+.status-action-btn.done{ color:var(--status-done); }
+.status-action-btn.done.active{ background:rgba(63,143,99,0.12); color:var(--status-done); }
+.status-action-btn.start{ color:var(--status-done); }
+.status-action-btn.start:hover{ background:rgba(63,143,99,0.12); color:var(--status-done); }
+
+/* Hold/Start Toggle Button */
+.status-action-btn.hold-toggle{ color:var(--purple); }
+.status-action-btn.hold-toggle.active{ background:rgba(124,58,237,0.12); color:var(--purple); }
+.status-action-btn.hold-toggle:hover{ background:rgba(124,58,237,0.1); }
+
+/* Stop Button */
+.status-action-btn.stop{ color:var(--status-risk); }
+.status-action-btn.stop:hover{ background:rgba(181,72,47,0.1); color:var(--status-risk); }
+
+/* Right side: Chart */
+.daily-task-right{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:12px;
+}
+.chart-title{
+  font-family:'Space Grotesk', sans-serif;
+  font-size:16px;
+  font-weight:600;
+  color:var(--ink);
+  margin:0;
+  text-align:center;
+}
+.chart-container{
+  position:relative;
+  width:100%;
+  max-width:300px;
+}
+#daily-task-chart{
+  display:block;
+  margin:0 auto;
+}
+.chart-legend{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  margin-top:8px;
+  font-size:12px;
+  font-family:'IBM Plex Mono', monospace;
+}
+.chart-legend-item{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.chart-legend-color{
+  width:12px;
+  height:12px;
+  border-radius:3px;
+  flex-shrink:0;
+}
+.chart-legend-label{
+  color:var(--ink);
+}
+.chart-legend-value{
+  margin-left:auto;
+  color:var(--ink-soft);
+  font-weight:600;
+}
+
+/* Empty state for chart */
+.chart-empty{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  height:280px;
+  color:var(--ink-faint);
+  text-align:center;
+  padding:20px;
+}
+.chart-empty i{
+  font-size:48px;
+  margin-bottom:12px;
+  opacity:0.5;
+}
+
+/* Responsive */
+@media (max-width: 768px){
+  .daily-task-grid{
+    grid-template-columns:1fr;
+    overflow-y:auto;
+  }
+  .daily-task-left{
+    height:auto;
+  }
+  .daily-task-table-wrapper{
+    max-height:45vh;
+  }
+  .daily-task-right{
+    width:100%;
+  }
+  .chart-container{
+    max-width:100%;
+  }
 }
