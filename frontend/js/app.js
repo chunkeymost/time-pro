@@ -314,7 +314,7 @@
         `Add Holiday` +
       `</button>` +
       `<button type="button" class="daily-history-btn" id="daily-history-btn" title="History Daily Task">` +
-        `<i class="bi bi-archive"></i> History Daily` +
+        `History Daily` +
       `</button>`;
   }
 
