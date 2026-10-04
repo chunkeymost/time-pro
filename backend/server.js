@@ -151,6 +151,17 @@ app.delete('/api/tasks/:id', async (req, res) => {
   }
 });
 
+app.put('/api/tasks/:id/hold', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const result = await storage.toggleHold(id);
+    if (!result) return res.status(404).json({ error: 'Task not found' });
+    res.json({ held: result.held, heldAt: result.heldAt });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ---------- Backup ---------- */
 
 function copyIfExist(src, dest) {
@@ -537,6 +548,62 @@ app.delete('/api/holidays/:id', async (req, res) => {
   }
 });
 
+/* ---------- Daily Tasks ---------- */
+
+app.get('/api/daily-tasks', async (req, res) => {
+  try {
+    if (typeof storage.ensureDailyRollover === 'function') storage.ensureDailyRollover();
+    const dailyTasks = await storage.getDailyTasks();
+    res.json({ dailyTasks });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/daily-tasks/history', async (req, res) => {
+  try {
+    const history = typeof storage.getDailyTaskHistory === 'function'
+      ? await storage.getDailyTaskHistory()
+      : [];
+    res.json({ history });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/daily-tasks', async (req, res) => {
+  try {
+    const { taskId, taskName, status, date } = req.body;
+    if (!taskName) return res.status(400).json({ error: 'taskName is required' });
+    const dt = await storage.createDailyTask({ taskId, taskName, status: status || 'in_progress', date });
+    res.status(201).json({ dailyTask: dt });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/daily-tasks/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const dt = await storage.updateDailyTask(id, req.body);
+    if (!dt) return res.status(404).json({ error: 'Daily task not found' });
+    res.json({ dailyTask: dt });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/daily-tasks/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const ok = await storage.deleteDailyTask(id);
+    if (!ok) return res.status(404).json({ error: 'Daily task not found' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ---------- Metadata ---------- */
 
 app.get('/api/metadata', async (req, res) => {
@@ -572,4 +639,12 @@ app.post('/api/sync/commit', (req, res) => {
 const PORT = config.port;
 app.listen(PORT, () => {
   console.log(`Time Pro API running at http://localhost:${PORT}`);
+
+  // Daily task day-rollover: snapshot closing day into history, reset active list
+  if (typeof storage.ensureDailyRollover === 'function') {
+    try { storage.ensureDailyRollover(); } catch (err) { console.error('Daily rollover (start) failed:', err.message); }
+    setInterval(() => {
+      try { storage.ensureDailyRollover(); } catch (err) { console.error('Daily rollover (interval) failed:', err.message); }
+    }, 60000);
+  }
 });

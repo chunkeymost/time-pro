@@ -121,6 +121,9 @@ class JsonStorage {
       assignee: taskData.assignee || '',
       progress: typeof taskData.progress === 'number' ? taskData.progress : 0,
       todos: [],
+      evidences: [],
+      held: false,
+      heldAt: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -153,6 +156,26 @@ class JsonStorage {
     data.tasks.splice(idx, 1);
     this._save(data);
     return true;
+  }
+
+  toggleHold(taskId) {
+    const data = this._load();
+    const task = data.tasks.find(t => t.id === taskId);
+    if (!task) return null;
+    
+    const now = new Date().toISOString();
+    const wasHeld = task.held === true;
+    task.held = !wasHeld;
+    task.heldAt = task.held ? now : null;
+    task.updatedAt = now;
+    
+    const action = task.held 
+      ? 'Tugas di-hold (dihentikan sementara)' 
+      : 'Tugas dibuka kembali (dilanjutkan)';
+    this.addTaskLog(taskId, action);
+    
+    this._save(data);
+    return { held: task.held, heldAt: task.heldAt };
   }
 
   addTodo(taskId, todoData) {
@@ -339,6 +362,145 @@ class JsonStorage {
     if (updates.title !== undefined) data.metadata.title = updates.title;
     this._save(data);
     return data.metadata;
+  }
+
+  /* ---------- Daily Tasks ---------- */
+  _getDailyTasksPath() {
+    return path.join(path.dirname(this.filePath), 'daily-tasks.json');
+  }
+
+  _loadDailyTasks() {
+    try {
+      const p = this._getDailyTasksPath();
+      if (!fs.existsSync(p)) {
+        const seed = { dailyTasks: [], nextId: 1 };
+        fs.writeFileSync(p, JSON.stringify(seed, null, 2), 'utf-8');
+        return seed;
+      }
+      const raw = fs.readFileSync(p, 'utf-8');
+      return JSON.parse(raw);
+    } catch (err) {
+      console.error('Failed to load daily tasks:', err.message);
+      const seed = { dailyTasks: [], nextId: 1 };
+      fs.writeFileSync(this._getDailyTasksPath(), JSON.stringify(seed, null, 2), 'utf-8');
+      return seed;
+    }
+  }
+
+  _saveDailyTasks(data) {
+    fs.writeFileSync(this._getDailyTasksPath(), JSON.stringify(data, null, 2), 'utf-8');
+  }
+
+  getDailyTasks() {
+    const data = this._loadDailyTasks();
+    return data.dailyTasks || [];
+  }
+
+  createDailyTask(dtData) {
+    const data = this._loadDailyTasks();
+    const dt = {
+      id: data.nextId++,
+      taskId: dtData.taskId || null,
+      taskName: dtData.taskName || '',
+      status: dtData.status || 'in_progress',
+      date: dtData.date || new Date().toISOString().split('T')[0],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    data.dailyTasks.push(dt);
+    this._saveDailyTasks(data);
+    return dt;
+  }
+
+  updateDailyTask(id, dtData) {
+    const data = this._loadDailyTasks();
+    const idx = data.dailyTasks.findIndex(t => t.id === id);
+    if (idx === -1) return null;
+    const dt = data.dailyTasks[idx];
+    if (dtData.taskId !== undefined) dt.taskId = dtData.taskId;
+    if (dtData.taskName !== undefined) dt.taskName = dtData.taskName;
+    if (dtData.status !== undefined) dt.status = dtData.status;
+    if (dtData.date !== undefined) dt.date = dtData.date;
+    dt.updatedAt = new Date().toISOString();
+    data.dailyTasks[idx] = dt;
+    this._saveDailyTasks(data);
+    return dt;
+  }
+
+  deleteDailyTask(id) {
+    const data = this._loadDailyTasks();
+    const idx = data.dailyTasks.findIndex(t => t.id === id);
+    if (idx === -1) return false;
+    data.dailyTasks.splice(idx, 1);
+    this._saveDailyTasks(data);
+    return true;
+  }
+
+  _getDailyHistoryPath() {
+    return path.join(path.dirname(this.filePath), 'daily-tasks-history.json');
+  }
+
+  _loadDailyHistory() {
+    try {
+      const p = this._getDailyHistoryPath();
+      if (!fs.existsSync(p)) return [];
+      const raw = fs.readFileSync(p, 'utf-8');
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+      console.error('Failed to load daily task history:', err.message);
+      return [];
+    }
+  }
+
+  _saveDailyHistory(history) {
+    fs.writeFileSync(this._getDailyHistoryPath(), JSON.stringify(history, null, 2), 'utf-8');
+  }
+
+  _localDateKey(d = new Date()) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  ensureDailyRollover() {
+    const data = this._loadDailyTasks();
+    const todayKey = this._localDateKey();
+
+    // First run: just record today, nothing to close yet
+    if (!data.lastSnapshotDate) {
+      data.lastSnapshotDate = todayKey;
+      this._saveDailyTasks(data);
+      return null;
+    }
+
+    // Same day: nothing to do
+    if (data.lastSnapshotDate === todayKey) return null;
+
+    // Day changed: snapshot the closing day's list (only if it has rows)
+    let snapshot = null;
+    const rows = data.dailyTasks || [];
+    if (rows.length > 0) {
+      snapshot = {
+        date: data.lastSnapshotDate,
+        snapshotAt: new Date().toISOString(),
+        dailyTasks: rows,
+      };
+      const history = this._loadDailyHistory();
+      history.unshift(snapshot);
+      this._saveDailyHistory(history);
+    }
+
+    // Reset active list for the new day (nextId is preserved)
+    data.dailyTasks = [];
+    data.lastSnapshotDate = todayKey;
+    this._saveDailyTasks(data);
+    return snapshot;
+  }
+
+  getDailyTaskHistory() {
+    return this._loadDailyHistory();
   }
 }
 
