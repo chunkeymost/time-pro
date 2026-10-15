@@ -152,6 +152,11 @@
     dailyHistoryOverlay: document.getElementById('daily-history-overlay'),
     dailyHistoryList: document.getElementById('daily-history-list'),
     dailyHistoryCloseBtn: document.getElementById('daily-history-close-btn'),
+    navSidebar: document.getElementById('nav-sidebar'),
+    navMenu: document.getElementById('nav-menu'),
+    navToggle: document.getElementById('nav-toggle'),
+    navOverlay: document.getElementById('nav-sidebar-overlay'),
+    navItems: document.querySelectorAll('.nav-item'),
   };
 
   /* ---------------- API helper ---------------- */
@@ -681,6 +686,80 @@
   document.getElementById('today-btn').addEventListener('click', ()=>{
     renderAll(true);
   });
+
+  /* ---------------- Navigation ---------------- */
+  let currentView = 'dashboard';
+
+  function initNavigation(){
+    // Nav item clicks
+    els.navItems.forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        const view = item.dataset.view;
+        if(view && view !== currentView){
+          setActiveView(view);
+        }
+        // Close mobile nav on click
+        closeMobileNav();
+      });
+    });
+
+    // Mobile nav toggle
+    if(els.navToggle){
+      els.navToggle.addEventListener('click', toggleMobileNav);
+    }
+    if(els.navOverlay){
+      els.navOverlay.addEventListener('click', closeMobileNav);
+    }
+
+    // Show/hide nav toggle based on screen size
+    updateNavToggleVisibility();
+    window.addEventListener('resize', updateNavToggleVisibility);
+  }
+
+  function setActiveView(view){
+    currentView = view;
+    els.navItems.forEach(item => {
+      item.classList.toggle('active', item.dataset.view === view);
+    });
+    
+    // For now, only dashboard is implemented
+    if(view !== 'dashboard'){
+      showToast(`${getViewLabel(view)} - Coming soon`, 'info');
+    }
+  }
+
+  function getViewLabel(view){
+    const labels = {
+      'dashboard': 'Dashboard',
+      'projects': 'Proyek Management',
+      'uat': 'UAT Workspace'
+    };
+    return labels[view] || view;
+  }
+
+  function toggleMobileNav(){
+    els.navSidebar.classList.toggle('open');
+    els.navOverlay.classList.toggle('open');
+  }
+
+  function closeMobileNav(){
+    els.navSidebar.classList.remove('open');
+    els.navOverlay.classList.remove('open');
+  }
+
+  function updateNavToggleVisibility(){
+    const isMobile = window.innerWidth <= 480;
+    if(els.navToggle){
+      els.navToggle.style.display = isMobile ? 'inline-flex' : 'none';
+    }
+    if(!isMobile){
+      closeMobileNav();
+    }
+  }
+
+  // Initialize navigation
+  initNavigation();
 
   /* ---------------- Toggle finished tasks ---------------- */
   document.getElementById('legend').addEventListener('change', (e)=>{
@@ -2027,6 +2106,7 @@
     if(e.key==='Escape' && els.evidenceOverlay.classList.contains('open')) closeEvidencePanel();
     if(e.key==='Escape' && els.dailyTaskOverlay.classList.contains('open')) closeDailyTaskPanel();
     if(e.key==='Escape' && els.imgPreviewOverlay.classList.contains('open')) closeImagePreview();
+    if(e.key==='Escape' && els.navSidebar.classList.contains('open')) closeMobileNav();
   });
 
   /* ---------------- Inline Title Edit ---------------- */
