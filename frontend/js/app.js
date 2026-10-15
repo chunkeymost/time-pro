@@ -178,6 +178,15 @@
     },
   };
 
+  async function saveTaskProgress(taskId, progress) {
+    try {
+      await api.put('/api/tasks/' + taskId, { progress });
+    } catch (e) {
+      console.error('Save task progress failed:', e);
+      showToast('Gagal menyimpan progress ke server', 'error');
+    }
+  }
+
   async function loadTasks(){
     try {
       const data = await api.get('/api/tasks');
@@ -1088,20 +1097,22 @@
           <button class="todo-del-btn" data-todo-id="${todo.id}">&times;</button>
         </td>
       `;
-      tr.querySelector('.todo-cb').addEventListener('change', function(){
+      tr.querySelector('.todo-cb').addEventListener('change', async function(){
         todo.done = this.checked;
-        api.put('/api/tasks/'+task.id+'/todos/'+todo.id, { done: todo.done }).catch(e => console.error('Save todo cb failed:', e));
+        await api.put('/api/tasks/'+task.id+'/todos/'+todo.id, { done: todo.done }).catch(e => console.error('Save todo cb failed:', e));
         updateProgressFromTodos(task);
+        await saveTaskProgress(task.id, task.progress);
         renderTodos(task);
         updateBellDot();
         renderAll(false);
         if(editingId) loadTaskLog(editingId);
       });
 
-      tr.querySelector('.todo-del-btn').addEventListener('click', function(){
-        api.del('/api/tasks/'+task.id+'/todos/'+todo.id).catch(e => console.error('Delete todo failed:', e));
+      tr.querySelector('.todo-del-btn').addEventListener('click', async function(){
+        await api.del('/api/tasks/'+task.id+'/todos/'+todo.id).catch(e => console.error('Delete todo failed:', e));
         task.todos = task.todos.filter(t=>t.id!==todo.id);
         updateProgressFromTodos(task);
+        await saveTaskProgress(task.id, task.progress);
         renderTodos(task);
         updateProgressSlider(task);
         updateBellDot();
@@ -1117,6 +1128,7 @@
         const created = newTodo.todo;
         task.todos.push({ ...created, due: created.due ? parseDate(created.due) : null, done: false });
         updateProgressFromTodos(task);
+        await saveTaskProgress(task.id, task.progress);
         renderTodos(task);
         updateBellDot();
         renderAll(false);
@@ -1265,6 +1277,7 @@
           const t = task.todos.find(td => td.id === todo.id);
           if(t) t.done = todo.done;
           updateProgressFromTodos(task);
+          await saveTaskProgress(task.id, task.progress);
           await api.put('/api/tasks/'+todo.taskId+'/todos/'+todo.id, { done: todo.done }).catch(e => console.error('Save notif todo failed:', e));
         }
         openNotifPanel();
@@ -1468,6 +1481,7 @@
       return;
     }
     updateProgressFromTodos(task);
+    await saveTaskProgress(task.id, task.progress);
     updateBellDot();
     if(els.notifOverlay.classList.contains('open')) openNotifPanel();
     if(editingId === task.id){
@@ -1854,7 +1868,7 @@
     if(editingTodoId){
       const todo = t.todos.find(x=>x.id===editingTodoId);
       if(todo){ todo.text = text; todo.due = dueStr ? parseDate(dueStr) : null; }
-      api.put('/api/tasks/'+t.id+'/todos/'+editingTodoId, { text, due: dueStr }).catch(e => console.error('Save todo failed:', e));
+      await api.put('/api/tasks/'+t.id+'/todos/'+editingTodoId, { text, due: dueStr }).catch(e => console.error('Save todo failed:', e));
       cancelTodoEdit();
     } else {
       try {
@@ -1867,6 +1881,7 @@
     els.todoInput.focus();
     renderTodos(t);
     updateProgressFromTodos(t);
+    await saveTaskProgress(t.id, t.progress);
     updateProgressSlider(t);
     updateBellDot();
     renderAll(false);
@@ -1906,7 +1921,13 @@
       if(!t) return;
       t.name = name; t.start = start; t.end = end;
       t.cat = cat; t.assignee = assignee; t.progress = progress;
-      api.put('/api/tasks/'+editingId, { name, start:fmt(start), end:fmt(end), cat, assignee, progress }).catch(e => console.error('Save task failed:', e));
+      try {
+        await api.put('/api/tasks/'+editingId, { name, start:fmt(start), end:fmt(end), cat, assignee, progress });
+      } catch(e){ 
+        console.error('Save task failed:', e); 
+        showToast('Gagal menyimpan tugas: ' + e.message, 'error');
+        return;
+      }
     } else {
       try {
         const result = await api.post('/api/tasks', { name, start:fmt(start), end:fmt(end), cat, assignee, progress });
