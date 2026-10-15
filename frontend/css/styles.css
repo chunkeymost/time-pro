@@ -104,7 +104,7 @@ body{
   color:var(--ink);
   letter-spacing:-0.02em;
   white-space:nowrap;
-  padding-left: 13px;
+  margin-left: -3px;
 }
 .nav-title-accent{
   color:var(--gold);
