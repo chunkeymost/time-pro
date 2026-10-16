@@ -83,11 +83,12 @@ body{
   z-index:20;
 }
 .nav-brand{
-  height:72px;
   display:flex;
-  align-items:center;
-  gap:10px;
-  padding:0 16px;
+  flex-direction:column;
+  align-items:flex-start;
+  justify-content:center;
+  gap:4px;
+  padding:16px;
   border-bottom:1px solid var(--paper-line-strong);
   flex-shrink:0;
 }
@@ -108,6 +109,13 @@ body{
 }
 .nav-title-accent{
   color:var(--gold);
+}
+.nav-subtitle{
+  font-family:'IBM Plex Mono', monospace;
+  font-size:11px;
+  color:var(--ink-soft);
+  letter-spacing:0.05em;
+  white-space:nowrap;
 }
 .nav-menu{
   flex:1;
@@ -1256,31 +1264,36 @@ body{
 
 /* Drag handle for resizing */
 .daily-task-drag-handle{
-  height:24px;
+  width: 36px;
+  height: 36px;
   display:flex;
   align-items:center;
   justify-content:center;
   background:var(--paper);
-  border-bottom:1px solid var(--paper-line-strong);
+  border:1px solid var(--paper-line-strong);
+  border-radius: 20%;
   cursor:ns-resize;
   user-select:none;
   -webkit-user-select:none;
   touch-action:none;
   flex-shrink:0;
+  margin: 0 auto;
+  margin-top: -10px;
+  margin-bottom: 16px;
 }
 .daily-task-drag-handle:hover{
   background:var(--paper-line);
+  border-color: var(--ink-soft);
 }
-.drag-handle-bar{
-  width:40px;
-  height:4px;
-  background:var(--ink-faint);
-  border-radius:2px;
-  transition:background .15s;
+.daily-task-drag-handle .nav-icon {
+  font-size: 20px;
+  color: var(--ink-faint);
+  transition: color .15s, transform .15s;
 }
-.daily-task-drag-handle:hover .drag-handle-bar,
-.daily-task-drag-handle.dragging .drag-handle-bar{
-  background:var(--ink);
+.daily-task-drag-handle:hover .nav-icon,
+.daily-task-drag-handle.dragging .nav-icon{
+  color: var(--ink);
+  transform: scale(1.1);
 }
 .bottom-modal.resizing{
   transition:none;
