@@ -225,7 +225,7 @@
       alert('Gagal memuat data. Pastikan server API berjalan (node server.js).');
     }
     renderLegend();
-    renderAll(true);
+    renderViewContent(currentView);
     updateBellDot();
   }
 
@@ -691,7 +691,7 @@
   });
 
   /* ---------------- Navigation ---------------- */
-  let currentView = 'projects';
+  let currentView = 'dashboard';
 
   function initNavigation(){
     // Nav item clicks
