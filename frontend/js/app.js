@@ -210,7 +210,7 @@
       nextId = data.nextId;
       nextTodoId = data.nextTodoId;
       lastUpdated = data.metadata?.updatedAt || null;
-      if (data.metadata?.title) els.title.textContent = data.metadata.title;
+      if (data.metadata?.title && els.title) els.title.textContent = data.metadata.title;
       try {
         const holRes = await api.get('/api/holidays');
         holidays = (holRes.holidays || []).slice().sort((a,b) => a.start.localeCompare(b.start));
@@ -610,6 +610,7 @@
 
   /* ---------------- Project range label ---------------- */
   function renderProjectRange(){
+    if(!els.range) return;
     if(tasks.length===0){ els.range.textContent='Belum ada tugas'; return; }
     let min=tasks[0].start, max=tasks[0].end;
     tasks.forEach(t=>{ if(t.start<min) min=t.start; if(t.end>max) max=t.end; });
@@ -797,6 +798,11 @@
       case 'settings':
         showToast('Settings feature coming soon', 'info');
         break;
+      case 'theme': {
+        const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        setTheme(next);
+        break;
+      }
       case 'logout':
         handleLogout();
         break;
@@ -820,7 +826,7 @@
     });
     
     // Update header data attribute for CSS targeting (dashboard/uat cleanup)
-    const header = document.querySelector('.app-header');
+    const header = document.querySelector('.app-navbar');
     if (header) {
       header.setAttribute('data-view', view);
     }
@@ -2277,7 +2283,7 @@
     input.addEventListener('blur', commit);
   }
 
-  document.querySelector('.title-row').addEventListener('click', function(e){
+  document.querySelector('.title-row')?.addEventListener('click', function(e){
     if(e.target.id === 'project-title' || e.target.id === 'title-edit-icon'){
       enableTitleEdit();
     }
@@ -2299,8 +2305,11 @@
   function setTheme(theme){
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
-    const btn = document.getElementById('theme-toggle');
-    if(btn) btn.innerHTML = theme === 'dark' ? '<i class="bi bi-sun-fill"></i>' : '<i class="bi bi-moon-fill"></i>';
+    const dark = theme === 'dark';
+    const icon = document.getElementById('theme-icon');
+    const label = document.getElementById('theme-label');
+    if(icon) icon.className = dark ? 'bi bi-sun' : 'bi bi-moon';
+    if(label) label.textContent = dark ? 'Mode Terang' : 'Mode Gelap';
   }
 
   function initTheme(){
@@ -2311,11 +2320,6 @@
   }
 
   setFavicon();
-
-  document.getElementById('theme-toggle').addEventListener('click', function(){
-    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    setTheme(next);
-  });
 
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e){
     if(!localStorage.getItem('theme')) setTheme(e.matches ? 'dark' : 'light');
