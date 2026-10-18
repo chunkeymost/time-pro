@@ -691,7 +691,7 @@
   });
 
   /* ---------------- Navigation ---------------- */
-  let currentView = 'dashboard';
+  let currentView = 'projects';
 
   function initNavigation(){
     // Nav item clicks
@@ -821,6 +821,7 @@
     const legend = document.getElementById('legend');
     const scrollArea = document.querySelector('.scroll-area');
     
+    // Only 'projects' view is supported now
     if(view === 'projects'){
       // Show project management content
       if(overviewCards) overviewCards.style.display = '';
@@ -833,59 +834,7 @@
       
       // Render the project management UI
       renderAll(true);
-    } else {
-      // Hide project management content
-      if(overviewCards) overviewCards.style.display = 'none';
-      if(legend) legend.style.display = 'none';
-      if(scrollArea) scrollArea.style.display = 'none';
-      
-      // Remove existing coming soon if any
-      const existingSoon = document.getElementById('coming-soon-container');
-      if(existingSoon) existingSoon.remove();
-      
-      // Create and show coming soon message
-      const comingSoonContainer = document.createElement('div');
-      comingSoonContainer.id = 'coming-soon-container';
-      comingSoonContainer.style.cssText = `
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        height: calc(100vh - 140px);
-        min-height: 400px;
-        text-align: center;
-        color: var(--ink-faint);
-      `;
-      
-      const viewLabels = {
-        'dashboard': 'Dashboard',
-        'uat': 'UAT Workspace'
-      };
-      
-      const label = viewLabels[view] || view;
-      comingSoonContainer.innerHTML = `
-        <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;">
-          <i class="bi bi-hourglass-split"></i>
-        </div>
-        <h2 style="font-size: 28px; font-weight: 600; color: var(--ink); margin-bottom: 8px;">
-          ${label}
-        </h2>
-        <p style="font-size: 16px; max-width: 400px;">
-          Fitur ini akan segera hadir. Tetap pantau perkembangannya!
-        </p>
-      `;
-      
-      mainContent.appendChild(comingSoonContainer);
     }
-  }
-
-  function getViewLabel(view){
-    const labels = {
-      'dashboard': 'Dashboard',
-      'projects': 'Proyek Management',
-      'uat': 'UAT Workspace'
-    };
-    return labels[view] || view;
   }
 
   function toggleMobileNav(){
@@ -2540,8 +2489,9 @@
   });
 
   /* ---------------- Init ---------------- */
-  loadTasks();
-  loadDailyTasks();
+  (async () => {
+    await Promise.all([loadTasks(), loadDailyTasks()]);
+  })();
 
   // Update date labels when the day rolls over (checked every 30s)
   let lastDateKey = fmt(today());
