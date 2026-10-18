@@ -157,6 +157,9 @@
     navToggle: document.getElementById('nav-toggle'),
     navOverlay: document.getElementById('nav-sidebar-overlay'),
     navItems: document.querySelectorAll('.nav-item'),
+    profileDropdown: document.getElementById('profile-dropdown'),
+    profileTrigger: document.getElementById('profile-trigger'),
+    profileMenu: document.getElementById('profile-menu'),
   };
 
   /* ---------------- API helper ---------------- */
@@ -717,11 +720,94 @@
     window.addEventListener('resize', updateNavToggleVisibility);
   }
 
+  /* ---------------- Profile Dropdown ---------------- */
+  function initProfileDropdown(){
+    if(!els.profileTrigger || !els.profileMenu || !els.profileDropdown) return;
+    
+    els.profileTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleProfileDropdown();
+    });
+    
+    // Close on click outside
+    document.addEventListener('click', (e) => {
+      if(els.profileDropdown && !els.profileDropdown.contains(e.target)){
+        closeProfileDropdown();
+      }
+    });
+    
+    // Close on ESC key
+    document.addEventListener('keydown', (e) => {
+      if(e.key === 'Escape'){
+        closeProfileDropdown();
+      }
+    });
+    
+    // Handle menu item clicks
+    if(els.profileMenu){
+      els.profileMenu.addEventListener('click', (e) => {
+        const item = e.target.closest('.profile-menu-item[data-action]');
+        if(!item) return;
+        
+        const action = item.dataset.action;
+        handleProfileAction(action);
+        closeProfileDropdown();
+      });
+    }
+  }
+
+  function toggleProfileDropdown(){
+    const isOpen = els.profileDropdown.classList.toggle('open');
+    els.profileTrigger.setAttribute('aria-expanded', isOpen);
+    if(isOpen){
+      els.profileMenu.hidden = false;
+    }else{
+      els.profileMenu.hidden = true;
+    }
+  }
+
+  function closeProfileDropdown(){
+    if(!els.profileDropdown) return;
+    els.profileDropdown.classList.remove('open');
+    els.profileTrigger.setAttribute('aria-expanded', 'false');
+    els.profileMenu.hidden = true;
+  }
+
+  function handleProfileAction(action){
+    switch(action){
+      case 'profile':
+        showToast('Profile feature coming soon', 'info');
+        break;
+      case 'settings':
+        showToast('Settings feature coming soon', 'info');
+        break;
+      case 'logout':
+        handleLogout();
+        break;
+    }
+  }
+
+  function handleLogout(){
+    showConfirm('Yakin ingin keluar?', 'Ya, Logout', 'Batal', 'confirm-yes').then(confirmed => {
+      if(confirmed){
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.reload();
+      }
+    });
+  }
+
   function setActiveView(view){
     currentView = view;
     els.navItems.forEach(item => {
       item.classList.toggle('active', item.dataset.view === view);
     });
+    
+    // Update header data attribute for CSS targeting (dashboard/uat cleanup)
+    const header = document.querySelector('.app-header');
+    if (header) {
+      header.setAttribute('data-view', view);
+    }
     
     renderViewContent(view);
   }
@@ -824,6 +910,7 @@
 
   // Initialize navigation
   initNavigation();
+  initProfileDropdown();
 
   /* ---------------- Toggle finished tasks ---------------- */
   document.getElementById('legend').addEventListener('change', (e)=>{

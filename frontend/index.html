@@ -69,6 +69,26 @@
         </svg>
         <span class="bell-dot" id="bell-dot"></span>
       </button>
+      <div class="profile-dropdown" id="profile-dropdown">
+        <button class="btn btn-ghost theme-toggle" id="profile-trigger" aria-label="User menu" aria-expanded="false" aria-haspopup="true">
+          <i class="bi bi-person-circle"></i>
+        </button>
+        <div class="profile-menu" id="profile-menu" role="menu" hidden>
+          <button class="profile-menu-item" data-action="profile" role="menuitem">
+            <i class="bi bi-person"></i>
+            <span>Profile</span>
+          </button>
+          <button class="profile-menu-item" data-action="settings" role="menuitem">
+            <i class="bi bi-gear"></i>
+            <span>Settings</span>
+          </button>
+          <hr class="profile-menu-divider">
+          <button class="profile-menu-item profile-menu-danger" data-action="logout" role="menuitem">
+            <i class="bi bi-box-arrow-right"></i>
+            <span>Logout</span>
+          </button>
+        </div>
+      </div>
     </div>
   </header>
 

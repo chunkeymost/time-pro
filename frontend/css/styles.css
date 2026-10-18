@@ -390,10 +390,120 @@ body{
 }
 #hold-btn.btn-success:hover{ background:var(--purple-hover); border-color:var(--purple-hover); }
 
+/* ---------- Profile Dropdown ---------- */
+.profile-dropdown{
+  position:relative;
+  display:flex;
+  align-items:center;
+}
+.profile-menu{
+  position:absolute;
+  top:calc(100% + 8px);
+  right:0;
+  min-width:180px;
+  background:var(--surface);
+  border:1px solid var(--paper-line-strong);
+  border-radius:10px;
+  box-shadow:var(--shadow), 0 8px 24px rgba(15,30,50,.15);
+  padding:6px;
+  z-index:100;
+  opacity:0;
+  visibility:hidden;
+  transform:translateY(-8px);
+  transition:opacity .15s ease, transform .15s ease, visibility .15s ease;
+}
+.profile-dropdown.open .profile-menu{
+  opacity:1;
+  visibility:visible;
+  transform:translateY(0);
+}
+.profile-menu[hidden]{
+  display:none;
+}
+.profile-menu-item{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  width:100%;
+  padding:10px 12px;
+  border:none;
+  background:transparent;
+  border-radius:6px;
+  font-family:'Inter', sans-serif;
+  font-size:13.5px;
+  font-weight:500;
+  color:var(--ink);
+  cursor:pointer;
+  text-align:left;
+  transition:background .12s ease, color .12s ease;
+}
+.profile-menu-item:hover{
+  background:var(--paper);
+  color:var(--ink);
+}
+.profile-menu-item i{
+  font-size:16px;
+  width:20px;
+  text-align:center;
+  color:var(--ink-soft);
+  flex-shrink:0;
+}
+.profile-menu-item:hover i{
+  color:var(--ink);
+}
+.profile-menu-divider{
+  border:none;
+  border-top:1px solid var(--paper-line-strong);
+  margin:4px 0;
+}
+.profile-menu-danger{
+  color:var(--status-risk);
+}
+.profile-menu-danger i{
+  color:var(--status-risk);
+}
+.profile-menu-danger:hover{
+  background:rgba(181,72,47,0.08);
+  color:var(--status-risk);
+}
+.profile-menu-danger:hover i{
+  color:var(--status-risk);
+}
+
+/* Dashboard view - hide specific header actions */
+.app-header[data-view="dashboard"] #backup-btn,
+.app-header[data-view="dashboard"] #restore-btn,
+.app-header[data-view="dashboard"] #view-toggle,
+.app-header[data-view="dashboard"] #add-task-btn,
+.app-header[data-view="dashboard"] #today-btn,
+.app-header[data-view="dashboard"] #report-btn,
+.app-header[data-view="dashboard"] #bell-btn{
+  display:none;
+}
+
+/* UAT view - same cleanup as dashboard */
+.app-header[data-view="uat"] #backup-btn,
+.app-header[data-view="uat"] #restore-btn,
+.app-header[data-view="uat"] #view-toggle,
+.app-header[data-view="uat"] #add-task-btn,
+.app-header[data-view="uat"] #today-btn,
+.app-header[data-view="uat"] #report-btn,
+.app-header[data-view="uat"] #bell-btn{
+  display:none;
+}
+
 .theme-toggle{
   font-size:18px;
-  padding:8px 12px;
+  padding:10px 16px;
   line-height:1;
+}
+.theme-toggle i{
+  font-size:22px;
+  color:var(--ink-soft);
+  transition:color .15s;
+}
+.theme-toggle:hover i{
+  color:var(--ink);
 }
 
 [data-theme="dark"] .btn-primary{
@@ -2048,6 +2158,11 @@ body{
     padding-right:12px;
     margin-left:-12px;
     margin-right:-12px;
+  }
+  /* Profile dropdown mobile */
+  .profile-menu{
+    right:-8px;
+    min-width:160px;
   }
 }
 
