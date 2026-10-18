@@ -130,16 +130,15 @@ body{
 .nav-item{
   display:flex;
   align-items:center;
-  gap:10px;
+  gap:8px;
   padding:12px 14px;
-  border-radius:8px;
+  border-radius:5px;
   color:var(--ink-soft);
   text-decoration:none;
   font-family:'Inter', sans-serif;
-  font-size:13.5px;
+  font-size:14.5px;
   font-weight:500;
   transition:background .15s ease, color .15s ease, border-left .15s ease;
-  border-left:3px solid transparent;
 }
 .nav-item i{
   font-size:18px;
@@ -244,7 +243,8 @@ body{
   width:100%;
   min-width:200px;
 }
-#project-title{
+#project-title,
+#dashboard-title{
   font-family:'Space Grotesk', sans-serif;
   font-size:30px;
   font-weight:700;
@@ -460,25 +460,14 @@ body{
   color:var(--status-risk);
 }
 
-/* Dashboard view - hide specific header actions */
-.app-navbar[data-view="dashboard"] #backup-btn,
-.app-navbar[data-view="dashboard"] #restore-btn,
-.app-navbar[data-view="dashboard"] #view-toggle,
-.app-navbar[data-view="dashboard"] #add-task-btn,
-.app-navbar[data-view="dashboard"] #today-btn,
-.app-navbar[data-view="dashboard"] #report-btn,
-.app-navbar[data-view="dashboard"] #bell-btn{
+/* View visibility - controlled via #app-main[data-active-view] */
+#app-main[data-active-view="dashboard"] #page-header,
+#app-main[data-active-view="dashboard"] #overview-cards,
+#app-main[data-active-view="dashboard"] #legend,
+#app-main[data-active-view="dashboard"] .scroll-area{
   display:none;
 }
-
-/* UAT view - same cleanup as dashboard */
-.app-navbar[data-view="uat"] #backup-btn,
-.app-navbar[data-view="uat"] #restore-btn,
-.app-navbar[data-view="uat"] #view-toggle,
-.app-navbar[data-view="uat"] #add-task-btn,
-.app-navbar[data-view="uat"] #today-btn,
-.app-navbar[data-view="uat"] #report-btn,
-.app-navbar[data-view="uat"] #bell-btn{
+#app-main[data-active-view="projects"] #dashboard-header{
   display:none;
 }
 

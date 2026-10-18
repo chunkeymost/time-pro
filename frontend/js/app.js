@@ -262,6 +262,18 @@
 
   /* ---------------- Overview Cards ---------------- */
   function renderBreadcrumb(){
+    if(currentView === 'dashboard'){
+      els.breadcrumbCard.innerHTML = `
+        <span class="breadcrumb-item">
+          <i class="bi bi-house-door"></i>
+          <span>Beranda</span>
+        </span>
+        <span class="breadcrumb-sep"><i class="bi bi-chevron-right"></i></span>
+        <span class="breadcrumb-item active" aria-current="page">Dashboard</span>
+      `;
+      return;
+    }
+
     const title = els.title?.textContent?.trim() || 'Timeframe';
     els.breadcrumbCard.innerHTML = `
       <span class="breadcrumb-item">
@@ -708,7 +720,7 @@
   });
 
   /* ---------------- Navigation ---------------- */
-  let currentView = 'projects';
+  let currentView = 'dashboard';
 
   function initNavigation(){
     // Nav item clicks
@@ -837,27 +849,18 @@
   function renderViewContent(view){
     const mainContent = document.getElementById('app-main');
     if(!mainContent) return;
-    
-    // Find all content sections to toggle
-    const overviewCards = document.getElementById('overview-cards');
-    const breadcrumbCard = document.getElementById('breadcrumb-card');
-    const pageHeader = document.getElementById('page-header');
-    const legend = document.getElementById('legend');
-    const scrollArea = document.querySelector('.scroll-area');
-    
-    // Only 'projects' view is supported now
+
+    // Toggle view visibility via CSS (see styles.css [data-active-view])
+    mainContent.setAttribute('data-active-view', view);
+
+    // Update breadcrumb path to match the active view
+    renderBreadcrumb();
+
+    // Remove any existing coming soon message
+    const existingSoon = document.getElementById('coming-soon-container');
+    if(existingSoon) existingSoon.remove();
+
     if(view === 'projects'){
-      // Show project management content
-      if(overviewCards) overviewCards.style.display = '';
-      if(breadcrumbCard) breadcrumbCard.style.display = '';
-      if(pageHeader) pageHeader.style.display = '';
-      if(legend) legend.style.display = '';
-      if(scrollArea) scrollArea.style.display = '';
-      
-      // Remove any existing coming soon message
-      const existingSoon = document.getElementById('coming-soon-container');
-      if(existingSoon) existingSoon.remove();
-      
       // Render the project management UI
       renderAll(true);
     }

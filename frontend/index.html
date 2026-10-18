@@ -21,7 +21,11 @@
       <span class="nav-subtitle">System Analyst & Associate PM</span>
     </div>
     <nav class="nav-menu" id="nav-menu">
-      <a href="#" class="nav-item active" data-view="projects">
+      <a href="#" class="nav-item active" data-view="dashboard">
+        <i class="bi bi-pie-chart-fill"></i>
+        <span>Dashboard</span>
+      </a>
+      <a href="#" class="nav-item" data-view="projects">
         <i class="bi bi-kanban-fill"></i>
         <span>Proyek Management</span>
       </a>
@@ -30,7 +34,7 @@
 
   <div class="nav-sidebar-overlay" id="nav-sidebar-overlay"></div>
 
-  <main class="app-main" id="app-main">
+  <main class="app-main" id="app-main" data-active-view="dashboard">
     <header class="app-navbar" id="app-navbar">
       <button class="btn btn-ghost nav-toggle" id="nav-toggle" aria-label="Toggle navigation" style="display:none;">
         <i class="bi bi-list"></i>
@@ -96,6 +100,19 @@
         </svg>
         <span class="bell-dot" id="bell-dot"></span>
       </button>
+    </section>
+  </header>
+
+  <header class="page-header" id="dashboard-header">
+    <section class="page-header-section">
+      <span class="page-header-eyebrow">Dashboard</span>
+      <div class="title-row">
+        <span id="dashboard-title">Ringkasan Proyek</span>
+      </div>
+      <span class="project-sub" id="dashboard-range"></span>
+    </section>
+    <section class="page-header-view" id="dashboard-header-view" aria-label="Konten halaman">
+      <!-- Sengaja kosong: menu Dashboard tidak memiliki tombol aksi -->
     </section>
   </header>
 
