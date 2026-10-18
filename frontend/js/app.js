@@ -1078,7 +1078,8 @@
 
   /* ---------------- Backup ---------------- */
   document.getElementById('backup-btn').addEventListener('click', async ()=>{
-    await showConfirm('Yakin ingin melakukan backup data?', 'Ya, Backup', 'Batal', 'btn-primary');
+    const confirmed = await showConfirm('Yakin ingin melakukan backup data?', 'Ya, Backup', 'Batal', 'btn-primary');
+    if (!confirmed) return;
     const btn = document.getElementById('backup-btn');
     btn.textContent = 'MENYIMPAN...';
     btn.disabled = true;
@@ -1161,7 +1162,8 @@
     const btn = e.target.closest('.restore-btn');
     if (!btn) return;
     const filename = btn.dataset.file;
-    await showConfirm('Yakin ingin me-restore data dari file <strong>' + filename + '</strong>?<br><br>Data tugas yang ada saat ini akan digantikan seluruhnya.', 'Ya, Restore', 'Batal', 'btn-primary');
+    const confirmed = await showConfirm('Yakin ingin me-restore data dari file <strong>' + filename + '</strong>?<br><br>Data tugas yang ada saat ini akan digantikan seluruhnya.', 'Ya, Restore', 'Batal', 'btn-primary');
+    if (!confirmed) return;
     btn.textContent = 'MERESTORE...';
     btn.disabled = true;
     try {
@@ -2126,7 +2128,8 @@
   document.getElementById('delete-btn').addEventListener('click', async ()=>{
     if(!editingId) return;
     const name = tasks.find(t=>t.id===editingId)?.name||'';
-    await showConfirm('Yakin ingin menghapus tugas <strong>'+escapeHtml(name)+'</strong>?', 'Ya, Hapus', 'Batal', 'confirm-yes');
+    const confirmed = await showConfirm('Yakin ingin menghapus tugas <strong>'+escapeHtml(name)+'</strong>?', 'Ya, Hapus', 'Batal', 'confirm-yes');
+    if (!confirmed) return;
     api.del('/api/tasks/'+editingId).catch(e => console.error('Delete task failed:', e));
     tasks = tasks.filter(t=>t.id!==editingId);
     closeModal(true);
