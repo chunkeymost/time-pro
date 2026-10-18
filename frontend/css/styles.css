@@ -608,14 +608,26 @@ body{
   margin-left:clamp(12px,3.5vw,28px);
   margin-right:clamp(12px,3.5vw,28px);
   margin-bottom:14px;
-  display:flex;
-  flex-direction:column;
-  gap:4px;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:18px;
   padding:16px 18px;
   background:var(--surface);
   border:1px solid var(--paper-line-strong);
   border-radius:10px;
   box-shadow:var(--shadow);
+}
+.page-header-section{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  min-width:0;
+}
+.page-header-view{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  min-width:0;
 }
 .page-header-eyebrow{
   font-family:'IBM Plex Mono', monospace;
@@ -635,6 +647,9 @@ body{
   font-size:13px;
   color:var(--ink-soft);
   margin:0;
+}
+@media (max-width:640px){
+  .page-header{ grid-template-columns:1fr; }
 }
 
 /* ---------- Breadcrumb Card ---------- */
