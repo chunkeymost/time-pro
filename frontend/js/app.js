@@ -835,6 +835,7 @@
     // Find all content sections to toggle
     const overviewCards = document.getElementById('overview-cards');
     const breadcrumbCard = document.getElementById('breadcrumb-card');
+    const pageHeader = document.getElementById('page-header');
     const legend = document.getElementById('legend');
     const scrollArea = document.querySelector('.scroll-area');
     
@@ -843,6 +844,7 @@
       // Show project management content
       if(overviewCards) overviewCards.style.display = '';
       if(breadcrumbCard) breadcrumbCard.style.display = '';
+      if(pageHeader) pageHeader.style.display = '';
       if(legend) legend.style.display = '';
       if(scrollArea) scrollArea.style.display = '';
       
