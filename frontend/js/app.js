@@ -688,7 +688,7 @@
   });
 
   /* ---------------- Navigation ---------------- */
-  let currentView = 'dashboard';
+  let currentView = 'projects';
 
   function initNavigation(){
     // Nav item clicks
@@ -723,9 +723,73 @@
       item.classList.toggle('active', item.dataset.view === view);
     });
     
-    // For now, only dashboard is implemented
-    if(view !== 'dashboard'){
-      showToast(`${getViewLabel(view)} - Coming soon`, 'info');
+    renderViewContent(view);
+  }
+
+  function renderViewContent(view){
+    const mainContent = document.getElementById('app-main');
+    if(!mainContent) return;
+    
+    // Find all content sections to toggle
+    const overviewCards = document.getElementById('overview-cards');
+    const legend = document.getElementById('legend');
+    const scrollArea = document.querySelector('.scroll-area');
+    
+    if(view === 'projects'){
+      // Show project management content
+      if(overviewCards) overviewCards.style.display = '';
+      if(legend) legend.style.display = '';
+      if(scrollArea) scrollArea.style.display = '';
+      
+      // Remove any existing coming soon message
+      const existingSoon = document.getElementById('coming-soon-container');
+      if(existingSoon) existingSoon.remove();
+      
+      // Render the project management UI
+      renderAll(true);
+    } else {
+      // Hide project management content
+      if(overviewCards) overviewCards.style.display = 'none';
+      if(legend) legend.style.display = 'none';
+      if(scrollArea) scrollArea.style.display = 'none';
+      
+      // Remove existing coming soon if any
+      const existingSoon = document.getElementById('coming-soon-container');
+      if(existingSoon) existingSoon.remove();
+      
+      // Create and show coming soon message
+      const comingSoonContainer = document.createElement('div');
+      comingSoonContainer.id = 'coming-soon-container';
+      comingSoonContainer.style.cssText = `
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: calc(100vh - 140px);
+        min-height: 400px;
+        text-align: center;
+        color: var(--ink-faint);
+      `;
+      
+      const viewLabels = {
+        'dashboard': 'Dashboard',
+        'uat': 'UAT Workspace'
+      };
+      
+      const label = viewLabels[view] || view;
+      comingSoonContainer.innerHTML = `
+        <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;">
+          <i class="bi bi-hourglass-split"></i>
+        </div>
+        <h2 style="font-size: 28px; font-weight: 600; color: var(--ink); margin-bottom: 8px;">
+          ${label}
+        </h2>
+        <p style="font-size: 16px; max-width: 400px;">
+          Fitur ini akan segera hadir. Tetap pantau perkembangannya!
+        </p>
+      `;
+      
+      mainContent.appendChild(comingSoonContainer);
     }
   }
 
