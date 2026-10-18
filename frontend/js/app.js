@@ -75,6 +75,7 @@
     range: document.getElementById('project-range'),
     legend: document.getElementById('legend'),
     overviewCards: document.getElementById('overview-cards'),
+    breadcrumbCard: document.getElementById('breadcrumb-card'),
     sidebarList: document.getElementById('sidebar-list'),
     ruler: document.getElementById('ruler'),
     rows: document.getElementById('rows'),
@@ -260,6 +261,20 @@
   });
 
   /* ---------------- Overview Cards ---------------- */
+  function renderBreadcrumb(){
+    const title = els.title?.textContent?.trim() || 'Timeframe';
+    els.breadcrumbCard.innerHTML = `
+      <span class="breadcrumb-item">
+        <i class="bi bi-house-door"></i>
+        <span>Beranda</span>
+      </span>
+      <span class="breadcrumb-sep"><i class="bi bi-chevron-right"></i></span>
+      <span class="breadcrumb-item">Proyek Management</span>
+      <span class="breadcrumb-sep"><i class="bi bi-chevron-right"></i></span>
+      <span class="breadcrumb-item active" aria-current="page">${escapeHtml(title)}</span>
+    `;
+  }
+
   function renderOverviewCards(){
     const totalTasks = tasks.length;
     const doneTasks = tasks.filter(t => t.progress === 100).length;
@@ -659,6 +674,7 @@
     renderRows(range);
     renderSidebar();
     renderOverviewCards();
+    renderBreadcrumb();
     renderProjectRange();
     document.getElementById('backup-btn').disabled = tasks.length === 0;
     if(scrollToToday) scrollToTodayLine(range);
@@ -818,6 +834,7 @@
     
     // Find all content sections to toggle
     const overviewCards = document.getElementById('overview-cards');
+    const breadcrumbCard = document.getElementById('breadcrumb-card');
     const legend = document.getElementById('legend');
     const scrollArea = document.querySelector('.scroll-area');
     
@@ -825,6 +842,7 @@
     if(view === 'projects'){
       // Show project management content
       if(overviewCards) overviewCards.style.display = '';
+      if(breadcrumbCard) breadcrumbCard.style.display = '';
       if(legend) legend.style.display = '';
       if(scrollArea) scrollArea.style.display = '';
       
@@ -2237,6 +2255,7 @@
       span.textContent = val;
       input.replaceWith(span);
       els.title = span;
+      renderBreadcrumb();
       api.put('/api/metadata', { title: val }).catch(e => console.error('Save title failed:', e));
     }
 
@@ -2246,6 +2265,7 @@
       span.textContent = _savedTitle;
       input.replaceWith(span);
       els.title = span;
+      renderBreadcrumb();
     }
 
     input.addEventListener('keydown', function(e){
