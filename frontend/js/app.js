@@ -1720,6 +1720,12 @@
       const isStopped = statusClass === 'stopped';
       const showStart = isHold || isStopped;
 
+      const takeoutBtn = `
+          <button class="takeout-btn" data-id="${dt.id}" title="Take Out — keluarkan dari Daily Task">
+            <i class="bi bi-box-arrow-left"></i>
+          </button>
+      `;
+
       const statusActions = isDone ? `
         <div class="status-actions">
           <button class="status-action-btn hold" data-id="${dt.id}" data-status="hold" title="Reopen as Hold">
@@ -1728,9 +1734,7 @@
           <button class="status-action-btn in_progress" data-id="${dt.id}" data-status="in_progress" title="Reopen as In Progress">
             <i class="bi bi-play-circle-fill"></i>
           </button>
-          <button class="status-action-btn stop" data-id="${dt.id}" data-del="true" title="Delete">
-            <i class="bi bi-trash-fill"></i>
-          </button>
+          ${takeoutBtn}
         </div>
       ` : `
         <div class="status-actions">
@@ -1743,6 +1747,7 @@
           <button class="status-action-btn stop ${isStopped ? 'active' : ''}" data-id="${dt.id}" data-status="stopped" title="Stop">
             <i class="bi bi-stop-circle-fill"></i>
           </button>
+          ${takeoutBtn}
         </div>
       `;
 
@@ -1757,21 +1762,51 @@
         </td>
       `;
 
+      // Handle take out: remove from daily task (and revert todo if it was done)
+      tr.querySelector('.takeout-btn').addEventListener('click', async function(){
+        const id = parseInt(this.dataset.id, 10);
+        const dt = dailyTasks.find(d => d.id === id);
+        if(!dt) return;
+
+        // If the item was marked done, revert the related todo to not-done
+        if((dt.status || 'in_progress') === 'done'){
+          const task = tasks.find(t => t.id === dt.taskId);
+          const todo = task && (task.todos || []).find(td => td.text === dt.taskName);
+          if(task && todo){
+            todo.done = false;
+            try {
+              await api.put('/api/tasks/'+task.id+'/todos/'+todo.id, { done: false });
+              updateProgressFromTodos(task);
+              await saveTaskProgress(task.id, task.progress);
+            } catch(e) {
+              console.error('Revert todo on take out failed:', e);
+              showToast('Gagal mengembalikan status todo', 'error');
+              return;
+            }
+          }
+        }
+
+        try {
+          await api.del('/api/daily-tasks/'+id);
+          await loadDailyTasks();
+          updateBellDot();
+          renderAll(false);
+          if (els.notifOverlay.classList.contains('open')) openNotifPanel();
+          if (editingId) {
+            const t = tasks.find(x => x.id === editingId);
+            if (t) renderTodos(t);
+          }
+          showToast('Tugas dikeluarkan dari Daily Task');
+        } catch(e) {
+          console.error('Failed to take out daily task:', e);
+          showToast('Gagal mengeluarkan tugas', 'error');
+        }
+      });
+
       // Add click handlers for all status buttons
       tr.querySelectorAll('.status-action-btn').forEach(btn => {
         btn.addEventListener('click', async function(){
           const id = parseInt(this.dataset.id, 10);
-          // Handle delete button
-          if (this.dataset.del === 'true') {
-            try {
-              await api.del('/api/daily-tasks/'+id);
-              loadDailyTasks();
-              if (els.notifOverlay.classList.contains('open')) openNotifPanel();
-            } catch(e) {
-              console.error('Failed to delete daily task:', e);
-            }
-            return;
-          }
           let newStatus = this.dataset.status;
           // Handle hold-toggle button (Hold/Start)
           if (this.classList.contains('hold-toggle')) {

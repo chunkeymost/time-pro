@@ -2530,6 +2530,12 @@ body{
   transition:all .15s;
 }
 .takeout-btn:hover{ background:rgba(181,72,47,0.1); color:var(--status-risk); }
+.status-actions .takeout-btn{
+  padding:4px 8px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
 
 /* Status Action Buttons */
 .status-actions{
