@@ -402,7 +402,7 @@ class JsonStorage {
       id: data.nextId++,
       taskId: dtData.taskId || null,
       taskName: dtData.taskName || '',
-      status: dtData.status || 'in_progress',
+      status: dtData.status || 'not_start',
       date: dtData.date || new Date().toISOString().split('T')[0],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

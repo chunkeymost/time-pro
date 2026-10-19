@@ -2513,6 +2513,7 @@ body{
   font-family:'IBM Plex Mono', monospace;
   text-transform:capitalize;
 }
+.status-badge.not_start{ background:rgba(139,156,179,0.15); color:var(--ink-faint); }
 .status-badge.hold{ background:rgba(124,58,237,0.12); color:var(--purple); }
 .status-badge.in_progress{ background:rgba(47,107,163,0.12); color:var(--status-progress); }
 .status-badge.done{ background:rgba(63,143,99,0.12); color:var(--status-done); }

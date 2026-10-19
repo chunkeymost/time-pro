@@ -575,7 +575,7 @@ app.post('/api/daily-tasks', async (req, res) => {
   try {
     const { taskId, taskName, status, date } = req.body;
     if (!taskName) return res.status(400).json({ error: 'taskName is required' });
-    const dt = await storage.createDailyTask({ taskId, taskName, status: status || 'in_progress', date });
+    const dt = await storage.createDailyTask({ taskId, taskName, status: status || 'not_start', date });
     res.status(201).json({ dailyTask: dt });
   } catch (err) {
     res.status(500).json({ error: err.message });

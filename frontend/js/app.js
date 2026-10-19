@@ -1034,7 +1034,7 @@
   els.holidayOverlay.addEventListener('click', (e)=>{ if(e.target===els.holidayOverlay) closeHolidayModal(); });
 
   /* ---------------- Daily history modal ---------------- */
-  const DAILY_STATUS_LABEL = { hold:'Hold', in_progress:'In Progress', done:'Done', stopped:'Stop' };
+  const DAILY_STATUS_LABEL = { not_start:'Not Start', hold:'Hold', in_progress:'In Progress', done:'Done', stopped:'Stop' };
 
   function openDailyHistoryModal(){
     els.dailyHistoryOverlay.classList.add('open');
@@ -1066,9 +1066,9 @@
 
     els.dailyHistoryList.innerHTML = history.map((snap, idx) => {
       const rows = snap.dailyTasks || [];
-      const done = rows.filter(r => (r.status||'in_progress') === 'done').length;
+      const done = rows.filter(r => (r.status||'not_start') === 'done').length;
       const items = rows.map(r => {
-        const st = r.status || 'in_progress';
+        const st = r.status || 'not_start';
         const label = DAILY_STATUS_LABEL[st] || st;
         return `<div class="daily-history-item">` +
           `<span class="daily-history-item-name">${escapeHtml(r.taskName || '')}</span>` +
@@ -1515,7 +1515,7 @@
             await api.post('/api/daily-tasks', {
               taskId: todo.taskId,
               taskName: todo.text,
-              status: 'hold'
+              status: 'not_start'
             });
             await loadDailyTasks();
             openNotifPanel();
@@ -1711,14 +1711,13 @@
 
     dailyTasks.forEach((dt, i) => {
       const tr = document.createElement('tr');
-      const statusClass = dt.status || 'in_progress';
-      const statusLabel = statusClass === 'hold' ? 'Hold' : statusClass === 'in_progress' ? 'In Progress' : statusClass === 'stopped' ? 'Stop' : 'Done';
+      const statusClass = dt.status || 'not_start';
+      const statusLabel = DAILY_STATUS_LABEL[statusClass] || statusClass;
 
       // Determine button states
-      const isHold = statusClass === 'hold';
       const isDone = statusClass === 'done';
       const isStopped = statusClass === 'stopped';
-      const showStart = isHold || isStopped;
+      const isInProgress = statusClass === 'in_progress';
 
       const takeoutBtn = `
           <button class="takeout-btn" data-id="${dt.id}" title="Take Out — keluarkan dari Daily Task">
@@ -1726,27 +1725,26 @@
           </button>
       `;
 
-      const statusActions = isDone ? `
+      // Explicit action buttons per status
+      const bStart = `<button class="status-action-btn start" data-id="${dt.id}" data-status="in_progress" title="Start"><i class="bi bi-play-circle-fill"></i></button>`;
+      const bHold = `<button class="status-action-btn hold" data-id="${dt.id}" data-status="hold" title="Hold"><i class="bi bi-pause-circle-fill"></i></button>`;
+      const bDone = `<button class="status-action-btn done" data-id="${dt.id}" data-status="done" title="Done"><i class="bi bi-check-circle-fill"></i></button>`;
+      const bStop = `<button class="status-action-btn stop" data-id="${dt.id}" data-status="stopped" title="Stop"><i class="bi bi-stop-circle-fill"></i></button>`;
+      const bReopenHold = `<button class="status-action-btn hold" data-id="${dt.id}" data-status="hold" title="Reopen as Hold"><i class="bi bi-pause-circle-fill"></i></button>`;
+      const bReopenProg = `<button class="status-action-btn in_progress" data-id="${dt.id}" data-status="in_progress" title="Reopen as In Progress"><i class="bi bi-play-circle-fill"></i></button>`;
+
+      let buttons = '';
+      if (isDone) {
+        buttons = bReopenHold + bReopenProg;
+      } else {
+        buttons = isInProgress ? bHold : bStart;
+        buttons += bDone;
+        if (!isStopped) buttons += bStop;
+      }
+
+      const statusActions = `
         <div class="status-actions">
-          <button class="status-action-btn hold" data-id="${dt.id}" data-status="hold" title="Reopen as Hold">
-            <i class="bi bi-pause-circle-fill"></i>
-          </button>
-          <button class="status-action-btn in_progress" data-id="${dt.id}" data-status="in_progress" title="Reopen as In Progress">
-            <i class="bi bi-play-circle-fill"></i>
-          </button>
-          ${takeoutBtn}
-        </div>
-      ` : `
-        <div class="status-actions">
-          <button class="status-action-btn hold-toggle ${showStart ? 'active' : ''}" data-id="${dt.id}" data-status="hold" data-toggle-status="${showStart ? 'in_progress' : 'hold'}" title="${showStart ? 'Start' : 'Hold'}">
-            <i class="bi ${showStart ? 'bi-play-circle-fill' : 'bi-pause-circle-fill'}"></i>
-          </button>
-          <button class="status-action-btn done" data-id="${dt.id}" data-status="done" title="Done">
-            <i class="bi bi-check-circle-fill"></i>
-          </button>
-          <button class="status-action-btn stop ${isStopped ? 'active' : ''}" data-id="${dt.id}" data-status="stopped" title="Stop">
-            <i class="bi bi-stop-circle-fill"></i>
-          </button>
+          ${buttons}
           ${takeoutBtn}
         </div>
       `;
@@ -1769,7 +1767,7 @@
         if(!dt) return;
 
         // If the item was marked done, revert the related todo to not-done
-        if((dt.status || 'in_progress') === 'done'){
+        if((dt.status || 'not_start') === 'done'){
           const task = tasks.find(t => t.id === dt.taskId);
           const todo = task && (task.todos || []).find(td => td.text === dt.taskName);
           if(task && todo){
@@ -1807,11 +1805,7 @@
       tr.querySelectorAll('.status-action-btn').forEach(btn => {
         btn.addEventListener('click', async function(){
           const id = parseInt(this.dataset.id, 10);
-          let newStatus = this.dataset.status;
-          // Handle hold-toggle button (Hold/Start)
-          if (this.classList.contains('hold-toggle')) {
-            newStatus = this.dataset.toggleStatus;
-          }
+          const newStatus = this.dataset.status;
           const dt = dailyTasks.find(d => d.id === id);
           try {
             await api.put('/api/daily-tasks/'+id, { status: newStatus });
@@ -1833,13 +1827,13 @@
     if(!ctx) return;
 
     // Count statuses
-    const counts = { hold: 0, in_progress: 0, done: 0, stopped: 0 };
+    const counts = { not_start: 0, hold: 0, in_progress: 0, done: 0, stopped: 0 };
     dailyTasks.forEach(dt => {
-      const s = dt.status || 'in_progress';
+      const s = dt.status || 'not_start';
       if(counts[s] !== undefined) counts[s]++;
     });
 
-    const total = counts.hold + counts.in_progress + counts.done + counts.stopped;
+    const total = counts.not_start + counts.hold + counts.in_progress + counts.done + counts.stopped;
 
     if(total === 0){
       // Show empty state
@@ -1858,6 +1852,7 @@
     if(dailyTaskChart) dailyTaskChart.destroy();
 
     const colors = {
+      not_start: getComputedStyle(document.documentElement).getPropertyValue('--ink-faint').trim() || '#8B9CB3',
       hold: getComputedStyle(document.documentElement).getPropertyValue('--purple').trim() || '#7C3AED',
       in_progress: getComputedStyle(document.documentElement).getPropertyValue('--status-progress').trim() || '#2F6BA3',
       done: getComputedStyle(document.documentElement).getPropertyValue('--status-done').trim() || '#3F8F63',
@@ -1893,10 +1888,10 @@
     dailyTaskChart = new Chart(ctx, {
       type: 'doughnut',
       data: {
-        labels: ['Hold', 'In Progress', 'Done', 'Stop'],
+        labels: ['Not Start', 'Hold', 'In Progress', 'Done', 'Stop'],
         datasets: [{
-          data: [counts.hold, counts.in_progress, counts.done, counts.stopped],
-          backgroundColor: [colors.hold, colors.in_progress, colors.done, colors.stopped],
+          data: [counts.not_start, counts.hold, counts.in_progress, counts.done, counts.stopped],
+          backgroundColor: [colors.not_start, colors.hold, colors.in_progress, colors.done, colors.stopped],
           borderWidth: 0,
           borderRadius: 4,
         }]
@@ -1927,6 +1922,7 @@
 
   function renderDailyTaskLegend(counts, total, colors){
     const labels = [
+      { key: 'not_start', label: 'Not Start' },
       { key: 'hold', label: 'Hold' },
       { key: 'in_progress', label: 'In Progress' },
       { key: 'done', label: 'Done' },
