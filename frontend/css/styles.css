@@ -2500,6 +2500,13 @@ body{
 .daily-task-table .todo-num{ width:40px; }
 .daily-task-table .todo-status{ width:110px; }
 .daily-task-table .todo-act{ width:180px; }
+.daily-task-table .todo-status,
+.daily-task-table .todo-act{
+  text-align:left !important;
+}
+.daily-task-table .status-actions{
+  justify-content:flex-start;
+}
 
 /* Status badges */
 .status-badge{
