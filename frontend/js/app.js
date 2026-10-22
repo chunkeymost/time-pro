@@ -274,6 +274,18 @@
       return;
     }
 
+    if(currentView === 'mom'){
+      els.breadcrumbCard.innerHTML = `
+        <span class="breadcrumb-item">
+          <i class="bi bi-house-door"></i>
+          <span>Beranda</span>
+        </span>
+        <span class="breadcrumb-sep"><i class="bi bi-chevron-right"></i></span>
+        <span class="breadcrumb-item active" aria-current="page">Minutes of Meeting</span>
+      `;
+      return;
+    }
+
     const title = els.title?.textContent?.trim() || 'Timeframe';
     els.breadcrumbCard.innerHTML = `
       <span class="breadcrumb-item">
@@ -863,6 +875,10 @@
     if(view === 'projects'){
       // Render the project management UI
       renderAll(true);
+    }
+
+    if(view === 'mom'){
+      renderMomPage();
     }
   }
 
@@ -2551,9 +2567,961 @@
     });
   });
 
+  /* ---------------- Minutes of Meeting ---------------- */
+  const MOM_TYPES = {
+    internal: 'Internal',
+    project: 'Project',
+    client: 'Client',
+    formal: 'Formal',
+    lainnya: 'Lainnya',
+  };
+  const MOM_ATTENDANCE = {
+    present: 'Hadir',
+    excused: 'Izin',
+    absent: 'Tidak Hadir',
+  };
+  const MOM_ACTION_STATUS = {
+    open: 'Open',
+    in_progress: 'In Progress',
+    done: 'Done',
+  };
+  const MOM_MONTHS_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+
+  let momMeetings = [];
+  let momEditingId = null;
+  let momPreviewId = null;
+  let momFilter = { search: '', status: '', month: '' };
+  let momDraft = null;
+  let momSearchTimer = null;
+
+  function momEsc(value){
+    return escapeHtml(String(value === undefined || value === null ? '' : value));
+  }
+
+  function momNl2br(value){
+    return momEsc(value).replace(/\n/g, '<br>');
+  }
+
+  function momVal(id){
+    const el = document.getElementById(id);
+    return el ? el.value : '';
+  }
+
+  function momSetVal(id, value){
+    const el = document.getElementById(id);
+    if(el) el.value = value === undefined || value === null ? '' : value;
+  }
+
+  function momFormatDate(value){
+    if(!value) return '—';
+    const parts = String(value).slice(0, 10).split('-');
+    if(parts.length !== 3) return value;
+    const month = MOM_MONTHS_ID[Number(parts[1]) - 1] || parts[1];
+    return `${Number(parts[2])} ${month} ${parts[0]}`;
+  }
+
+  function momTimeRange(meeting){
+    const start = meeting.startTime || '';
+    const end = meeting.endTime || '';
+    if(!start && !end) return '—';
+    return start + (end ? ' – ' + end : '');
+  }
+
+  function momOptions(map, selected){
+    return Object.keys(map).map(key =>
+      `<option value="${key}"${key === selected ? ' selected' : ''}>${map[key]}</option>`
+    ).join('');
+  }
+
+  function momEmptyDraft(){
+    return {
+      momNumber: '',
+      title: '',
+      meetingType: 'internal',
+      date: fmt(today()),
+      startTime: '',
+      endTime: '',
+      location: '',
+      chair: '',
+      notetaker: '',
+      status: 'draft',
+      attendees: [{ name: '', role: '', organization: '', attendance: 'present' }],
+      agenda: [{ topic: '', presenter: '', duration: '' }],
+      discussions: [{ agendaTopic: '', notes: '' }],
+      decisions: [{ text: '' }],
+      actionItems: [{ description: '', pic: '', dueDate: '', status: 'open' }],
+      nextSteps: '',
+      nextMeetingDate: '',
+      nextMeetingTime: '',
+      nextMeetingLocation: '',
+      preparedBy: { name: '', role: '', date: fmt(today()), signature: '' },
+      approvedBy: { name: '', role: '', date: fmt(today()), signature: '' },
+    };
+  }
+
+  function momNormalizeDraft(meeting){
+    const draft = meeting ? JSON.parse(JSON.stringify(meeting)) : momEmptyDraft();
+    draft.attendees = Array.isArray(draft.attendees) ? draft.attendees : [];
+    draft.agenda = Array.isArray(draft.agenda) ? draft.agenda : [];
+    draft.discussions = Array.isArray(draft.discussions) ? draft.discussions : [];
+    draft.decisions = Array.isArray(draft.decisions) ? draft.decisions : [];
+    draft.actionItems = Array.isArray(draft.actionItems) ? draft.actionItems : [];
+    draft.preparedBy = draft.preparedBy || { name: '', role: '', date: fmt(today()), signature: '' };
+    draft.approvedBy = draft.approvedBy || { name: '', role: '', date: fmt(today()), signature: '' };
+    if(!draft.preparedBy.date) draft.preparedBy.date = fmt(today());
+    if(!draft.approvedBy.date) draft.approvedBy.date = fmt(today());
+    draft.meetingType = draft.meetingType || 'internal';
+    draft.status = draft.status === 'final' ? 'final' : 'draft';
+    return draft;
+  }
+
+  function momUpdateAttendeeCount(){
+    const countEl = document.getElementById('mom-attendee-count');
+    if(!countEl || !momDraft) return;
+    countEl.textContent = (momDraft.attendees || []).filter(a => String(a.name || '').trim()).length;
+  }
+
+  function momRenderAttendees(){
+    const body = document.getElementById('mom-attendee-body');
+    if(!body || !momDraft) return;
+    if(!momDraft.attendees.length){
+      body.innerHTML = '<tr><td colspan="6" class="mom-input-empty">Belum ada peserta. Klik "Tambah Peserta".</td></tr>';
+      momUpdateAttendeeCount();
+      return;
+    }
+    body.innerHTML = momDraft.attendees.map((a, i) => `
+      <tr data-index="${i}">
+        <td class="mom-row-num">${i + 1}</td>
+        <td><input type="text" data-mom-array="attendees" data-field="name" value="${momEsc(a.name)}" placeholder="Nama peserta"></td>
+        <td><input type="text" data-mom-array="attendees" data-field="role" value="${momEsc(a.role)}" placeholder="Jabatan / Divisi"></td>
+        <td><input type="text" data-mom-array="attendees" data-field="organization" value="${momEsc(a.organization)}" placeholder="Instansi"></td>
+        <td><select data-mom-array="attendees" data-field="attendance">${momOptions(MOM_ATTENDANCE, a.attendance || 'present')}</select></td>
+        <td><button type="button" class="mom-row-del" data-mom-remove="attendees" data-index="${i}" title="Hapus peserta"><i class="bi bi-x-lg"></i></button></td>
+      </tr>
+    `).join('');
+    momUpdateAttendeeCount();
+  }
+
+  function momRenderAgenda(){
+    const body = document.getElementById('mom-agenda-body');
+    if(!body || !momDraft) return;
+    if(!momDraft.agenda.length){
+      body.innerHTML = '<tr><td colspan="5" class="mom-input-empty">Belum ada agenda. Klik "Tambah Agenda".</td></tr>';
+      return;
+    }
+    body.innerHTML = momDraft.agenda.map((a, i) => `
+      <tr data-index="${i}">
+        <td class="mom-row-num">${i + 1}</td>
+        <td><input type="text" data-mom-array="agenda" data-field="topic" value="${momEsc(a.topic)}" placeholder="Topik agenda"></td>
+        <td><input type="text" data-mom-array="agenda" data-field="presenter" value="${momEsc(a.presenter)}" placeholder="Presenter / PIC"></td>
+        <td><input type="text" data-mom-array="agenda" data-field="duration" value="${momEsc(a.duration)}" placeholder="cth. 15"></td>
+        <td><button type="button" class="mom-row-del" data-mom-remove="agenda" data-index="${i}" title="Hapus agenda"><i class="bi bi-x-lg"></i></button></td>
+      </tr>
+    `).join('');
+  }
+
+  function momRenderDiscussions(){
+    const body = document.getElementById('mom-discussion-body');
+    if(!body || !momDraft) return;
+    if(!momDraft.discussions.length){
+      body.innerHTML = '<tr><td colspan="4" class="mom-input-empty">Belum ada poin pembahasan. Klik "Tambah Pembahasan".</td></tr>';
+      return;
+    }
+    body.innerHTML = momDraft.discussions.map((d, i) => `
+      <tr data-index="${i}">
+        <td class="mom-row-num">${i + 1}</td>
+        <td><input type="text" data-mom-array="discussions" data-field="agendaTopic" value="${momEsc(d.agendaTopic)}" placeholder="Agenda terkait"></td>
+        <td><textarea data-mom-array="discussions" data-field="notes" rows="2" placeholder="Tulis poin pembahasan...">${momEsc(d.notes)}</textarea></td>
+        <td><button type="button" class="mom-row-del" data-mom-remove="discussions" data-index="${i}" title="Hapus pembahasan"><i class="bi bi-x-lg"></i></button></td>
+      </tr>
+    `).join('');
+  }
+
+  function momRenderDecisions(){
+    const body = document.getElementById('mom-decision-body');
+    if(!body || !momDraft) return;
+    if(!momDraft.decisions.length){
+      body.innerHTML = '<tr><td colspan="3" class="mom-input-empty">Belum ada keputusan. Klik "Tambah Keputusan".</td></tr>';
+      return;
+    }
+    body.innerHTML = momDraft.decisions.map((d, i) => `
+      <tr data-index="${i}">
+        <td class="mom-row-num">${i + 1}</td>
+        <td><input type="text" data-mom-array="decisions" data-field="text" value="${momEsc(d.text)}" placeholder="Tulis keputusan / kesepakatan..."></td>
+        <td><button type="button" class="mom-row-del" data-mom-remove="decisions" data-index="${i}" title="Hapus keputusan"><i class="bi bi-x-lg"></i></button></td>
+      </tr>
+    `).join('');
+  }
+
+  function momRenderActions(){
+    const body = document.getElementById('mom-action-body');
+    if(!body || !momDraft) return;
+    if(!momDraft.actionItems.length){
+      body.innerHTML = '<tr><td colspan="6" class="mom-input-empty">Belum ada action item. Klik "Tambah Action Item".</td></tr>';
+      return;
+    }
+    body.innerHTML = momDraft.actionItems.map((a, i) => `
+      <tr data-index="${i}">
+        <td class="mom-row-num">${i + 1}</td>
+        <td><input type="text" data-mom-array="actionItems" data-field="description" value="${momEsc(a.description)}" placeholder="Action item"></td>
+        <td><input type="text" data-mom-array="actionItems" data-field="pic" value="${momEsc(a.pic)}" placeholder="PIC"></td>
+        <td><input type="date" data-mom-array="actionItems" data-field="dueDate" value="${momEsc(a.dueDate)}"></td>
+        <td><select data-mom-array="actionItems" data-field="status">${momOptions(MOM_ACTION_STATUS, a.status || 'open')}</select></td>
+        <td><button type="button" class="mom-row-del" data-mom-remove="actionItems" data-index="${i}" title="Hapus action item"><i class="bi bi-x-lg"></i></button></td>
+      </tr>
+    `).join('');
+  }
+
+  function momRenderAllRows(){
+    momRenderAttendees();
+    momRenderAgenda();
+    momRenderDiscussions();
+    momRenderDecisions();
+    momRenderActions();
+  }
+
+  function momHandleArrayInput(e){
+    const el = e.target.closest('[data-mom-array]');
+    if(!el || !momDraft) return;
+    const arr = momDraft[el.dataset.momArray];
+    const tr = el.closest('tr[data-index]');
+    if(!Array.isArray(arr) || !tr) return;
+    const idx = Number(tr.dataset.index);
+    if(!arr[idx]) return;
+    arr[idx][el.dataset.field] = el.value;
+    if(el.dataset.momArray === 'attendees') momUpdateAttendeeCount();
+  }
+
+  function momHandleArrayRemove(e){
+    const btn = e.target.closest('[data-mom-remove]');
+    if(!btn || !momDraft) return;
+    const arr = momDraft[btn.dataset.momRemove];
+    const tr = btn.closest('tr[data-index]');
+    if(!Array.isArray(arr) || !tr) return;
+    arr.splice(Number(tr.dataset.index), 1);
+    momRenderAllRows();
+  }
+
+  function momSetupSignaturePad(canvasId, existingSignature){
+    const original = document.getElementById(canvasId);
+    if(!original) return;
+    const canvas = original.cloneNode(false);
+    original.parentNode.replaceChild(canvas, original);
+
+    const rect = canvas.getBoundingClientRect();
+    const width = Math.max(rect.width, 260);
+    const height = Math.max(rect.height, 120);
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#1B3350';
+
+    canvas.dataset.dirty = '0';
+    canvas.dataset.existing = existingSignature || '';
+
+    if(existingSignature){
+      const img = new Image();
+      img.onload = () => {
+        const ratio = Math.min(width / img.width, height / img.height);
+        const w = img.width * ratio;
+        const h = img.height * ratio;
+        ctx.drawImage(img, (width - w) / 2, (height - h) / 2, w, h);
+      };
+      img.src = existingSignature;
+    }
+
+    let drawing = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    function point(e){
+      const r = canvas.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      drawing = true;
+      canvas.dataset.dirty = '1';
+      const p = point(e);
+      lastX = p.x;
+      lastY = p.y;
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      try { canvas.setPointerCapture(e.pointerId); } catch(_) {}
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if(!drawing) return;
+      e.preventDefault();
+      const p = point(e);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      lastX = p.x;
+      lastY = p.y;
+    });
+
+    const stop = () => { drawing = false; };
+    canvas.addEventListener('pointerup', stop);
+    canvas.addEventListener('pointercancel', stop);
+    canvas.addEventListener('pointerleave', stop);
+  }
+
+  function momReadSignature(canvasId, fallback){
+    const canvas = document.getElementById(canvasId);
+    if(!canvas) return fallback || '';
+    if(canvas.dataset.dirty === '1') {
+      try { return canvas.toDataURL('image/png'); } catch(_) { return fallback || ''; }
+    }
+    return canvas.dataset.existing || fallback || '';
+  }
+
+  function momClearSignature(canvasId){
+    const canvas = document.getElementById(canvasId);
+    if(!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    canvas.dataset.dirty = '1';
+    canvas.dataset.existing = '';
+  }
+
+  function openMomForm(meeting){
+    momEditingId = meeting ? meeting.id : null;
+    momDraft = momNormalizeDraft(meeting);
+
+    document.getElementById('mom-form-title').textContent = meeting ? 'Edit MoM' : 'MoM Baru';
+    document.getElementById('mom-form-sub').textContent = meeting
+      ? 'Perbarui informasi rapat, keputusan, action item, dan pengesahan.'
+      : 'Lengkapi informasi rapat, peserta, agenda, keputusan, dan tindak lanjut.';
+
+    momSetVal('mom-number', momDraft.momNumber || '');
+    momSetVal('mom-title', momDraft.title);
+    momSetVal('mom-type', momDraft.meetingType);
+    momSetVal('mom-status', momDraft.status);
+    momSetVal('mom-date', momDraft.date);
+    momSetVal('mom-location', momDraft.location);
+    momSetVal('mom-start', momDraft.startTime);
+    momSetVal('mom-end', momDraft.endTime);
+    momSetVal('mom-chair', momDraft.chair);
+    momSetVal('mom-notetaker', momDraft.notetaker);
+
+    momSetVal('mom-next-steps', momDraft.nextSteps);
+    momSetVal('mom-next-date', momDraft.nextMeetingDate);
+    momSetVal('mom-next-time', momDraft.nextMeetingTime);
+    momSetVal('mom-next-location', momDraft.nextMeetingLocation);
+
+    momSetVal('mom-prepared-name', momDraft.preparedBy.name);
+    momSetVal('mom-prepared-role', momDraft.preparedBy.role);
+    momSetVal('mom-prepared-date', momDraft.preparedBy.date);
+    momSetVal('mom-approved-name', momDraft.approvedBy.name);
+    momSetVal('mom-approved-role', momDraft.approvedBy.role);
+    momSetVal('mom-approved-date', momDraft.approvedBy.date);
+
+    document.getElementById('mom-delete-btn').style.visibility = meeting ? 'visible' : 'hidden';
+    momRenderAllRows();
+
+    const overlay = document.getElementById('mom-form-overlay');
+    overlay.classList.add('open');
+
+    requestAnimationFrame(() => {
+      if(!momDraft) return;
+      momSetupSignaturePad('mom-prepared-canvas', momDraft.preparedBy.signature);
+      momSetupSignaturePad('mom-approved-canvas', momDraft.approvedBy.signature);
+    });
+  }
+
+  function closeMomForm(){
+    const overlay = document.getElementById('mom-form-overlay');
+    if(overlay) overlay.classList.remove('open');
+    momEditingId = null;
+    momDraft = null;
+  }
+
+  function momCollectPayload(status){
+    const draft = momDraft || momEmptyDraft();
+    draft.title = momVal('mom-title').trim();
+    draft.momNumber = momVal('mom-number').trim();
+    draft.meetingType = momVal('mom-type') || 'internal';
+    draft.status = status || momVal('mom-status') || 'draft';
+    draft.date = momVal('mom-date');
+    draft.startTime = momVal('mom-start');
+    draft.endTime = momVal('mom-end');
+    draft.location = momVal('mom-location').trim();
+    draft.chair = momVal('mom-chair').trim();
+    draft.notetaker = momVal('mom-notetaker').trim();
+
+    draft.nextSteps = momVal('mom-next-steps').trim();
+    draft.nextMeetingDate = momVal('mom-next-date');
+    draft.nextMeetingTime = momVal('mom-next-time');
+    draft.nextMeetingLocation = momVal('mom-next-location').trim();
+
+    draft.preparedBy = {
+      name: momVal('mom-prepared-name').trim(),
+      role: momVal('mom-prepared-role').trim(),
+      date: momVal('mom-prepared-date'),
+      signature: momReadSignature('mom-prepared-canvas', draft.preparedBy && draft.preparedBy.signature),
+    };
+    draft.approvedBy = {
+      name: momVal('mom-approved-name').trim(),
+      role: momVal('mom-approved-role').trim(),
+      date: momVal('mom-approved-date'),
+      signature: momReadSignature('mom-approved-canvas', draft.approvedBy && draft.approvedBy.signature),
+    };
+
+    draft.attendees = (draft.attendees || []).filter(a =>
+      String(a.name || '').trim() || String(a.role || '').trim() || String(a.organization || '').trim()
+    );
+    draft.agenda = (draft.agenda || []).filter(a =>
+      String(a.topic || '').trim() || String(a.presenter || '').trim() || String(a.duration || '').trim()
+    );
+    draft.discussions = (draft.discussions || []).filter(d =>
+      String(d.agendaTopic || '').trim() || String(d.notes || '').trim()
+    );
+    draft.decisions = (draft.decisions || []).filter(d => String(d.text || '').trim());
+    draft.actionItems = (draft.actionItems || []).filter(a =>
+      String(a.description || '').trim() || String(a.pic || '').trim() || String(a.dueDate || '').trim()
+    );
+
+    return JSON.parse(JSON.stringify(draft));
+  }
+
+  async function saveMom(status){
+    if(!momDraft) return;
+    const payload = momCollectPayload(status);
+    if(!payload.title){
+      showToast('Judul rapat wajib diisi.', 'error');
+      document.getElementById('mom-title').focus();
+      return;
+    }
+    if(!payload.date){
+      showToast('Tanggal rapat wajib diisi.', 'error');
+      document.getElementById('mom-date').focus();
+      return;
+    }
+
+    const btn = document.getElementById(status === 'final' ? 'mom-save-final-btn' : 'mom-save-draft-btn');
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.textContent = 'Menyimpan...';
+    try {
+      if(momEditingId){
+        await api.put('/api/mom/' + momEditingId, payload);
+      } else {
+        await api.post('/api/mom', payload);
+      }
+      const savedStatus = payload.status;
+      closeMomForm();
+      await loadMomMeetings();
+      showToast(savedStatus === 'final' ? 'MoM berhasil disimpan sebagai Final.' : 'MoM berhasil disimpan sebagai Draft.');
+    } catch(err){
+      showToast('Gagal menyimpan MoM: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
+  }
+
+  async function loadMomMeetings(){
+    try {
+      const data = await api.get('/api/mom');
+      momMeetings = Array.isArray(data.meetings) ? data.meetings : [];
+    } catch(err){
+      console.error('Gagal memuat Minutes of Meeting:', err);
+      momMeetings = [];
+    }
+    renderMomPage();
+  }
+
+  function momFilteredMeetings(){
+    const q = momFilter.search.toLowerCase();
+    return momMeetings.filter(m => {
+      if(momFilter.status && m.status !== momFilter.status) return false;
+      if(momFilter.month && String(m.date || '').slice(0, 7) !== momFilter.month) return false;
+      if(!q) return true;
+      const haystack = [
+        m.title,
+        m.momNumber,
+        m.chair,
+        m.notetaker,
+        m.location,
+        ...(m.attendees || []).map(a => a.name),
+      ].join(' ').toLowerCase();
+      return haystack.includes(q);
+    }).sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || (b.id || 0) - (a.id || 0));
+  }
+
+  function momActionCounts(){
+    let open = 0;
+    let overdue = 0;
+    const todayKey = fmt(today());
+    momMeetings.forEach(m => {
+      (m.actionItems || []).forEach(a => {
+        if(a.status === 'done') return;
+        open += 1;
+        const due = a.dueDate ? String(a.dueDate).slice(0, 10) : '';
+        if(due && due < todayKey) overdue += 1;
+      });
+    });
+    return { open, overdue };
+  }
+
+  function renderMomPage(){
+    const tbody = document.getElementById('mom-table-body');
+    if(!tbody) return;
+
+    const currentMonth = fmt(today()).slice(0, 7);
+    const monthCount = momMeetings.filter(m => String(m.date || '').slice(0, 7) === currentMonth).length;
+    const counts = momActionCounts();
+    const statsEl = document.getElementById('mom-stats');
+    if(statsEl){
+      statsEl.innerHTML = `
+        <div class="mom-stat">
+          <div class="mom-stat-icon total"><i class="bi bi-journal-check"></i></div>
+          <div><div class="mom-stat-num">${momMeetings.length}</div><div class="mom-stat-label">Total MoM</div></div>
+        </div>
+        <div class="mom-stat">
+          <div class="mom-stat-icon month"><i class="bi bi-calendar3"></i></div>
+          <div><div class="mom-stat-num">${monthCount}</div><div class="mom-stat-label">Rapat Bulan Ini</div></div>
+        </div>
+        <div class="mom-stat">
+          <div class="mom-stat-icon open"><i class="bi bi-list-task"></i></div>
+          <div><div class="mom-stat-num">${counts.open}</div><div class="mom-stat-label">Action Item Open</div></div>
+        </div>
+        <div class="mom-stat">
+          <div class="mom-stat-icon overdue"><i class="bi bi-exclamation-triangle"></i></div>
+          <div><div class="mom-stat-num">${counts.overdue}</div><div class="mom-stat-label">Action Item Overdue</div></div>
+        </div>
+      `;
+    }
+
+    const monthSelect = document.getElementById('mom-filter-month');
+    if(monthSelect){
+      const months = Array.from(new Set(
+        momMeetings.map(m => String(m.date || '').slice(0, 7)).filter(Boolean)
+      )).sort().reverse();
+      if(momFilter.month && !months.includes(momFilter.month)) momFilter.month = '';
+      monthSelect.innerHTML = '<option value="">Semua Bulan</option>' + months.map(ym => {
+        const parts = ym.split('-');
+        const label = `${MOM_MONTHS_ID[Number(parts[1]) - 1] || parts[1]} ${parts[0]}`;
+        return `<option value="${ym}"${ym === momFilter.month ? ' selected' : ''}>${label}</option>`;
+      }).join('');
+    }
+    const filtered = momFilteredMeetings();
+    const countLabel = document.getElementById('mom-count-label');
+    if(countLabel){
+      countLabel.textContent = filtered.length === momMeetings.length
+        ? `${momMeetings.length} MoM tercatat`
+        : `Menampilkan ${filtered.length} dari ${momMeetings.length} MoM`;
+    }
+
+    tbody.innerHTML = filtered.map((m, i) => {
+      const status = m.status === 'final' ? 'final' : 'draft';
+      const openActions = (m.actionItems || []).filter(a => a.status !== 'done').length;
+      const participantCount = (m.attendees || []).filter(a => String(a.name || '').trim()).length;
+      const typeLabel = MOM_TYPES[m.meetingType] || MOM_TYPES.lainnya;
+      return `
+        <tr data-mom-id="${m.id}">
+          <td class="mom-col-num">${i + 1}</td>
+          <td><span class="mom-number">${momEsc(m.momNumber || '—')}</span></td>
+          <td>
+            <div class="mom-title-cell">${momEsc(m.title || '(Tanpa judul)')}</div>
+            <div class="mom-sub-cell">${momEsc(typeLabel)}</div>
+          </td>
+          <td>${momEsc(momFormatDate(m.date))}</td>
+          <td class="mom-time-cell">${momEsc(momTimeRange(m))}</td>
+          <td>${momEsc(m.location || '—')}</td>
+          <td class="mom-people-cell">
+            <span><b>${momEsc(m.chair || '—')}</b></span>
+            <span>${momEsc(m.notetaker || '—')}</span>
+          </td>
+          <td class="mom-col-center">${participantCount}</td>
+          <td class="mom-col-center">${openActions}</td>
+          <td class="mom-col-center"><span class="mom-badge ${status}">${status === 'final' ? 'Final' : 'Draft'}</span></td>
+          <td class="mom-col-act">
+            <div class="mom-actions">
+              <button type="button" class="mom-icon-btn" data-mom-action="preview" data-id="${m.id}" title="Preview"><i class="bi bi-eye"></i></button>
+              <button type="button" class="mom-icon-btn" data-mom-action="edit" data-id="${m.id}" title="Edit"><i class="bi bi-pencil"></i></button>
+              <button type="button" class="mom-icon-btn danger" data-mom-action="delete" data-id="${m.id}" title="Hapus"><i class="bi bi-trash"></i></button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    const emptyEl = document.getElementById('mom-empty');
+    if(emptyEl) emptyEl.style.display = filtered.length === 0 ? 'block' : 'none';
+  }
+
+  function momSignatureBlock(label, sig){
+    const signature = sig && sig.signature
+      ? `<img src="${momEsc(sig.signature)}" alt="Tanda tangan">`
+      : '';
+    return `
+      <div class="mom-doc-sign">
+        <div class="mom-doc-sign-label">${label},</div>
+        <div class="mom-doc-sign-space">${signature}</div>
+        <div class="mom-doc-sign-line"></div>
+        <div class="mom-doc-sign-name">${momEsc(sig && sig.name ? sig.name : '................................')}</div>
+        <div class="mom-doc-sign-role">${momEsc(sig && sig.role ? sig.role : 'Jabatan')}</div>
+        <div class="mom-doc-sign-date">${sig && sig.date ? 'Tanggal: ' + momEsc(momFormatDate(sig.date)) : '&nbsp;'}</div>
+      </div>
+    `;
+  }
+
+  function momBuildDoc(m){
+    const infoRows = [
+      ['Nomor MoM', m.momNumber || '—'],
+      ['Jenis Rapat', MOM_TYPES[m.meetingType] || MOM_TYPES.lainnya],
+      ['Hari / Tanggal', momFormatDate(m.date)],
+      ['Waktu', momTimeRange(m)],
+      ['Lokasi / Link', m.location || '—'],
+      ['Pimpinan Rapat', m.chair || '—'],
+      ['Notulis', m.notetaker || '—'],
+      ['Status', m.status === 'final' ? 'Final' : 'Draft'],
+    ];
+
+    const attendees = (m.attendees || []).filter(a => String(a.name || '').trim());
+    const agenda = (m.agenda || []).filter(a => String(a.topic || '').trim());
+    const discussions = (m.discussions || []).filter(d => String(d.notes || '').trim() || String(d.agendaTopic || '').trim());
+    const decisions = (m.decisions || []).filter(d => String(d.text || '').trim());
+    const actions = (m.actionItems || []).filter(a => String(a.description || '').trim());
+
+    let html = `
+      <div class="mom-doc-head">
+        <div class="mom-doc-kicker">Minutes of Meeting</div>
+        <h1>${momEsc(m.title || '(Tanpa judul)')}</h1>
+        <div class="mom-doc-number">${momEsc(m.momNumber || '')}</div>
+      </div>
+      <table class="mom-doc-table mom-doc-info">
+        <tbody>
+          ${infoRows.map(([label, value]) => `<tr><th>${momEsc(label)}</th><td>${momEsc(value)}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    `;
+
+    html += '<div class="mom-doc-section"><h2>Peserta Meeting</h2>';
+    if(attendees.length){
+      html += `
+        <table class="mom-doc-table">
+          <thead><tr><th style="width:34px;">No.</th><th>Nama</th><th>Jabatan / Divisi</th><th>Instansi</th><th>Kehadiran</th></tr></thead>
+          <tbody>
+            ${attendees.map((a, i) => `
+              <tr>
+                <td>${i + 1}</td>
+                <td>${momEsc(a.name)}</td>
+                <td>${momEsc(a.role || '—')}</td>
+                <td>${momEsc(a.organization || '—')}</td>
+                <td>${momEsc(MOM_ATTENDANCE[a.attendance] || MOM_ATTENDANCE.present)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    } else {
+      html += '<p class="mom-doc-muted">Tidak ada data peserta.</p>';
+    }
+    html += '</div>';
+
+    if(agenda.length){
+      html += `
+        <div class="mom-doc-section">
+          <h2>Agenda Meeting</h2>
+          <table class="mom-doc-table">
+            <thead><tr><th style="width:34px;">No.</th><th>Agenda</th><th>Presenter / PIC</th><th>Durasi</th></tr></thead>
+            <tbody>
+              ${agenda.map((a, i) => `
+                <tr>
+                  <td>${i + 1}</td>
+                  <td>${momEsc(a.topic)}</td>
+                  <td>${momEsc(a.presenter || '—')}</td>
+                  <td>${momEsc(a.duration ? a.duration + ' menit' : '—')}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    if(discussions.length){
+      html += `
+        <div class="mom-doc-section">
+          <h2>Poin-poin Pembahasan</h2>
+          <ol class="mom-doc-list">
+            ${discussions.map(d => `
+              <li>
+                ${d.agendaTopic ? `<strong>${momEsc(d.agendaTopic)}</strong><br>` : ''}
+                <div class="mom-doc-p">${momNl2br(d.notes)}</div>
+              </li>
+            `).join('')}
+          </ol>
+        </div>
+      `;
+    }
+
+    if(decisions.length){
+      html += `
+        <div class="mom-doc-section">
+          <h2>Keputusan / Kesepakatan</h2>
+          <ol class="mom-doc-list">
+            ${decisions.map(d => `<li>${momNl2br(d.text)}</li>`).join('')}
+          </ol>
+        </div>
+      `;
+    }
+
+    if(actions.length){
+      html += `
+        <div class="mom-doc-section">
+          <h2>Action Item / Tindak Lanjut</h2>
+          <table class="mom-doc-table">
+            <thead><tr><th style="width:34px;">No.</th><th>Action Item</th><th>PIC</th><th>Due Date</th><th>Status</th></tr></thead>
+            <tbody>
+              ${actions.map((a, i) => `
+                <tr>
+                  <td>${i + 1}</td>
+                  <td>${momNl2br(a.description)}</td>
+                  <td>${momEsc(a.pic || '—')}</td>
+                  <td>${a.dueDate ? momEsc(momFormatDate(a.dueDate)) : '—'}</td>
+                  <td>${momEsc(MOM_ACTION_STATUS[a.status] || MOM_ACTION_STATUS.open)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    if(m.nextSteps || m.nextMeetingDate || m.nextMeetingTime || m.nextMeetingLocation){
+      html += `
+        <div class="mom-doc-section">
+          <h2>What's Next / Rencana Selanjutnya</h2>
+          ${m.nextSteps ? `<p class="mom-doc-p">${momNl2br(m.nextSteps)}</p>` : ''}
+          <div class="mom-doc-meta">
+            ${m.nextMeetingDate ? `<span><b>Rapat berikutnya:</b> ${momEsc(momFormatDate(m.nextMeetingDate))}</span>` : ''}
+            ${m.nextMeetingTime ? `<span><b>Waktu:</b> ${momEsc(m.nextMeetingTime)}</span>` : ''}
+            ${m.nextMeetingLocation ? `<span><b>Lokasi:</b> ${momEsc(m.nextMeetingLocation)}</span>` : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    html += `
+      <div class="mom-doc-signatures">
+        ${momSignatureBlock('Dibuat oleh', m.preparedBy)}
+        ${momSignatureBlock('Disetujui oleh', m.approvedBy)}
+      </div>
+    `;
+
+    return html;
+  }
+
+  function openMomPreview(id){
+    const meeting = momMeetings.find(m => m.id === id);
+    if(!meeting) return;
+    momPreviewId = id;
+    const sub = document.getElementById('mom-preview-sub');
+    if(sub) sub.textContent = `${meeting.momNumber || 'MoM'} · ${momFormatDate(meeting.date)} · ${meeting.status === 'final' ? 'Final' : 'Draft'}`;
+    const doc = document.getElementById('mom-printable');
+    if(doc) doc.innerHTML = momBuildDoc(meeting);
+    document.getElementById('mom-preview-overlay').classList.add('open');
+  }
+
+  function closeMomPreview(){
+    const overlay = document.getElementById('mom-preview-overlay');
+    if(overlay) overlay.classList.remove('open');
+  }
+
+  function openMomEdit(id){
+    const meeting = momMeetings.find(m => m.id === id);
+    if(!meeting) return;
+    closeMomPreview();
+    openMomForm(meeting);
+  }
+
+  async function deleteMom(id){
+    const meeting = momMeetings.find(m => m.id === id);
+    if(!meeting) return;
+    const confirmed = await showConfirm(
+      `Yakin ingin menghapus MoM <strong>${momEsc(meeting.title || 'ini')}</strong>?`,
+      'Ya, Hapus',
+      'Batal'
+    );
+    if(!confirmed) return;
+    try {
+      await api.del('/api/mom/' + id);
+      if(momPreviewId === id) closeMomPreview();
+      if(momEditingId === id) closeMomForm();
+      await loadMomMeetings();
+      showToast('MoM berhasil dihapus.');
+    } catch(err){
+      showToast('Gagal menghapus MoM: ' + err.message, 'error');
+    }
+  }
+
+  async function exportMomPdf(){
+    const el = document.getElementById('mom-printable');
+    if(!el) return;
+    if(typeof html2pdf === 'undefined'){
+      showToast('Library PDF belum dimuat. Silakan coba lagi.', 'error');
+      return;
+    }
+    const meeting = momMeetings.find(m => m.id === momPreviewId);
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    if(currentTheme === 'dark') document.documentElement.setAttribute('data-theme', 'light');
+    el.classList.add('mom-print-light');
+
+    const fileName = ((meeting && meeting.momNumber) || 'MoM').replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') + '.pdf';
+    const opt = {
+      margin: [10, 10, 10, 10],
+      filename: fileName || 'MoM.pdf',
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    };
+
+    try {
+      await html2pdf().set(opt).from(el).save();
+    } catch(err){
+      showToast('Gagal export PDF: ' + err.message, 'error');
+    } finally {
+      el.classList.remove('mom-print-light');
+      if(currentTheme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  }
+
+  function openMomTemplate(){
+    document.getElementById('mom-template-overlay').classList.add('open');
+  }
+
+  function closeMomTemplate(){
+    document.getElementById('mom-template-overlay').classList.remove('open');
+  }
+
+  function initMom(){
+    const addBtns = [document.getElementById('mom-add-btn'), document.getElementById('mom-add-btn-2')];
+    addBtns.forEach(btn => {
+      if(btn) btn.addEventListener('click', () => openMomForm(null));
+    });
+
+    document.getElementById('mom-template-btn').addEventListener('click', openMomTemplate);
+    document.getElementById('mom-template-close').addEventListener('click', closeMomTemplate);
+    document.getElementById('mom-template-ok').addEventListener('click', closeMomTemplate);
+    document.getElementById('mom-template-overlay').addEventListener('click', (e) => {
+      if(e.target === document.getElementById('mom-template-overlay')) closeMomTemplate();
+    });
+
+    const searchInput = document.getElementById('mom-search');
+    searchInput.addEventListener('input', () => {
+      clearTimeout(momSearchTimer);
+      momSearchTimer = setTimeout(() => {
+        momFilter.search = searchInput.value.trim();
+        renderMomPage();
+      }, 150);
+    });
+
+    document.getElementById('mom-filter-status').addEventListener('change', (e) => {
+      momFilter.status = e.target.value;
+      renderMomPage();
+    });
+    document.getElementById('mom-filter-month').addEventListener('change', (e) => {
+      momFilter.month = e.target.value;
+      renderMomPage();
+    });
+    document.getElementById('mom-filter-reset').addEventListener('click', () => {
+      momFilter = { search: '', status: '', month: '' };
+      searchInput.value = '';
+      document.getElementById('mom-filter-status').value = '';
+      document.getElementById('mom-filter-month').value = '';
+      renderMomPage();
+    });
+
+    document.getElementById('mom-table-body').addEventListener('click', (e) => {
+      const actionBtn = e.target.closest('[data-mom-action]');
+      if(actionBtn){
+        e.stopPropagation();
+        const id = Number(actionBtn.dataset.id);
+        const action = actionBtn.dataset.momAction;
+        if(action === 'preview') openMomPreview(id);
+        if(action === 'edit') openMomEdit(id);
+        if(action === 'delete') deleteMom(id);
+        return;
+      }
+      const row = e.target.closest('tr[data-mom-id]');
+      if(row) openMomPreview(Number(row.dataset.momId));
+    });
+
+    document.getElementById('mom-form-close').addEventListener('click', closeMomForm);
+    document.getElementById('mom-cancel-btn').addEventListener('click', closeMomForm);
+    document.getElementById('mom-form-overlay').addEventListener('click', (e) => {
+      if(e.target === document.getElementById('mom-form-overlay')) closeMomForm();
+    });
+
+    document.getElementById('mom-save-draft-btn').addEventListener('click', () => saveMom('draft'));
+    document.getElementById('mom-save-final-btn').addEventListener('click', () => saveMom('final'));
+    document.getElementById('mom-delete-btn').addEventListener('click', () => {
+      if(momEditingId) deleteMom(momEditingId);
+    });
+
+    document.getElementById('mom-form').addEventListener('input', momHandleArrayInput);
+    document.getElementById('mom-form').addEventListener('change', momHandleArrayInput);
+    document.getElementById('mom-form').addEventListener('click', momHandleArrayRemove);
+    document.getElementById('mom-form').addEventListener('submit', (e) => e.preventDefault());
+
+    document.getElementById('mom-add-attendee').addEventListener('click', () => {
+      momDraft.attendees.push({ name: '', role: '', organization: '', attendance: 'present' });
+      momRenderAttendees();
+    });
+    document.getElementById('mom-add-agenda').addEventListener('click', () => {
+      momDraft.agenda.push({ topic: '', presenter: '', duration: '' });
+      momRenderAgenda();
+    });
+    document.getElementById('mom-add-discussion').addEventListener('click', () => {
+      momDraft.discussions.push({ agendaTopic: '', notes: '' });
+      momRenderDiscussions();
+    });
+    document.getElementById('mom-add-decision').addEventListener('click', () => {
+      momDraft.decisions.push({ text: '' });
+      momRenderDecisions();
+    });
+    document.getElementById('mom-add-action').addEventListener('click', () => {
+      momDraft.actionItems.push({ description: '', pic: '', dueDate: '', status: 'open' });
+      momRenderActions();
+    });
+
+    document.querySelectorAll('[data-sign-clear]').forEach(btn => {
+      btn.addEventListener('click', () => momClearSignature(btn.dataset.signClear));
+    });
+
+    document.getElementById('mom-preview-close').addEventListener('click', closeMomPreview);
+    document.getElementById('mom-preview-overlay').addEventListener('click', (e) => {
+      if(e.target === document.getElementById('mom-preview-overlay')) closeMomPreview();
+    });
+    document.getElementById('mom-preview-edit').addEventListener('click', () => {
+      if(momPreviewId) openMomEdit(momPreviewId);
+    });
+    document.getElementById('mom-export-pdf').addEventListener('click', exportMomPdf);
+
+    document.addEventListener('keydown', (e) => {
+      if(e.key === 'Escape'){
+        if(document.getElementById('mom-form-overlay').classList.contains('open')) closeMomForm();
+        else if(document.getElementById('mom-preview-overlay').classList.contains('open')) closeMomPreview();
+        else if(document.getElementById('mom-template-overlay').classList.contains('open')) closeMomTemplate();
+      }
+    });
+  }
+
+  initMom();
+
   /* ---------------- Init ---------------- */
   (async () => {
-    await Promise.all([loadTasks(), loadDailyTasks()]);
+    await Promise.all([loadTasks(), loadDailyTasks(), loadMomMeetings()]);
   })();
 
   // Update date labels when the day rolls over (checked every 30s)

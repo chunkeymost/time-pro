@@ -162,6 +162,106 @@ app.put('/api/tasks/:id/hold', async (req, res) => {
   }
 });
 
+/* ---------- Minutes of Meeting ---------- */
+
+// MoM untuk sementara hanya didukung pada penyimpanan JSON.
+// MySQL ditangguhkan sampai implementasi dan migration-nya diaktifkan kembali.
+function requireJsonMomStorage(req, res, next) {
+  if (!(storage instanceof JsonStorage)) {
+    return res.status(501).json({
+      error: 'Minutes of Meeting sementara hanya tersedia pada penyimpanan JSON.',
+    });
+  }
+  next();
+}
+
+app.use('/api/mom', requireJsonMomStorage);
+
+function validateMomBody(body, partial) {
+  if (!partial || body.title !== undefined) {
+    if (!body.title || !String(body.title).trim()) return 'Judul rapat wajib diisi';
+  }
+  if (!partial || body.date !== undefined) {
+    if (!body.date || !/^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
+      return 'Tanggal rapat wajib diisi dengan format YYYY-MM-DD';
+    }
+  }
+  for (const field of ['startTime', 'endTime', 'nextMeetingTime']) {
+    if (body[field] && !/^\d{2}:\d{2}$/.test(body[field])) {
+      return field + ' harus format HH:MM';
+    }
+  }
+  for (const field of ['nextMeetingDate']) {
+    if (body[field] && !/^\d{4}-\d{2}-\d{2}$/.test(body[field])) {
+      return field + ' harus format YYYY-MM-DD';
+    }
+  }
+  if (body.actionItems !== undefined && !Array.isArray(body.actionItems)) {
+    return 'actionItems harus berupa array';
+  }
+  if (body.attendees !== undefined && !Array.isArray(body.attendees)) {
+    return 'attendees harus berupa array';
+  }
+  return null;
+}
+
+app.get('/api/mom', async (req, res) => {
+  try {
+    const meetings = await storage.getMomMeetings();
+    res.json({ meetings });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/mom/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const meeting = await storage.getMomMeetingById(id);
+    if (!meeting) return res.status(404).json({ error: 'MoM not found' });
+    res.json({ meeting });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/mom', async (req, res) => {
+  try {
+    const err = validateMomBody(req.body, false);
+    if (err) return res.status(400).json({ error: err });
+    const meeting = await storage.createMomMeeting(req.body);
+    res.status(201).json({ meeting });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/mom/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const existing = await storage.getMomMeetingById(id);
+    if (!existing) return res.status(404).json({ error: 'MoM not found' });
+    const err = validateMomBody(req.body, true);
+    if (err) return res.status(400).json({ error: err });
+    const meeting = await storage.updateMomMeeting(id, req.body);
+    if (!meeting) return res.status(404).json({ error: 'MoM not found' });
+    res.json({ meeting });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/mom/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const ok = await storage.deleteMomMeeting(id);
+    if (!ok) return res.status(404).json({ error: 'MoM not found' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ---------- Backup ---------- */
 
 function copyIfExist(src, dest) {
@@ -202,6 +302,13 @@ app.post('/api/backup', async (req, res) => {
           }
         }
       }
+    }
+    // Sertakan data Minutes of Meeting ke file backup agar ikut tersimpan
+    const momPath = path.join(dataDir, 'mom.json');
+    if (fs.existsSync(momPath)) {
+      try {
+        srcData.mom = JSON.parse(fs.readFileSync(momPath, 'utf-8'));
+      } catch (_) {}
     }
     fs.writeFileSync(path.join(backupDir, taskFile), JSON.stringify(srcData, null, 2), 'utf-8');
 
@@ -293,6 +400,13 @@ app.post('/api/restore', async (req, res) => {
     currentData.metadata.updatedAt = new Date().toISOString();
     fs.writeFileSync(destPath, JSON.stringify(currentData, null, 2), 'utf-8');
 
+    // Restore data Minutes of Meeting bila tersedia di file backup
+    let momRestored = false;
+    if (srcData.mom && Array.isArray(srcData.mom.meetings)) {
+      fs.writeFileSync(path.join(dataDir, 'mom.json'), JSON.stringify(srcData.mom, null, 2), 'utf-8');
+      momRestored = true;
+    }
+
     // Restore log history files dari backup
     const timestamp = filename.replace(/^task-/, '').replace(/\.json$/, '');
     const logFiles = [
@@ -314,7 +428,7 @@ app.post('/api/restore', async (req, res) => {
     for (const f of restoredFiles) {
       await storage.addRestoreLog('Restored', f);
     }
-    res.json({ success: true, taskCount: srcData.tasks.length, imageCount });
+    res.json({ success: true, taskCount: srcData.tasks.length, imageCount, momRestored });
   } catch (err) {
     await storage.addRestoreLog('Failed', filename);
     res.status(500).json({ error: err.message });

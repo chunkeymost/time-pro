@@ -1,6 +1,58 @@
 const fs = require('fs');
 const path = require('path');
 
+function momString(value) {
+  return value === undefined || value === null ? '' : String(value);
+}
+
+function normalizeMomAttendees(list) {
+  return (Array.isArray(list) ? list : []).map(item => ({
+    name: momString(item && item.name),
+    role: momString(item && item.role),
+    organization: momString(item && item.organization),
+    attendance: momString(item && item.attendance) || 'present',
+  }));
+}
+
+function normalizeMomAgenda(list) {
+  return (Array.isArray(list) ? list : []).map(item => ({
+    topic: momString(item && item.topic),
+    presenter: momString(item && item.presenter),
+    duration: momString(item && item.duration),
+  }));
+}
+
+function normalizeMomDiscussions(list) {
+  return (Array.isArray(list) ? list : []).map(item => ({
+    agendaTopic: momString(item && item.agendaTopic),
+    notes: momString(item && item.notes),
+  }));
+}
+
+function normalizeMomDecisions(list) {
+  return (Array.isArray(list) ? list : []).map(item => ({
+    text: momString(typeof item === 'string' ? item : item && item.text),
+  }));
+}
+
+function normalizeMomActions(list) {
+  return (Array.isArray(list) ? list : []).map(item => ({
+    description: momString(item && item.description),
+    pic: momString(item && item.pic),
+    dueDate: momString(item && item.dueDate),
+    status: momString(item && item.status) || 'open',
+  }));
+}
+
+function normalizeMomSignature(sig) {
+  return {
+    name: momString(sig && sig.name),
+    role: momString(sig && sig.role),
+    date: momString(sig && sig.date),
+    signature: momString(sig && sig.signature),
+  };
+}
+
 class JsonStorage {
   constructor(filePath) {
     this.filePath = filePath;
@@ -501,6 +553,127 @@ class JsonStorage {
 
   getDailyTaskHistory() {
     return this._loadDailyHistory();
+  }
+
+  /* ---------- Minutes of Meeting ---------- */
+  _getMomPath() {
+    return path.join(path.dirname(this.filePath), 'mom.json');
+  }
+
+  _loadMom() {
+    try {
+      const p = this._getMomPath();
+      if (!fs.existsSync(p)) {
+        const seed = { meetings: [], nextId: 1 };
+        fs.writeFileSync(p, JSON.stringify(seed, null, 2), 'utf-8');
+        return seed;
+      }
+      const raw = fs.readFileSync(p, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed.meetings)) parsed.meetings = [];
+      if (!parsed.nextId) parsed.nextId = 1;
+      return parsed;
+    } catch (err) {
+      console.error('Failed to load MoM data:', err.message);
+      const seed = { meetings: [], nextId: 1 };
+      fs.writeFileSync(this._getMomPath(), JSON.stringify(seed, null, 2), 'utf-8');
+      return seed;
+    }
+  }
+
+  _saveMom(data) {
+    fs.writeFileSync(this._getMomPath(), JSON.stringify(data, null, 2), 'utf-8');
+  }
+
+  _nextMomNumber(meetings, year) {
+    const prefix = `MoM/${year}/`;
+    let max = 0;
+    (meetings || []).forEach(m => {
+      if (m && typeof m.momNumber === 'string' && m.momNumber.startsWith(prefix)) {
+        const n = parseInt(m.momNumber.slice(prefix.length), 10);
+        if (!isNaN(n) && n > max) max = n;
+      }
+    });
+    return prefix + String(max + 1).padStart(3, '0');
+  }
+
+  _normalizeMomMeeting(input, existing) {
+    const data = input || {};
+    const base = existing || {};
+    const now = new Date().toISOString();
+    return {
+      momNumber: data.momNumber !== undefined ? momString(data.momNumber) : momString(base.momNumber),
+      title: data.title !== undefined ? momString(data.title).trim() : momString(base.title),
+      meetingType: data.meetingType !== undefined ? momString(data.meetingType) : (base.meetingType || 'internal'),
+      date: data.date !== undefined ? momString(data.date).slice(0, 10) : momString(base.date),
+      startTime: data.startTime !== undefined ? momString(data.startTime) : momString(base.startTime),
+      endTime: data.endTime !== undefined ? momString(data.endTime) : momString(base.endTime),
+      location: data.location !== undefined ? momString(data.location) : momString(base.location),
+      chair: data.chair !== undefined ? momString(data.chair) : momString(base.chair),
+      notetaker: data.notetaker !== undefined ? momString(data.notetaker) : momString(base.notetaker),
+      status: (data.status !== undefined ? momString(data.status) : (base.status || 'draft')) === 'final' ? 'final' : 'draft',
+      attendees: data.attendees !== undefined ? normalizeMomAttendees(data.attendees) : normalizeMomAttendees(base.attendees),
+      agenda: data.agenda !== undefined ? normalizeMomAgenda(data.agenda) : normalizeMomAgenda(base.agenda),
+      discussions: data.discussions !== undefined ? normalizeMomDiscussions(data.discussions) : normalizeMomDiscussions(base.discussions),
+      decisions: data.decisions !== undefined ? normalizeMomDecisions(data.decisions) : normalizeMomDecisions(base.decisions),
+      actionItems: data.actionItems !== undefined ? normalizeMomActions(data.actionItems) : normalizeMomActions(base.actionItems),
+      nextSteps: data.nextSteps !== undefined ? momString(data.nextSteps) : momString(base.nextSteps),
+      nextMeetingDate: data.nextMeetingDate !== undefined ? momString(data.nextMeetingDate).slice(0, 10) : momString(base.nextMeetingDate),
+      nextMeetingTime: data.nextMeetingTime !== undefined ? momString(data.nextMeetingTime) : momString(base.nextMeetingTime),
+      nextMeetingLocation: data.nextMeetingLocation !== undefined ? momString(data.nextMeetingLocation) : momString(base.nextMeetingLocation),
+      preparedBy: normalizeMomSignature(data.preparedBy !== undefined ? data.preparedBy : base.preparedBy),
+      approvedBy: normalizeMomSignature(data.approvedBy !== undefined ? data.approvedBy : base.approvedBy),
+      createdAt: base.createdAt || now,
+      updatedAt: now,
+    };
+  }
+
+  getMomMeetings() {
+    const data = this._loadMom();
+    return data.meetings.slice().sort((a, b) => {
+      const da = momString(a.date);
+      const db = momString(b.date);
+      if (da === db) return (b.id || 0) - (a.id || 0);
+      return db.localeCompare(da);
+    });
+  }
+
+  getMomMeetingById(id) {
+    const data = this._loadMom();
+    return data.meetings.find(m => m.id === id) || null;
+  }
+
+  createMomMeeting(input) {
+    const data = this._loadMom();
+    const year = momString(input && input.date).slice(0, 4) || String(new Date().getFullYear());
+    const meeting = this._normalizeMomMeeting(input, null);
+    meeting.id = data.nextId++;
+    if (!meeting.momNumber) {
+      meeting.momNumber = this._nextMomNumber(data.meetings, year);
+    }
+    data.meetings.push(meeting);
+    this._saveMom(data);
+    return meeting;
+  }
+
+  updateMomMeeting(id, input) {
+    const data = this._loadMom();
+    const idx = data.meetings.findIndex(m => m.id === id);
+    if (idx === -1) return null;
+    const merged = this._normalizeMomMeeting(input, data.meetings[idx]);
+    merged.id = data.meetings[idx].id;
+    data.meetings[idx] = merged;
+    this._saveMom(data);
+    return merged;
+  }
+
+  deleteMomMeeting(id) {
+    const data = this._loadMom();
+    const idx = data.meetings.findIndex(m => m.id === id);
+    if (idx === -1) return false;
+    data.meetings.splice(idx, 1);
+    this._saveMom(data);
+    return true;
   }
 }
 

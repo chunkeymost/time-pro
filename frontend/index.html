@@ -29,6 +29,10 @@
         <i class="bi bi-kanban-fill"></i>
         <span>Proyek Management</span>
       </a>
+      <a href="#" class="nav-item" data-view="mom">
+        <i class="bi bi-journal-check"></i>
+        <span>Minutes of Meeting</span>
+      </a>
     </nav>
   </aside>
 
@@ -116,6 +120,20 @@
     </section>
   </header>
 
+  <header class="page-header" id="mom-header">
+    <section class="page-header-section">
+      <span class="page-header-eyebrow">Dokumentasi Rapat</span>
+      <div class="title-row">
+        <span>Minutes of Meeting</span>
+      </div>
+      <span class="project-sub">Catat keputusan, action item, dan tindak lanjut rapat.</span>
+    </section>
+    <section class="page-header-view" aria-label="Aksi Minutes of Meeting">
+      <button class="btn btn-ghost" id="mom-template-btn"><i class="bi bi-file-earmark-text"></i> PANDUAN TEMPLATE</button>
+      <button class="btn btn-primary" id="mom-add-btn">+ MoM BARU</button>
+    </section>
+  </header>
+
   <nav class="breadcrumb-card" id="breadcrumb-card" aria-label="Breadcrumb"></nav>
 
   <div class="overview-cards" id="overview-cards"></div>
@@ -139,6 +157,62 @@
       </div>
     </div>
   </div>
+  </div>
+
+  <div class="mom-page" id="mom-page">
+    <div class="mom-stats" id="mom-stats"></div>
+
+    <div class="mom-panel">
+      <div class="mom-panel-head">
+        <div>
+          <h2 class="mom-panel-title">Daftar Minutes of Meeting</h2>
+          <p class="mom-panel-sub" id="mom-count-label">Memuat data...</p>
+        </div>
+        <button class="btn btn-primary mom-panel-add" id="mom-add-btn-2">+ MoM BARU</button>
+      </div>
+
+      <div class="mom-toolbar">
+        <div class="mom-search">
+          <i class="bi bi-search"></i>
+          <input type="text" id="mom-search" placeholder="Cari judul, nomor, peserta, pimpinan...">
+        </div>
+        <select id="mom-filter-status" class="mom-filter-select">
+          <option value="">Semua Status</option>
+          <option value="draft">Draft</option>
+          <option value="final">Final</option>
+        </select>
+        <select id="mom-filter-month" class="mom-filter-select">
+          <option value="">Semua Bulan</option>
+        </select>
+        <button class="btn btn-ghost mom-filter-reset" id="mom-filter-reset"><i class="bi bi-arrow-counterclockwise"></i> Reset</button>
+      </div>
+
+      <div class="mom-table-wrap">
+        <table class="mom-table">
+          <thead>
+            <tr>
+              <th class="mom-col-num">No.</th>
+              <th>Nomor MoM</th>
+              <th>Judul Rapat</th>
+              <th>Tanggal</th>
+              <th>Waktu</th>
+              <th>Lokasi</th>
+              <th>Pimpinan / Notulis</th>
+              <th class="mom-col-center">Peserta</th>
+              <th class="mom-col-center">Action</th>
+              <th class="mom-col-center">Status</th>
+              <th class="mom-col-act">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="mom-table-body"></tbody>
+        </table>
+      </div>
+      <div class="mom-empty" id="mom-empty" style="display:none;">
+        <i class="bi bi-journal-x"></i>
+        <div class="mom-empty-title">Belum ada Minutes of Meeting</div>
+        <div class="mom-empty-sub">Klik tombol "MoM Baru" untuk mulai mencatat rapat pertama Anda.</div>
+      </div>
+    </div>
   </div>
 
   <div class="toast-container" id="toast-container"></div>
@@ -517,6 +591,366 @@
     </div>
     <div class="modal-sub">Arsip daily task per tanggal yang sudah di-snapshot saat pergantian hari.</div>
     <div class="daily-history-list" id="daily-history-list"></div>
+  </div>
+</div>
+
+<!-- MoM form sidepeek -->
+<div class="overlay" id="mom-form-overlay">
+  <div class="modal mom-modal">
+    <div class="modal-head">
+      <h2 id="mom-form-title">MoM Baru</h2>
+      <button class="modal-close" id="mom-form-close">&times;</button>
+    </div>
+    <div class="modal-sub" id="mom-form-sub">Lengkapi informasi rapat, peserta, agenda, keputusan, dan tindak lanjut.</div>
+
+    <form id="mom-form" class="mom-form" autocomplete="off" novalidate>
+      <section class="mom-form-section">
+        <div class="mom-section-head">
+          <h3><i class="bi bi-info-circle"></i> Info MoM</h3>
+          <span class="mom-section-hint">Identitas dan detail pelaksanaan rapat</span>
+        </div>
+        <div class="row-2">
+          <div class="field">
+            <label for="mom-title">Judul Rapat *</label>
+            <input type="text" id="mom-title" placeholder="cth. Weekly Project Sync">
+          </div>
+          <div class="field">
+            <label for="mom-number">Nomor MoM</label>
+            <input type="text" id="mom-number" readonly placeholder="Otomatis saat disimpan">
+          </div>
+        </div>
+        <div class="row-2">
+          <div class="field">
+            <label for="mom-type">Jenis Rapat</label>
+            <select id="mom-type">
+              <option value="internal">Internal</option>
+              <option value="project">Project</option>
+              <option value="client">Client</option>
+              <option value="formal">Formal</option>
+              <option value="lainnya">Lainnya</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="mom-status">Status</label>
+            <select id="mom-status">
+              <option value="draft">Draft</option>
+              <option value="final">Final</option>
+            </select>
+          </div>
+        </div>
+        <div class="row-2">
+          <div class="field">
+            <label for="mom-date">Tanggal Rapat *</label>
+            <input type="date" id="mom-date">
+          </div>
+          <div class="field">
+            <label for="mom-location">Lokasi / Link Rapat</label>
+            <input type="text" id="mom-location" placeholder="Ruang Meeting / Zoom / Google Meet">
+          </div>
+        </div>
+        <div class="row-2">
+          <div class="field">
+            <label for="mom-start">Waktu Mulai</label>
+            <input type="time" id="mom-start">
+          </div>
+          <div class="field">
+            <label for="mom-end">Waktu Selesai</label>
+            <input type="time" id="mom-end">
+          </div>
+        </div>
+        <div class="row-2">
+          <div class="field">
+            <label for="mom-chair">Pimpinan Rapat</label>
+            <input type="text" id="mom-chair" placeholder="Nama pimpinan rapat">
+          </div>
+          <div class="field">
+            <label for="mom-notetaker">Notulis</label>
+            <input type="text" id="mom-notetaker" placeholder="Nama notulis">
+          </div>
+        </div>
+      </section>
+
+      <section class="mom-form-section">
+        <div class="mom-section-head">
+          <h3><i class="bi bi-people"></i> Peserta Meeting <span class="mom-count-badge" id="mom-attendee-count">0</span></h3>
+          <button type="button" class="btn btn-ghost mom-add-btn" id="mom-add-attendee"><i class="bi bi-plus-lg"></i> Tambah Peserta</button>
+        </div>
+        <div class="mom-table-scroll">
+          <table class="mom-input-table">
+            <thead>
+              <tr>
+                <th class="mom-col-num">No.</th>
+                <th>Nama</th>
+                <th>Jabatan / Divisi</th>
+                <th>Instansi</th>
+                <th>Kehadiran</th>
+                <th class="mom-col-act"></th>
+              </tr>
+            </thead>
+            <tbody id="mom-attendee-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="mom-form-section">
+        <div class="mom-section-head">
+          <h3><i class="bi bi-list-ol"></i> Agenda Meeting</h3>
+          <button type="button" class="btn btn-ghost mom-add-btn" id="mom-add-agenda"><i class="bi bi-plus-lg"></i> Tambah Agenda</button>
+        </div>
+        <div class="mom-table-scroll">
+          <table class="mom-input-table">
+            <thead>
+              <tr>
+                <th class="mom-col-num">No.</th>
+                <th>Topik Agenda</th>
+                <th>Presenter / PIC</th>
+                <th>Durasi (menit)</th>
+                <th class="mom-col-act"></th>
+              </tr>
+            </thead>
+            <tbody id="mom-agenda-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="mom-form-section">
+        <div class="mom-section-head">
+          <h3><i class="bi bi-chat-left-text"></i> Poin-poin Pembahasan</h3>
+          <button type="button" class="btn btn-ghost mom-add-btn" id="mom-add-discussion"><i class="bi bi-plus-lg"></i> Tambah Pembahasan</button>
+        </div>
+        <div class="mom-table-scroll">
+          <table class="mom-input-table">
+            <thead>
+              <tr>
+                <th class="mom-col-num">No.</th>
+                <th>Agenda Terkait</th>
+                <th>Poin Pembahasan</th>
+                <th class="mom-col-act"></th>
+              </tr>
+            </thead>
+            <tbody id="mom-discussion-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="mom-form-section">
+        <div class="mom-section-head">
+          <h3><i class="bi bi-check2-square"></i> Keputusan / Kesepakatan</h3>
+          <button type="button" class="btn btn-ghost mom-add-btn" id="mom-add-decision"><i class="bi bi-plus-lg"></i> Tambah Keputusan</button>
+        </div>
+        <div class="mom-table-scroll">
+          <table class="mom-input-table">
+            <thead>
+              <tr>
+                <th class="mom-col-num">No.</th>
+                <th>Keputusan / Kesepakatan</th>
+                <th class="mom-col-act"></th>
+              </tr>
+            </thead>
+            <tbody id="mom-decision-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="mom-form-section">
+        <div class="mom-section-head">
+          <h3><i class="bi bi-list-task"></i> Action Item / Tindak Lanjut</h3>
+          <button type="button" class="btn btn-ghost mom-add-btn" id="mom-add-action"><i class="bi bi-plus-lg"></i> Tambah Action Item</button>
+        </div>
+        <div class="mom-table-scroll">
+          <table class="mom-input-table">
+            <thead>
+              <tr>
+                <th class="mom-col-num">No.</th>
+                <th>Action Item</th>
+                <th>PIC</th>
+                <th>Due Date</th>
+                <th>Status</th>
+                <th class="mom-col-act"></th>
+              </tr>
+            </thead>
+            <tbody id="mom-action-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="mom-form-section">
+        <div class="mom-section-head">
+          <h3><i class="bi bi-arrow-right-circle"></i> What's Next / Rencana Selanjutnya</h3>
+          <span class="mom-section-hint">Rencana dan jadwal rapat berikutnya</span>
+        </div>
+        <div class="field">
+          <label for="mom-next-steps">Rencana Selanjutnya</label>
+          <textarea id="mom-next-steps" rows="3" placeholder="cth. Finalisasi dokumen, lanjut ke tahap development, dst."></textarea>
+        </div>
+        <div class="row-3">
+          <div class="field">
+            <label for="mom-next-date">Tanggal Rapat Berikutnya</label>
+            <input type="date" id="mom-next-date">
+          </div>
+          <div class="field">
+            <label for="mom-next-time">Waktu</label>
+            <input type="time" id="mom-next-time">
+          </div>
+          <div class="field">
+            <label for="mom-next-location">Lokasi / Link</label>
+            <input type="text" id="mom-next-location" placeholder="Ruang Meeting / Zoom">
+          </div>
+        </div>
+      </section>
+
+      <section class="mom-form-section">
+        <div class="mom-section-head">
+          <h3><i class="bi bi-pen"></i> Pengesahan &amp; Tanda Tangan</h3>
+          <span class="mom-section-hint">Gambar tanda tangan langsung pada area di bawah</span>
+        </div>
+        <div class="mom-sign-grid">
+          <div class="mom-sign-card">
+            <div class="mom-sign-title">Dibuat oleh</div>
+            <div class="row-2">
+              <div class="field">
+                <label for="mom-prepared-name">Nama</label>
+                <input type="text" id="mom-prepared-name" placeholder="Nama pembuat MoM">
+              </div>
+              <div class="field">
+                <label for="mom-prepared-role">Jabatan</label>
+                <input type="text" id="mom-prepared-role" placeholder="Jabatan">
+              </div>
+            </div>
+            <div class="field">
+              <label for="mom-prepared-date">Tanggal</label>
+              <input type="date" id="mom-prepared-date">
+            </div>
+            <div class="mom-sign-canvas-wrap">
+              <canvas id="mom-prepared-canvas" class="mom-sign-canvas"></canvas>
+              <button type="button" class="mom-sign-clear" data-sign-clear="mom-prepared-canvas">Hapus</button>
+            </div>
+          </div>
+
+          <div class="mom-sign-card">
+            <div class="mom-sign-title">Disetujui oleh</div>
+            <div class="row-2">
+              <div class="field">
+                <label for="mom-approved-name">Nama</label>
+                <input type="text" id="mom-approved-name" placeholder="Nama penyetuju">
+              </div>
+              <div class="field">
+                <label for="mom-approved-role">Jabatan</label>
+                <input type="text" id="mom-approved-role" placeholder="Jabatan">
+              </div>
+            </div>
+            <div class="field">
+              <label for="mom-approved-date">Tanggal</label>
+              <input type="date" id="mom-approved-date">
+            </div>
+            <div class="mom-sign-canvas-wrap">
+              <canvas id="mom-approved-canvas" class="mom-sign-canvas"></canvas>
+              <button type="button" class="mom-sign-clear" data-sign-clear="mom-approved-canvas">Hapus</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </form>
+
+    <div class="mom-form-footer">
+      <div class="mom-form-footer-left">
+        <button type="button" class="link-danger" id="mom-delete-btn" style="visibility:hidden;">Hapus MoM</button>
+      </div>
+      <div class="mom-form-footer-right">
+        <button type="button" class="btn btn-ghost" id="mom-cancel-btn">Batal</button>
+        <button type="button" class="btn btn-ghost" id="mom-save-draft-btn">Simpan Draft</button>
+        <button type="button" class="btn btn-primary" id="mom-save-final-btn">Simpan Final</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MoM preview -->
+<div class="overlay" id="mom-preview-overlay">
+  <div class="modal mom-preview-modal">
+    <div class="modal-head mom-no-print">
+      <h2>Preview Minutes of Meeting</h2>
+      <button class="modal-close" id="mom-preview-close">&times;</button>
+    </div>
+    <div class="modal-sub mom-no-print" id="mom-preview-sub"></div>
+    <div class="mom-doc" id="mom-printable"></div>
+    <div class="mom-preview-actions mom-no-print">
+      <button type="button" class="btn btn-ghost" id="mom-preview-edit"><i class="bi bi-pencil"></i> Edit MoM</button>
+      <button type="button" class="btn btn-primary" id="mom-export-pdf"><i class="bi bi-file-earmark-pdf"></i> Export PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- MoM template guide -->
+<div class="overlay" id="mom-template-overlay">
+  <div class="modal mom-template-modal">
+    <div class="modal-head">
+      <h2><i class="bi bi-file-earmark-text"></i> Panduan Template MoM</h2>
+      <button class="modal-close" id="mom-template-close">&times;</button>
+    </div>
+    <div class="modal-sub">Format standar yang paling umum digunakan untuk Minutes of Meeting.</div>
+
+    <div class="mom-template-body">
+      <p class="mom-template-lead">
+        Template ini mengikuti struktur <strong>standard meeting minutes</strong> yang dipakai Atlassian, Adobe Acrobat, dan Wrike: identitas rapat, peserta, agenda, pembahasan, keputusan, action item dengan PIC &amp; tenggat, lalu rencana selanjutnya dan pengesahan.
+      </p>
+
+      <div class="mom-template-grid">
+        <div class="mom-template-item">
+          <span class="mom-template-num">1</span>
+          <div><strong>Info MoM</strong><p>Judul, nomor, tanggal, waktu, lokasi/link, pimpinan rapat, dan notulis.</p></div>
+        </div>
+        <div class="mom-template-item">
+          <span class="mom-template-num">2</span>
+          <div><strong>Peserta Meeting</strong><p>Nama, jabatan/divisi, instansi, dan status kehadiran.</p></div>
+        </div>
+        <div class="mom-template-item">
+          <span class="mom-template-num">3</span>
+          <div><strong>Agenda Meeting</strong><p>Topik yang dibahas, presenter/PIC, dan durasi tiap agenda.</p></div>
+        </div>
+        <div class="mom-template-item">
+          <span class="mom-template-num">4</span>
+          <div><strong>Poin Pembahasan</strong><p>Ringkasan diskusi per agenda, bukan transkrip kata per kata.</p></div>
+        </div>
+        <div class="mom-template-item">
+          <span class="mom-template-num">5</span>
+          <div><strong>Keputusan / Kesepakatan</strong><p>Tulis keputusan dalam kalimat lengkap agar tidak ambigu.</p></div>
+        </div>
+        <div class="mom-template-item">
+          <span class="mom-template-num">6</span>
+          <div><strong>Action Item</strong><p>Satu PIC dan satu tenggat untuk setiap tindak lanjut.</p></div>
+        </div>
+        <div class="mom-template-item">
+          <span class="mom-template-num">7</span>
+          <div><strong>What's Next</strong><p>Rencana selanjutnya, agenda terbuka, dan jadwal rapat berikutnya.</p></div>
+        </div>
+        <div class="mom-template-item">
+          <span class="mom-template-num">8</span>
+          <div><strong>Pengesahan</strong><p>Dibuat oleh dan disetujui oleh, lengkap dengan tanda tangan.</p></div>
+        </div>
+      </div>
+
+      <div class="mom-template-tips">
+        <strong>Tips pengisian</strong>
+        <ul>
+          <li>Catat keputusan segera setelah disepakati, sebelum agenda berpindah.</li>
+          <li>Gunakan kata kerja + hasil + tenggat untuk action item.</li>
+          <li>Bagikan MoM maksimal 1x24 jam setelah rapat.</li>
+          <li>Simpan status <em>Final</em> setelah MoM disetujui.</li>
+        </ul>
+      </div>
+
+      <div class="mom-template-sources">
+        <strong>Referensi format</strong>
+        <a href="https://www.atlassian.com/software/confluence/templates/meeting-notes" target="_blank" rel="noopener">Atlassian Confluence</a>
+        <a href="https://www.adobe.com/acrobat/business/resources/meeting-minutes-templates.html" target="_blank" rel="noopener">Adobe Acrobat</a>
+        <a href="https://www.wrike.com/blog/action-items-with-meeting-notes-template" target="_blank" rel="noopener">Wrike</a>
+      </div>
+    </div>
+
+    <div class="modal-actions" style="justify-content:flex-end;">
+      <button type="button" class="btn btn-primary" id="mom-template-ok">Mengerti</button>
+    </div>
   </div>
 </div>
 

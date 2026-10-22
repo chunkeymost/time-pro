@@ -71,6 +71,7 @@ Aplikasi web ringan untuk memvisualisasikan, melacak, dan mengelola jadwal tugas
 - **Backup & Restore** — Backup data ke file timestamp, restore dari backup, history log backup & restore terpisah
 - **Editable Project Title** — Judul proyek bisa diubah langsung via klik (inline edit) — tersimpan di metadata server
 - **📊 Reporting** — Ringkasan laporan tugas berdasarkan periode tanggal (client-side), dengan export PDF dan breakdown per kategori
+- **🧾 Minutes of Meeting (MoM)** — Halaman khusus untuk mencatat notulen rapat: info MoM, peserta, agenda, poin pembahasan, keputusan, action item (PIC + due date), what's next, serta pengesahan "Dibuat oleh" & "Disetujui oleh" dengan tanda tangan digital (canvas). Dilengkapi tabel list, filter, preview dokumen, dan export PDF.
 
 ## Arsitektur
 
@@ -114,6 +115,11 @@ Jalan otomatis saat `STORAGE=mysql` — `server.js` menjalankan `migrate()` pada
 | `POST` | `/api/holidays` | Tambah hari libur (`start`, `end`, `keterangan`) |
 | `PUT` | `/api/holidays/:id` | Update hari libur |
 | `DELETE` | `/api/holidays/:id` | Hapus hari libur |
+| `GET` | `/api/mom` | Ambil semua Minutes of Meeting |
+| `GET` | `/api/mom/:id` | Ambil detail MoM |
+| `POST` | `/api/mom` | Buat MoM baru (nomor otomatis) |
+| `PUT` | `/api/mom/:id` | Update MoM |
+| `DELETE` | `/api/mom/:id` | Hapus MoM |
 | `POST` | `/api/backup` | Backup tasks.json ke file timestamp |
 | `GET` | `/api/backups` | List semua file backup di data/ |
 | `POST` | `/api/restore` | Restore data dari file backup |
@@ -121,6 +127,8 @@ Jalan otomatis saat `STORAGE=mysql` — `server.js` menjalankan `migrate()` pada
 | `GET` | `/api/metadata` | Ambil metadata (title, versi, lastSynced) |
 | `PUT` | `/api/metadata` | Update metadata (title) |
 | `POST` | `/api/sync/commit` | Sync JSON ke MySQL (stub) |
+
+> Catatan: endpoint `/api/mom` saat ini hanya aktif untuk `STORAGE=json`. Jika server dijalankan dengan `STORAGE=mysql`, endpoint MoM akan mengembalikan `501` sampai dukungan MySQL diaktifkan kembali.
 
 ## Rencana Pengembangan
 
@@ -146,6 +154,9 @@ Lihat `know-me/PLAN.md` untuk detail rencana implementasi.
 - Data tersimpan secara persistent di `backend/data/tasks.json` — tidak hilang saat browser di-refresh
 - Hari libur tersimpan di file yang sama (`backend/data/tasks.json`, array `holidays`) bersama data tugas
 - Mode MySQL: tabel `holidays` dibuat otomatis oleh auto-migration (`V9__create_holidays.sql`) saat startup
+- Minutes of Meeting **saat ini hanya menggunakan penyimpanan JSON**, tersimpan terpisah di `backend/data/mom.json`
+- Backup data tugas juga menyertakan data MoM (`mom.json`) dan akan ikut direstore
+- Dukungan MySQL untuk MoM ditangguhkan sementara. Migration `V10__create_mom.sql.disabled` tidak dijalankan oleh migration runner dan API MoM menolak storage MySQL hingga fitur diaktifkan kembali.
 - History restore & backup disimpan di `backend/data/restore-log.json` (terpisah dari data tugas)
 - File `frontend/index.html` tetap single-file; backend terpisah di `backend/server.js` + `backend/src/`
 - Bootstrap Icons dimuat dari CDN untuk ikon copy di notifikasi
