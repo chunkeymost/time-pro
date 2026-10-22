@@ -286,6 +286,18 @@
       return;
     }
 
+    if(currentView === 'qa'){
+      els.breadcrumbCard.innerHTML = `
+        <span class="breadcrumb-item">
+          <i class="bi bi-house-door"></i>
+          <span>Beranda</span>
+        </span>
+        <span class="breadcrumb-sep"><i class="bi bi-chevron-right"></i></span>
+        <span class="breadcrumb-item active" aria-current="page">Quality Assurance</span>
+      `;
+      return;
+    }
+
     const title = els.title?.textContent?.trim() || 'Timeframe';
     els.breadcrumbCard.innerHTML = `
       <span class="breadcrumb-item">
