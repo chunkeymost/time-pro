@@ -1,5 +1,26 @@
 const mysql = require('mysql2/promise');
 
+const MOM_HEADER_COLUMNS = `id, mom_number, title, meeting_type, meeting_date, start_time, end_time, location, chair, notetaker, status, next_steps, next_meeting_date, next_meeting_time, next_meeting_location, prepared_by_name, prepared_by_role, prepared_by_date, prepared_by_signature, approved_by_name, approved_by_role, approved_by_date, approved_by_signature, created_at, updated_at`;
+
+function momDateStr(value) {
+  if (!value) return '';
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value).slice(0, 10);
+}
+
+function momTimeStr(value) {
+  if (!value) return '';
+  return String(value).slice(0, 5);
+}
+
+function momIso(value) {
+  return value instanceof Date ? value.toISOString() : (value || null);
+}
+
+function momStr(value) {
+  return value === undefined || value === null ? '' : String(value);
+}
+
 class MysqlStorage {
   constructor(mysqlConfig) {
     this.config = mysqlConfig;
@@ -501,6 +522,474 @@ class MysqlStorage {
     try {
       const [result] = await conn.execute('DELETE FROM holidays WHERE id = ?', [id]);
       return result.affectedRows > 0;
+    } finally {
+      await conn.end();
+    }
+  }
+
+  /* ---------- Minutes of Meeting (NONAKTIF) ----------
+   * Dukungan MoM untuk MySQL ditangguhkan sementara.
+   * API /api/mom diblokir untuk storage MySQL dan migration V10 dinonaktifkan.
+   * Method di bawah dipertahankan sebagai referensi untuk aktivasi kembali.
+   */
+  _mapMomHeader(row, children) {
+    const c = children || {};
+    return {
+      id: row.id,
+      momNumber: row.mom_number || '',
+      title: row.title || '',
+      meetingType: row.meeting_type || 'internal',
+      date: momDateStr(row.meeting_date),
+      startTime: momTimeStr(row.start_time),
+      endTime: momTimeStr(row.end_time),
+      location: row.location || '',
+      chair: row.chair || '',
+      notetaker: row.notetaker || '',
+      status: row.status || 'draft',
+      attendees: c.attendees || [],
+      agenda: c.agenda || [],
+      discussions: c.discussions || [],
+      decisions: c.decisions || [],
+      actionItems: c.actionItems || [],
+      nextSteps: row.next_steps || '',
+      nextMeetingDate: momDateStr(row.next_meeting_date),
+      nextMeetingTime: momTimeStr(row.next_meeting_time),
+      nextMeetingLocation: row.next_meeting_location || '',
+      preparedBy: {
+        name: row.prepared_by_name || '',
+        role: row.prepared_by_role || '',
+        date: momDateStr(row.prepared_by_date),
+        signature: row.prepared_by_signature || '',
+      },
+      approvedBy: {
+        name: row.approved_by_name || '',
+        role: row.approved_by_role || '',
+        date: momDateStr(row.approved_by_date),
+        signature: row.approved_by_signature || '',
+      },
+      createdAt: momIso(row.created_at),
+      updatedAt: momIso(row.updated_at),
+    };
+  }
+
+  async _loadMomChildrenMap(conn) {
+    const map = {};
+    const ensure = id => {
+      if (!map[id]) map[id] = { attendees: [], agenda: [], discussions: [], decisions: [], actionItems: [] };
+      return map[id];
+    };
+
+    const [attendees] = await conn.execute(
+      'SELECT id, mom_id, name, role, organization, attendance FROM mom_attendees WHERE deleted_at IS NULL ORDER BY mom_id, sort_order, id'
+    );
+    for (const a of attendees) {
+      ensure(a.mom_id).attendees.push({
+        id: a.id,
+        name: a.name || '',
+        role: a.role || '',
+        organization: a.organization || '',
+        attendance: a.attendance || 'present',
+      });
+    }
+
+    const [agenda] = await conn.execute(
+      'SELECT id, mom_id, topic, presenter, duration FROM mom_agenda WHERE deleted_at IS NULL ORDER BY mom_id, sort_order, id'
+    );
+    for (const a of agenda) {
+      ensure(a.mom_id).agenda.push({
+        id: a.id,
+        topic: a.topic || '',
+        presenter: a.presenter || '',
+        duration: a.duration || '',
+      });
+    }
+
+    const [discussions] = await conn.execute(
+      'SELECT id, mom_id, agenda_topic, notes FROM mom_discussions WHERE deleted_at IS NULL ORDER BY mom_id, sort_order, id'
+    );
+    for (const d of discussions) {
+      ensure(d.mom_id).discussions.push({
+        id: d.id,
+        agendaTopic: d.agenda_topic || '',
+        notes: d.notes || '',
+      });
+    }
+
+    const [decisions] = await conn.execute(
+      'SELECT id, mom_id, decision_text FROM mom_decisions WHERE deleted_at IS NULL ORDER BY mom_id, sort_order, id'
+    );
+    for (const d of decisions) {
+      ensure(d.mom_id).decisions.push({
+        id: d.id,
+        text: d.decision_text || '',
+      });
+    }
+
+    const [actions] = await conn.execute(
+      'SELECT id, mom_id, description, pic, due_date, status FROM mom_action_items WHERE deleted_at IS NULL ORDER BY mom_id, sort_order, id'
+    );
+    for (const a of actions) {
+      ensure(a.mom_id).actionItems.push({
+        id: a.id,
+        description: a.description || '',
+        pic: a.pic || '',
+        dueDate: momDateStr(a.due_date),
+        status: a.status || 'open',
+      });
+    }
+
+    return map;
+  }
+
+  async getMomMeetings() {
+    const conn = await this._getConnection();
+    try {
+      const [headers] = await conn.execute(
+        `SELECT ${MOM_HEADER_COLUMNS} FROM mom_meetings WHERE deleted_at IS NULL ORDER BY meeting_date DESC, id DESC`
+      );
+      if (headers.length === 0) return [];
+      const map = await this._loadMomChildrenMap(conn);
+      return headers.map(h => this._mapMomHeader(h, map[h.id]));
+    } finally {
+      await conn.end();
+    }
+  }
+
+  async getMomMeetingById(id) {
+    const conn = await this._getConnection();
+    try {
+      const [headers] = await conn.execute(
+        `SELECT ${MOM_HEADER_COLUMNS} FROM mom_meetings WHERE id = ? AND deleted_at IS NULL`,
+        [id]
+      );
+      if (headers.length === 0) return null;
+
+      const [attendees] = await conn.execute(
+        'SELECT id, name, role, organization, attendance FROM mom_attendees WHERE mom_id = ? AND deleted_at IS NULL ORDER BY sort_order, id',
+        [id]
+      );
+      const [agenda] = await conn.execute(
+        'SELECT id, topic, presenter, duration FROM mom_agenda WHERE mom_id = ? AND deleted_at IS NULL ORDER BY sort_order, id',
+        [id]
+      );
+      const [discussions] = await conn.execute(
+        'SELECT id, agenda_topic, notes FROM mom_discussions WHERE mom_id = ? AND deleted_at IS NULL ORDER BY sort_order, id',
+        [id]
+      );
+      const [decisions] = await conn.execute(
+        'SELECT id, decision_text FROM mom_decisions WHERE mom_id = ? AND deleted_at IS NULL ORDER BY sort_order, id',
+        [id]
+      );
+      const [actions] = await conn.execute(
+        'SELECT id, description, pic, due_date, status FROM mom_action_items WHERE mom_id = ? AND deleted_at IS NULL ORDER BY sort_order, id',
+        [id]
+      );
+
+      return this._mapMomHeader(headers[0], {
+        attendees: attendees.map(a => ({
+          id: a.id,
+          name: a.name || '',
+          role: a.role || '',
+          organization: a.organization || '',
+          attendance: a.attendance || 'present',
+        })),
+        agenda: agenda.map(a => ({
+          id: a.id,
+          topic: a.topic || '',
+          presenter: a.presenter || '',
+          duration: a.duration || '',
+        })),
+        discussions: discussions.map(d => ({
+          id: d.id,
+          agendaTopic: d.agenda_topic || '',
+          notes: d.notes || '',
+        })),
+        decisions: decisions.map(d => ({
+          id: d.id,
+          text: d.decision_text || '',
+        })),
+        actionItems: actions.map(a => ({
+          id: a.id,
+          description: a.description || '',
+          pic: a.pic || '',
+          dueDate: momDateStr(a.due_date),
+          status: a.status || 'open',
+        })),
+      });
+    } finally {
+      await conn.end();
+    }
+  }
+
+  async _nextMomNumber(conn, year) {
+    const prefix = `MoM/${year}/`;
+    const [rows] = await conn.execute(
+      'SELECT mom_number FROM mom_meetings WHERE mom_number LIKE ?',
+      [prefix + '%']
+    );
+    let max = 0;
+    for (const row of rows) {
+      const n = parseInt(String(row.mom_number).slice(prefix.length), 10);
+      if (!isNaN(n) && n > max) max = n;
+    }
+    return prefix + String(max + 1).padStart(3, '0');
+  }
+
+  async _insertMomChildren(conn, momId, data) {
+    const attendees = Array.isArray(data.attendees) ? data.attendees : [];
+    for (let i = 0; i < attendees.length; i++) {
+      const a = attendees[i] || {};
+      await conn.execute(
+        'INSERT INTO mom_attendees (mom_id, name, role, organization, attendance, sort_order) VALUES (?, ?, ?, ?, ?, ?)',
+        [momId, momStr(a.name), momStr(a.role), momStr(a.organization), momStr(a.attendance) || 'present', i]
+      );
+    }
+
+    const agenda = Array.isArray(data.agenda) ? data.agenda : [];
+    for (let i = 0; i < agenda.length; i++) {
+      const a = agenda[i] || {};
+      await conn.execute(
+        'INSERT INTO mom_agenda (mom_id, topic, presenter, duration, sort_order) VALUES (?, ?, ?, ?, ?)',
+        [momId, momStr(a.topic), momStr(a.presenter), momStr(a.duration), i]
+      );
+    }
+
+    const discussions = Array.isArray(data.discussions) ? data.discussions : [];
+    for (let i = 0; i < discussions.length; i++) {
+      const d = discussions[i] || {};
+      await conn.execute(
+        'INSERT INTO mom_discussions (mom_id, agenda_topic, notes, sort_order) VALUES (?, ?, ?, ?)',
+        [momId, momStr(d.agendaTopic), momStr(d.notes), i]
+      );
+    }
+
+    const decisions = Array.isArray(data.decisions) ? data.decisions : [];
+    for (let i = 0; i < decisions.length; i++) {
+      const d = decisions[i] || {};
+      await conn.execute(
+        'INSERT INTO mom_decisions (mom_id, decision_text, sort_order) VALUES (?, ?, ?)',
+        [momId, momStr(d.text), i]
+      );
+    }
+
+    const actions = Array.isArray(data.actionItems) ? data.actionItems : [];
+    for (let i = 0; i < actions.length; i++) {
+      const a = actions[i] || {};
+      await conn.execute(
+        'INSERT INTO mom_action_items (mom_id, description, pic, due_date, status, sort_order) VALUES (?, ?, ?, ?, ?, ?)',
+        [momId, momStr(a.description), momStr(a.pic), a.dueDate || null, momStr(a.status) || 'open', i]
+      );
+    }
+  }
+
+  async createMomMeeting(data) {
+    const conn = await this._getConnection();
+    let newId = null;
+    try {
+      await conn.beginTransaction();
+      const year = momDateStr(data.date).slice(0, 4) || String(new Date().getFullYear());
+      const momNumber = data.momNumber || await this._nextMomNumber(conn, year);
+      const prepared = data.preparedBy || {};
+      const approved = data.approvedBy || {};
+
+      const [result] = await conn.execute(
+        `INSERT INTO mom_meetings
+          (mom_number, title, meeting_type, meeting_date, start_time, end_time, location, chair, notetaker, status,
+           next_steps, next_meeting_date, next_meeting_time, next_meeting_location,
+           prepared_by_name, prepared_by_role, prepared_by_date, prepared_by_signature,
+           approved_by_name, approved_by_role, approved_by_date, approved_by_signature)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          momNumber,
+          momStr(data.title).trim(),
+          momStr(data.meetingType) || 'internal',
+          data.date,
+          data.startTime || null,
+          data.endTime || null,
+          momStr(data.location),
+          momStr(data.chair),
+          momStr(data.notetaker),
+          data.status === 'final' ? 'final' : 'draft',
+          momStr(data.nextSteps),
+          data.nextMeetingDate || null,
+          data.nextMeetingTime || null,
+          momStr(data.nextMeetingLocation),
+          momStr(prepared.name),
+          momStr(prepared.role),
+          prepared.date || null,
+          momStr(prepared.signature) || null,
+          momStr(approved.name),
+          momStr(approved.role),
+          approved.date || null,
+          momStr(approved.signature) || null,
+        ]
+      );
+      newId = result.insertId;
+      await this._insertMomChildren(conn, newId, data);
+      await conn.commit();
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      await conn.end();
+    }
+    return this.getMomMeetingById(newId);
+  }
+
+  async updateMomMeeting(id, data) {
+    const conn = await this._getConnection();
+    try {
+      await conn.beginTransaction();
+      const [existing] = await conn.execute(
+        'SELECT id FROM mom_meetings WHERE id = ? AND deleted_at IS NULL',
+        [id]
+      );
+      if (existing.length === 0) {
+        await conn.rollback();
+        return null;
+      }
+
+      const sets = [];
+      const params = [];
+      const scalarMap = {
+        title: 'title',
+        meetingType: 'meeting_type',
+        date: 'meeting_date',
+        startTime: 'start_time',
+        endTime: 'end_time',
+        location: 'location',
+        chair: 'chair',
+        notetaker: 'notetaker',
+        status: 'status',
+        nextSteps: 'next_steps',
+        nextMeetingDate: 'next_meeting_date',
+        nextMeetingTime: 'next_meeting_time',
+        nextMeetingLocation: 'next_meeting_location',
+      };
+      for (const [key, col] of Object.entries(scalarMap)) {
+        if (data[key] !== undefined) {
+          let value = data[key];
+          if (key === 'title') value = momStr(value).trim();
+          if (key === 'status') value = value === 'final' ? 'final' : 'draft';
+          if (['startTime', 'endTime', 'nextMeetingDate', 'nextMeetingTime'].includes(key)) value = value || null;
+          sets.push(`${col} = ?`);
+          params.push(value);
+        }
+      }
+      if (data.momNumber !== undefined) {
+        sets.push('mom_number = ?');
+        params.push(momStr(data.momNumber));
+      }
+
+      const prepared = data.preparedBy;
+      if (prepared) {
+        if (prepared.name !== undefined) { sets.push('prepared_by_name = ?'); params.push(momStr(prepared.name)); }
+        if (prepared.role !== undefined) { sets.push('prepared_by_role = ?'); params.push(momStr(prepared.role)); }
+        if (prepared.date !== undefined) { sets.push('prepared_by_date = ?'); params.push(prepared.date || null); }
+        if (prepared.signature !== undefined) { sets.push('prepared_by_signature = ?'); params.push(prepared.signature || null); }
+      }
+      const approved = data.approvedBy;
+      if (approved) {
+        if (approved.name !== undefined) { sets.push('approved_by_name = ?'); params.push(momStr(approved.name)); }
+        if (approved.role !== undefined) { sets.push('approved_by_role = ?'); params.push(momStr(approved.role)); }
+        if (approved.date !== undefined) { sets.push('approved_by_date = ?'); params.push(approved.date || null); }
+        if (approved.signature !== undefined) { sets.push('approved_by_signature = ?'); params.push(approved.signature || null); }
+      }
+
+      sets.push('updated_at = NOW()');
+      params.push(id);
+      await conn.execute(
+        `UPDATE mom_meetings SET ${sets.join(', ')} WHERE id = ? AND deleted_at IS NULL`,
+        params
+      );
+
+      if (data.attendees !== undefined) {
+        await conn.execute('DELETE FROM mom_attendees WHERE mom_id = ?', [id]);
+        const list = Array.isArray(data.attendees) ? data.attendees : [];
+        for (let i = 0; i < list.length; i++) {
+          const a = list[i] || {};
+          await conn.execute(
+            'INSERT INTO mom_attendees (mom_id, name, role, organization, attendance, sort_order) VALUES (?, ?, ?, ?, ?, ?)',
+            [id, momStr(a.name), momStr(a.role), momStr(a.organization), momStr(a.attendance) || 'present', i]
+          );
+        }
+      }
+      if (data.agenda !== undefined) {
+        await conn.execute('DELETE FROM mom_agenda WHERE mom_id = ?', [id]);
+        const list = Array.isArray(data.agenda) ? data.agenda : [];
+        for (let i = 0; i < list.length; i++) {
+          const a = list[i] || {};
+          await conn.execute(
+            'INSERT INTO mom_agenda (mom_id, topic, presenter, duration, sort_order) VALUES (?, ?, ?, ?, ?)',
+            [id, momStr(a.topic), momStr(a.presenter), momStr(a.duration), i]
+          );
+        }
+      }
+      if (data.discussions !== undefined) {
+        await conn.execute('DELETE FROM mom_discussions WHERE mom_id = ?', [id]);
+        const list = Array.isArray(data.discussions) ? data.discussions : [];
+        for (let i = 0; i < list.length; i++) {
+          const d = list[i] || {};
+          await conn.execute(
+            'INSERT INTO mom_discussions (mom_id, agenda_topic, notes, sort_order) VALUES (?, ?, ?, ?)',
+            [id, momStr(d.agendaTopic), momStr(d.notes), i]
+          );
+        }
+      }
+      if (data.decisions !== undefined) {
+        await conn.execute('DELETE FROM mom_decisions WHERE mom_id = ?', [id]);
+        const list = Array.isArray(data.decisions) ? data.decisions : [];
+        for (let i = 0; i < list.length; i++) {
+          const d = list[i] || {};
+          await conn.execute(
+            'INSERT INTO mom_decisions (mom_id, decision_text, sort_order) VALUES (?, ?, ?)',
+            [id, momStr(d.text), i]
+          );
+        }
+      }
+      if (data.actionItems !== undefined) {
+        await conn.execute('DELETE FROM mom_action_items WHERE mom_id = ?', [id]);
+        const list = Array.isArray(data.actionItems) ? data.actionItems : [];
+        for (let i = 0; i < list.length; i++) {
+          const a = list[i] || {};
+          await conn.execute(
+            'INSERT INTO mom_action_items (mom_id, description, pic, due_date, status, sort_order) VALUES (?, ?, ?, ?, ?, ?)',
+            [id, momStr(a.description), momStr(a.pic), a.dueDate || null, momStr(a.status) || 'open', i]
+          );
+        }
+      }
+
+      await conn.commit();
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      await conn.end();
+    }
+    return this.getMomMeetingById(id);
+  }
+
+  async deleteMomMeeting(id) {
+    const conn = await this._getConnection();
+    try {
+      await conn.beginTransaction();
+      const [result] = await conn.execute(
+        'UPDATE mom_meetings SET deleted_at = NOW() WHERE id = ? AND deleted_at IS NULL',
+        [id]
+      );
+      if (result.affectedRows > 0) {
+        for (const table of ['mom_attendees', 'mom_agenda', 'mom_discussions', 'mom_decisions', 'mom_action_items']) {
+          await conn.execute(
+            `UPDATE ${table} SET deleted_at = NOW() WHERE mom_id = ? AND deleted_at IS NULL`,
+            [id]
+          );
+        }
+      }
+      await conn.commit();
+      return result.affectedRows > 0;
+    } catch (err) {
+      await conn.rollback();
+      throw err;
     } finally {
       await conn.end();
     }

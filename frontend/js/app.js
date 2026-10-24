@@ -26,6 +26,9 @@
     const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
     return `${y}-${m}-${day}`;
   }
+  function dateLabel(){
+    return fmt(today()).split('-').reverse().join('-');
+  }
   function parseDate(str){
     const parts = str.split('-').map(Number);
     if(parts.length!==3 || parts.some(isNaN)) return null;
@@ -65,12 +68,14 @@
   let view = "week"; // "week" | "month"
   let dayWidth = 40;
   let showFinished = localStorage.getItem('showFinished') !== 'false';
+  let modalSource = null; // 'notification' | 'sidebar' | 'new' | null
 
   const els = {
     title: document.getElementById('project-title'),
     range: document.getElementById('project-range'),
     legend: document.getElementById('legend'),
     overviewCards: document.getElementById('overview-cards'),
+    breadcrumbCard: document.getElementById('breadcrumb-card'),
     sidebarList: document.getElementById('sidebar-list'),
     ruler: document.getElementById('ruler'),
     rows: document.getElementById('rows'),
@@ -98,9 +103,14 @@
     todoSection: document.getElementById('todo-section'),
     bellBtn: document.getElementById('bell-btn'),
     bellDot: document.getElementById('bell-dot'),
+    holdBtn: document.getElementById('hold-btn'),
+    backBtn: document.getElementById('back-btn'),
     notifOverlay: document.getElementById('notif-overlay'),
-    notifBody: document.getElementById('notif-body'),
     notifSub: document.getElementById('notif-sub'),
+    notifHoldBody: document.getElementById('notif-hold-body'),
+    notifActiveBody: document.getElementById('notif-active-body'),
+    notifHoldCount: document.getElementById('notif-hold-count'),
+    notifActiveCount: document.getElementById('notif-active-count'),
     evidenceOverlay: document.getElementById('evidence-overlay'),
     evidenceBody: document.getElementById('evidence-body'),
     evidenceSub: document.getElementById('evidence-sub'),
@@ -116,6 +126,14 @@
     evidenceAddBtn: document.getElementById('evidence-add-btn'),
     evidenceLogSection: document.getElementById('evidence-log-section'),
     evidenceLogBody: document.getElementById('evidence-log-body'),
+    dailyTaskOverlay: document.getElementById('daily-task-overlay'),
+    dailyTaskTitle: document.getElementById('daily-task-title'),
+    dailyTaskCloseBtn: document.getElementById('daily-task-close-btn'),
+    dailyTaskContent: document.getElementById('daily-task-content'),
+    dailyTaskBody: document.getElementById('daily-task-body'),
+    dailyTaskChart: document.getElementById('daily-task-chart'),
+    dailyTaskLegend: document.getElementById('daily-task-legend'),
+    dailyTaskDragHandle: document.getElementById('daily-task-drag-handle'),
     imgPreviewOverlay: document.getElementById('img-preview-overlay'),
     imgPreviewImg: document.getElementById('img-preview-img'),
     reportOverlay: document.getElementById('report-overlay'),
@@ -132,6 +150,17 @@
     holSaveBtn: document.getElementById('hol-save-btn'),
     holCancelEditBtn: document.getElementById('hol-cancel-edit-btn'),
     holidayList: document.getElementById('holiday-list'),
+    dailyHistoryOverlay: document.getElementById('daily-history-overlay'),
+    dailyHistoryList: document.getElementById('daily-history-list'),
+    dailyHistoryCloseBtn: document.getElementById('daily-history-close-btn'),
+    navSidebar: document.getElementById('nav-sidebar'),
+    navMenu: document.getElementById('nav-menu'),
+    navToggle: document.getElementById('nav-toggle'),
+    navOverlay: document.getElementById('nav-sidebar-overlay'),
+    navItems: document.querySelectorAll('.nav-item'),
+    profileDropdown: document.getElementById('profile-dropdown'),
+    profileTrigger: document.getElementById('profile-trigger'),
+    profileMenu: document.getElementById('profile-menu'),
   };
 
   /* ---------------- API helper ---------------- */
@@ -158,6 +187,15 @@
     },
   };
 
+  async function saveTaskProgress(taskId, progress) {
+    try {
+      await api.put('/api/tasks/' + taskId, { progress });
+    } catch (e) {
+      console.error('Save task progress failed:', e);
+      showToast('Gagal menyimpan progress ke server', 'error');
+    }
+  }
+
   async function loadTasks(){
     try {
       const data = await api.get('/api/tasks');
@@ -172,7 +210,7 @@
       nextId = data.nextId;
       nextTodoId = data.nextTodoId;
       lastUpdated = data.metadata?.updatedAt || null;
-      if (data.metadata?.title) els.title.textContent = data.metadata.title;
+      if (data.metadata?.title && els.title) els.title.textContent = data.metadata.title;
       try {
         const holRes = await api.get('/api/holidays');
         holidays = (holRes.holidays || []).slice().sort((a,b) => a.start.localeCompare(b.start));
@@ -188,7 +226,7 @@
       alert('Gagal memuat data. Pastikan server API berjalan (node server.js).');
     }
     renderLegend();
-    renderAll(true);
+    renderViewContent(currentView);
     updateBellDot();
   }
 
@@ -223,11 +261,64 @@
   });
 
   /* ---------------- Overview Cards ---------------- */
+  function renderBreadcrumb(){
+    if(currentView === 'dashboard'){
+      els.breadcrumbCard.innerHTML = `
+        <span class="breadcrumb-item">
+          <i class="bi bi-house-door"></i>
+          <span>Beranda</span>
+        </span>
+        <span class="breadcrumb-sep"><i class="bi bi-chevron-right"></i></span>
+        <span class="breadcrumb-item active" aria-current="page">Dashboard</span>
+      `;
+      return;
+    }
+
+    if(currentView === 'mom'){
+      els.breadcrumbCard.innerHTML = `
+        <span class="breadcrumb-item">
+          <i class="bi bi-house-door"></i>
+          <span>Beranda</span>
+        </span>
+        <span class="breadcrumb-sep"><i class="bi bi-chevron-right"></i></span>
+        <span class="breadcrumb-item active" aria-current="page">Minutes of Meeting</span>
+      `;
+      return;
+    }
+
+    if(currentView === 'qa'){
+      els.breadcrumbCard.innerHTML = `
+        <span class="breadcrumb-item">
+          <i class="bi bi-house-door"></i>
+          <span>Beranda</span>
+        </span>
+        <span class="breadcrumb-sep"><i class="bi bi-chevron-right"></i></span>
+        <span class="breadcrumb-item active" aria-current="page">Quality Assurance</span>
+      `;
+      return;
+    }
+
+    const title = els.title?.textContent?.trim() || 'Timeframe';
+    els.breadcrumbCard.innerHTML = `
+      <span class="breadcrumb-item">
+        <i class="bi bi-house-door"></i>
+        <span>Beranda</span>
+      </span>
+      <span class="breadcrumb-sep"><i class="bi bi-chevron-right"></i></span>
+      <span class="breadcrumb-item">Proyek Management</span>
+      <span class="breadcrumb-sep"><i class="bi bi-chevron-right"></i></span>
+      <span class="breadcrumb-item active" aria-current="page">${escapeHtml(title)}</span>
+    `;
+  }
+
   function renderOverviewCards(){
     const totalTasks = tasks.length;
     const doneTasks = tasks.filter(t => t.progress === 100).length;
     const openTodos = tasks.reduce((sum, t) => sum + (t.todos||[]).filter(td => !td.done).length, 0);
     const overdueTasks = tasks.filter(t => t.progress < 100 && t.end && t.end < today()).length;
+    const heldTasks = tasks.filter(t => t.held === true).length;
+    const dailyTotal = dailyTasks.length;
+    const dailyDone = dailyTasks.filter(t => t.status === 'done').length;
 
     els.overviewCards.innerHTML = `
       <div class="overview-card">
@@ -254,7 +345,25 @@
           <div class="overview-sub">${overdueTasks > 0 ? 'Melewati batas waktu' : 'Tidak ada keterlambatan'}</div>
         </div>
       </div>
+      <div class="overview-card" id="card-task-hold">
+        <div class="overview-icon held"><i class="bi bi-pause-circle-fill"></i></div>
+        <div class="overview-body">
+          <div class="overview-num">${heldTasks}</div>
+          <div class="overview-label">Task Hold</div>
+          <div class="overview-sub">${heldTasks > 0 ? 'Sedang di-hold' : 'Tidak ada tugas di-hold'}</div>
+        </div>
+      </div>
+      <div class="overview-card" id="card-daily-task">
+        <div class="overview-icon daily"><i class="bi bi-calendar-day"></i></div>
+        <div class="overview-body">
+          <div class="overview-num">${dailyDone}/${dailyTotal}</div>
+          <div class="overview-label">Daily Task ${dateLabel()}</div>
+          <div class="overview-sub">${dailyDone} selesai dari ${dailyTotal} tugas</div>
+        </div>
+      </div>
     `;
+    const pulseActive = dailyTotal > 0 && dailyDone < dailyTotal;
+    document.getElementById('card-daily-task')?.classList.toggle('pulse-active', pulseActive);
   }
 
   /* ---------------- Legend ---------------- */
@@ -272,6 +381,9 @@
       `</label>` +
       `<button type="button" class="holiday-btn" id="holiday-manage-btn" title="Kelola Hari Libur">` +
         `Add Holiday` +
+      `</button>` +
+      `<button type="button" class="daily-history-btn" id="daily-history-btn" title="History Daily Task">` +
+        `History Daily` +
       `</button>`;
   }
 
@@ -387,7 +499,7 @@
 
     visibleTasks.forEach((t, idx) => {
       const bar = document.createElement('div');
-      bar.className = 'bar ' + (CATS[t.cat] ?? CATS.lainnya).cls;
+      bar.className = 'bar ' + (CATS[t.cat] ?? CATS.lainnya).cls + (t.held ? ' held' : '');
       bar.dataset.id = t.id;
       const left = dayDiff(range.start, t.start)*dayWidth;
       const width = (dayDiff(t.start,t.end)+1)*dayWidth - 4;
@@ -409,6 +521,13 @@
       pct.className='pct';
       pct.textContent = t.progress+'%';
       bar.appendChild(pct);
+
+      if (t.held) {
+        const holdBadge = document.createElement('span');
+        holdBadge.className = 'hold-badge';
+        holdBadge.innerHTML = '<i class="bi bi-pause-circle-fill"></i>';
+        bar.appendChild(holdBadge);
+      }
 
       const hLeft = document.createElement('div');
       hLeft.className='handle left';
@@ -494,12 +613,14 @@
       const row = document.createElement('div');
       const isDone = t.progress === 100;
       const isOverdue = !isDone && t.end && t.end < today();
-      row.className = 'sidebar-row' + (t.id===selectedId ? ' selected':'') + (isDone ? ' done':'') + (isOverdue ? ' overdue':'');
+      const isHeld = t.held === true;
+      row.className = 'sidebar-row' + (t.id===selectedId ? ' selected':'') + (isDone ? ' done':'') + (isOverdue ? ' overdue':'') + (isHeld ? ' held':'');
       row.innerHTML = `
         <div class="sidebar-row-top">
           <span class="name">${escapeHtml(t.name)}</span>
           ${isDone ? '<span class="done-flag">🏁</span>' : ''}
           ${isOverdue ? '<span class="overdue-flag"><i class="bi bi-bell-fill"></i></span>' : ''}
+          ${isHeld ? '<span class="held-flag"><i class="bi bi-pause-circle-fill"></i></span>' : ''}
         </div>
         <span class="meta"><span class="tag-dot ${(CATS[t.cat] ?? CATS.lainnya).cls}"></span>${(CATS[t.cat] ?? CATS.lainnya).label} · ${t.progress}% · ${countWeekdays(t.start,t.end)} Hari Pengerjaan</span>
       `;
@@ -525,6 +646,7 @@
 
   /* ---------------- Project range label ---------------- */
   function renderProjectRange(){
+    if(!els.range) return;
     if(tasks.length===0){ els.range.textContent='Belum ada tugas'; return; }
     let min=tasks[0].start, max=tasks[0].end;
     tasks.forEach(t=>{ if(t.start<min) min=t.start; if(t.end>max) max=t.end; });
@@ -589,6 +711,7 @@
     renderRows(range);
     renderSidebar();
     renderOverviewCards();
+    renderBreadcrumb();
     renderProjectRange();
     document.getElementById('backup-btn').disabled = tasks.length === 0;
     if(scrollToToday) scrollToTodayLine(range);
@@ -620,6 +743,181 @@
     renderAll(true);
   });
 
+  /* ---------------- Navigation ---------------- */
+  let currentView = 'dashboard';
+
+  function initNavigation(){
+    // Nav item clicks
+    els.navItems.forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        const view = item.dataset.view;
+        if(view && view !== currentView){
+          setActiveView(view);
+        }
+        // Close mobile nav on click
+        closeMobileNav();
+      });
+    });
+
+    // Mobile nav toggle
+    if(els.navToggle){
+      els.navToggle.addEventListener('click', toggleMobileNav);
+    }
+    if(els.navOverlay){
+      els.navOverlay.addEventListener('click', closeMobileNav);
+    }
+
+    // Show/hide nav toggle based on screen size
+    updateNavToggleVisibility();
+    window.addEventListener('resize', updateNavToggleVisibility);
+  }
+
+  /* ---------------- Profile Dropdown ---------------- */
+  function initProfileDropdown(){
+    if(!els.profileTrigger || !els.profileMenu || !els.profileDropdown) return;
+    
+    els.profileTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleProfileDropdown();
+    });
+    
+    // Close on click outside
+    document.addEventListener('click', (e) => {
+      if(els.profileDropdown && !els.profileDropdown.contains(e.target)){
+        closeProfileDropdown();
+      }
+    });
+    
+    // Close on ESC key
+    document.addEventListener('keydown', (e) => {
+      if(e.key === 'Escape'){
+        closeProfileDropdown();
+      }
+    });
+    
+    // Handle menu item clicks
+    if(els.profileMenu){
+      els.profileMenu.addEventListener('click', (e) => {
+        const item = e.target.closest('.profile-menu-item[data-action]');
+        if(!item) return;
+        
+        const action = item.dataset.action;
+        handleProfileAction(action);
+        closeProfileDropdown();
+      });
+    }
+  }
+
+  function toggleProfileDropdown(){
+    const isOpen = els.profileDropdown.classList.toggle('open');
+    els.profileTrigger.setAttribute('aria-expanded', isOpen);
+    if(isOpen){
+      els.profileMenu.hidden = false;
+    }else{
+      els.profileMenu.hidden = true;
+    }
+  }
+
+  function closeProfileDropdown(){
+    if(!els.profileDropdown) return;
+    els.profileDropdown.classList.remove('open');
+    els.profileTrigger.setAttribute('aria-expanded', 'false');
+    els.profileMenu.hidden = true;
+  }
+
+  function handleProfileAction(action){
+    switch(action){
+      case 'profile':
+        showToast('Profile feature coming soon', 'info');
+        break;
+      case 'settings':
+        showToast('Settings feature coming soon', 'info');
+        break;
+      case 'theme': {
+        const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        setTheme(next);
+        break;
+      }
+      case 'logout':
+        handleLogout();
+        break;
+    }
+  }
+
+  function handleLogout(){
+    showConfirm('Yakin ingin keluar?', 'Ya, Logout', 'Batal', 'confirm-yes').then(confirmed => {
+      if(confirmed){
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.reload();
+      }
+    });
+  }
+
+  function setActiveView(view){
+    currentView = view;
+    els.navItems.forEach(item => {
+      item.classList.toggle('active', item.dataset.view === view);
+    });
+    
+    // Update header data attribute for CSS targeting (dashboard/uat cleanup)
+    const header = document.querySelector('.app-navbar');
+    if (header) {
+      header.setAttribute('data-view', view);
+    }
+    
+    renderViewContent(view);
+  }
+
+  function renderViewContent(view){
+    const mainContent = document.getElementById('app-main');
+    if(!mainContent) return;
+
+    // Toggle view visibility via CSS (see styles.css [data-active-view])
+    mainContent.setAttribute('data-active-view', view);
+
+    // Update breadcrumb path to match the active view
+    renderBreadcrumb();
+
+    // Remove any existing coming soon message
+    const existingSoon = document.getElementById('coming-soon-container');
+    if(existingSoon) existingSoon.remove();
+
+    if(view === 'projects'){
+      // Render the project management UI
+      renderAll(true);
+    }
+
+    if(view === 'mom'){
+      renderMomPage();
+    }
+  }
+
+  function toggleMobileNav(){
+    els.navSidebar.classList.toggle('open');
+    els.navOverlay.classList.toggle('open');
+  }
+
+  function closeMobileNav(){
+    els.navSidebar.classList.remove('open');
+    els.navOverlay.classList.remove('open');
+  }
+
+  function updateNavToggleVisibility(){
+    const isMobile = window.innerWidth <= 480;
+    if(els.navToggle){
+      els.navToggle.style.display = isMobile ? 'inline-flex' : 'none';
+    }
+    if(!isMobile){
+      closeMobileNav();
+    }
+  }
+
+  // Initialize navigation
+  initNavigation();
+  initProfileDropdown();
+
   /* ---------------- Toggle finished tasks ---------------- */
   document.getElementById('legend').addEventListener('change', (e)=>{
     if(e.target.id === 'toggle-finished'){
@@ -630,6 +928,7 @@
   });
   document.getElementById('legend').addEventListener('click', (e)=>{
     if(e.target.closest('#holiday-manage-btn')) openHolidayModal();
+    if(e.target.closest('#daily-history-btn')) openDailyHistoryModal();
   });
 
   /* ---------------- Holiday management ---------------- */
@@ -762,6 +1061,69 @@
   document.getElementById('holiday-close-btn').addEventListener('click', closeHolidayModal);
   els.holidayOverlay.addEventListener('click', (e)=>{ if(e.target===els.holidayOverlay) closeHolidayModal(); });
 
+  /* ---------------- Daily history modal ---------------- */
+  const DAILY_STATUS_LABEL = { not_start:'Not Start', hold:'Hold', in_progress:'In Progress', done:'Done', stopped:'Stop' };
+
+  function openDailyHistoryModal(){
+    els.dailyHistoryOverlay.classList.add('open');
+    loadDailyHistory();
+  }
+  function closeDailyHistoryModal(){
+    els.dailyHistoryOverlay.classList.remove('open');
+  }
+
+  async function loadDailyHistory(){
+    els.dailyHistoryList.innerHTML = '<div class="daily-history-empty">Memuat history...</div>';
+    let history = [];
+    try {
+      const res = await api.get('/api/daily-tasks/history');
+      history = res.history || [];
+    } catch(err){
+      console.error('Failed to load daily history:', err);
+      els.dailyHistoryList.innerHTML = '<div class="daily-history-empty">Gagal memuat history daily task.</div>';
+      return;
+    }
+    renderDailyHistory(history);
+  }
+
+  function renderDailyHistory(history){
+    if(!history.length){
+      els.dailyHistoryList.innerHTML = '<div class="daily-history-empty">Belum ada history daily task.</div>';
+      return;
+    }
+
+    els.dailyHistoryList.innerHTML = history.map((snap, idx) => {
+      const rows = snap.dailyTasks || [];
+      const done = rows.filter(r => (r.status||'not_start') === 'done').length;
+      const items = rows.map(r => {
+        const st = r.status || 'not_start';
+        const label = DAILY_STATUS_LABEL[st] || st;
+        return `<div class="daily-history-item">` +
+          `<span class="daily-history-item-name">${escapeHtml(r.taskName || '')}</span>` +
+          `<span class="status-badge ${st}">${label}</span>` +
+        `</div>`;
+      }).join('') || '<div class="daily-history-empty">Tidak ada task pada tanggal ini.</div>';
+
+      return `<div class="daily-history-day" data-idx="${idx}">` +
+        `<div class="daily-history-day-head">` +
+          `<i class="bi bi-chevron-right daily-history-chevron"></i>` +
+          `<i class="bi bi-calendar-day daily-history-cal"></i>` +
+          `<span class="daily-history-date">${fmtDisplayDate(snap.date || '')}</span>` +
+          `<span class="daily-history-day-summary">${done}/${rows.length} Done</span>` +
+        `</div>` +
+        `<div class="daily-history-items">${items}</div>` +
+      `</div>`;
+    }).join('');
+  }
+
+  els.dailyHistoryList.addEventListener('click', (e)=>{
+    const head = e.target.closest('.daily-history-day-head');
+    if(!head) return;
+    head.parentElement.classList.toggle('expanded');
+  });
+  els.dailyHistoryCloseBtn.addEventListener('click', closeDailyHistoryModal);
+  els.dailyHistoryOverlay.addEventListener('click', (e)=>{ if(e.target===els.dailyHistoryOverlay) closeDailyHistoryModal(); });
+
   /* ---------------- Toast ---------------- */
   function showToast(msg, type='success'){
     const el = document.createElement('div');
@@ -773,7 +1135,8 @@
 
   /* ---------------- Backup ---------------- */
   document.getElementById('backup-btn').addEventListener('click', async ()=>{
-    await showConfirm('Yakin ingin melakukan backup data?', 'Ya, Backup', 'Batal', 'btn-primary');
+    const confirmed = await showConfirm('Yakin ingin melakukan backup data?', 'Ya, Backup', 'Batal', 'btn-primary');
+    if (!confirmed) return;
     const btn = document.getElementById('backup-btn');
     btn.textContent = 'MENYIMPAN...';
     btn.disabled = true;
@@ -856,7 +1219,8 @@
     const btn = e.target.closest('.restore-btn');
     if (!btn) return;
     const filename = btn.dataset.file;
-    await showConfirm('Yakin ingin me-restore data dari file <strong>' + filename + '</strong>?<br><br>Data tugas yang ada saat ini akan digantikan seluruhnya.', 'Ya, Restore', 'Batal', 'btn-primary');
+    const confirmed = await showConfirm('Yakin ingin me-restore data dari file <strong>' + filename + '</strong>?<br><br>Data tugas yang ada saat ini akan digantikan seluruhnya.', 'Ya, Restore', 'Batal', 'btn-primary');
+    if (!confirmed) return;
     btn.textContent = 'MERESTORE...';
     btn.disabled = true;
     try {
@@ -880,8 +1244,9 @@
   /* ---------------- Modal logic ---------------- */
   let editingId = null;
 
-  function openModal(task){
+  function openModal(task, source = null){
     editingId = task ? task.id : null;
+    modalSource = source;
     els.modalTitle.textContent = task ? 'Ubah Tugas' : 'Tugas Baru';
     els.modalSub.textContent = task ? 'Perbarui detail atau geser jadwal tugas ini.' : 'Isi detail tugas di bawah ini.';
     els.fName.value = task ? task.name : '';
@@ -898,9 +1263,27 @@
     if(task){
       els.todoDate.min = fmt(task.start);
       els.todoDate.max = fmt(task.end);
+      // Update hold button based on task.held status
+      if (task.held) {
+        els.holdBtn.textContent = 'Open Again';
+        els.holdBtn.classList.add('btn-success');
+        els.holdBtn.classList.remove('btn-ghost');
+      } else {
+        els.holdBtn.textContent = 'Hold';
+        els.holdBtn.classList.add('btn-ghost');
+        els.holdBtn.classList.remove('btn-success');
+      }
+      els.holdBtn.style.display = '';
     } else {
       els.todoDate.min = '';
       els.todoDate.max = '';
+      els.holdBtn.style.display = 'none';
+    }
+    // Show/hide back button based on source
+    if (modalSource === 'notification') {
+      els.backBtn.style.display = '';
+    } else {
+      els.backBtn.style.display = 'none';
     }
     renderTodos(task);
     updateProgressSlider(task);
@@ -924,6 +1307,7 @@
     cancelTodoEdit();
     editingId = null;
     selectedId = null;
+    modalSource = null;
     renderSidebar();
     closeEvidencePanel();
   }
@@ -946,27 +1330,50 @@
         <td><span class="todo-text${todo.done?' done':''}">${escapeHtml(todo.text)}</span></td>
         <td class="todo-due" style="font-size:11px;font-family:'IBM Plex Mono',monospace;">${todo.due ? fmt(todo.due) : '—'}</td>
         <td class="todo-status"><input type="checkbox" class="todo-cb" data-todo-id="${todo.id}"${todo.done?' checked':''}></td>
-        <td class="todo-del"><button class="todo-del-btn" data-todo-id="${todo.id}">&times;</button></td>
+        <td class="todo-act">
+          <button class="todo-dup-btn" data-todo-id="${todo.id}" title="Duplicate"><i class="bi bi-files"></i></button>
+          <button class="todo-del-btn" data-todo-id="${todo.id}">&times;</button>
+        </td>
       `;
-      tr.querySelector('.todo-cb').addEventListener('change', function(){
+      tr.querySelector('.todo-cb').addEventListener('change', async function(){
         todo.done = this.checked;
-        api.put('/api/tasks/'+task.id+'/todos/'+todo.id, { done: todo.done }).catch(e => console.error('Save todo cb failed:', e));
+        await api.put('/api/tasks/'+task.id+'/todos/'+todo.id, { done: todo.done }).catch(e => console.error('Save todo cb failed:', e));
         updateProgressFromTodos(task);
+        await saveTaskProgress(task.id, task.progress);
         renderTodos(task);
         updateBellDot();
         renderAll(false);
         if(editingId) loadTaskLog(editingId);
       });
-      tr.querySelector('.todo-del-btn').addEventListener('click', function(){
-        api.del('/api/tasks/'+task.id+'/todos/'+todo.id).catch(e => console.error('Delete todo failed:', e));
+
+      tr.querySelector('.todo-del-btn').addEventListener('click', async function(){
+        await api.del('/api/tasks/'+task.id+'/todos/'+todo.id).catch(e => console.error('Delete todo failed:', e));
         task.todos = task.todos.filter(t=>t.id!==todo.id);
         updateProgressFromTodos(task);
+        await saveTaskProgress(task.id, task.progress);
         renderTodos(task);
         updateProgressSlider(task);
         updateBellDot();
         renderAll(false);
         if(editingId) loadTaskLog(editingId);
       });
+
+      tr.querySelector('.todo-dup-btn').addEventListener('click', async function(){
+        const newTodo = await api.post('/api/tasks/'+task.id+'/todos', {
+          text: todo.text,
+          due: todo.due ? fmt(todo.due) : null
+        }).catch(e => { showToast('Gagal duplikasi: '+e.message, 'error'); throw e; });
+        const created = newTodo.todo;
+        task.todos.push({ ...created, due: created.due ? parseDate(created.due) : null, done: false });
+        updateProgressFromTodos(task);
+        await saveTaskProgress(task.id, task.progress);
+        renderTodos(task);
+        updateBellDot();
+        renderAll(false);
+        if(editingId) loadTaskLog(editingId);
+        showToast('Sub Task diduplikasi');
+      });
+
       tr.querySelector('.todo-text').addEventListener('click', function(){
         editingTodoId = todo.id;
         els.todoInput.value = todo.text;
@@ -1009,11 +1416,10 @@
 
   /* ---------------- Notification Panel ---------------- */
   function openNotifPanel(){
-    const T = today();
     const allTodos = [];
     tasks.forEach(task => {
       (task.todos||[]).forEach(todo => {
-        allTodos.push({ ...todo, taskId: task.id, taskName: task.name });
+        allTodos.push({ ...todo, taskId: task.id, taskName: task.name, taskHeld: task.held });
       });
     });
 
@@ -1026,21 +1432,50 @@
 
     const ordered = sorted.filter(t => !t.done);
 
+    // Split into hold and non-hold
+    const holdTodos = ordered.filter(t => t.taskHeld === true);
+    const activeTodos = ordered.filter(t => t.taskHeld !== true);
+
+    // Update counts
+    els.notifHoldCount.textContent = holdTodos.length;
+    els.notifActiveCount.textContent = activeTodos.length;
+
+    // Clear both bodies
+    els.notifHoldBody.innerHTML = '';
+    els.notifActiveBody.innerHTML = '';
+
     if(ordered.length === 0){
-      els.notifBody.innerHTML = '<tr><td colspan="6" class="notif-empty">Semua aktivitas telah selesai.</td></tr>';
       els.notifSub.textContent = 'Tidak ada aktivitas yang perlu diproses.';
+      // Add empty messages to both sections
+      els.notifHoldBody.innerHTML = '<tr><td colspan="6" class="notif-empty">Tidak ada tugas di-hold.</td></tr>';
+      els.notifActiveBody.innerHTML = '<tr><td colspan="6" class="notif-empty">Tidak ada tugas aktif.</td></tr>';
       return;
     }
 
     els.notifSub.textContent = 'Daftar aktivitas yang perlu diproses.';
-    els.notifBody.innerHTML = '';
-    ordered.forEach((todo, i) => {
+
+    // Render hold todos
+    renderNotifTodos(holdTodos, els.notifHoldBody, 'Tidak ada tugas di-hold.', false);
+
+    // Render active todos
+    renderNotifTodos(activeTodos, els.notifActiveBody, 'Tidak ada tugas aktif.', true);
+
+    // Open the panel
+    els.notifOverlay.classList.add('open');
+  }
+
+  function renderNotifTodos(todos, tbody, emptyMessage, showAdd){
+    if(todos.length === 0){
+      tbody.innerHTML = '<tr><td colspan="6" class="notif-empty">' + emptyMessage + '</td></tr>';
+      return;
+    }
+    todos.forEach((todo, i) => {
       let sisaHariText, sisaClass;
       if(!todo.due){
         sisaHariText = '—';
         sisaClass = '';
       } else {
-        const diff = dayDiff(T, todo.due);
+        const diff = dayDiff(today(), todo.due);
         if(diff < 0){
           sisaHariText = 'Overdue';
           sisaClass = 'overdue';
@@ -1053,9 +1488,19 @@
         }
       }
 
+      const inDaily = dailyTasks.some(dt => dt.taskId === todo.taskId && dt.taskName === todo.text);
+
       const tr = document.createElement('tr');
+      if(inDaily && showAdd) tr.classList.add('notif-row-in-daily');
+      const numCell = showAdd
+        ? `<td class="todo-num">` +
+          (inDaily
+            ? `<span class="daily-badge" title="Sudah di Daily Task"><i class="bi bi-check-circle-fill"></i></span>`
+            : `<button class="todo-add-btn" title="Tambahkan ke Daily Task"><i class="bi bi-plus-lg"></i></button>`)
+          + `</td>`
+        : `<td class="todo-num">${i+1}</td>`;
       tr.innerHTML = `
-        <td class="todo-num">${i+1}</td>
+        ${numCell}
         <td><span class="todo-text${todo.done?' done':''}">${escapeHtml(todo.text)}</span></td>
         <td class="todo-due" style="font-size:11px;font-family:'IBM Plex Mono',monospace;">${todo.due ? fmt(todo.due) : '—'}</td>
         <td class="todo-due" style="font-size:11px;font-family:'IBM Plex Mono',monospace;${sisaClass ? 'color:var(--status-risk);font-weight:600;' : ''}">${sisaHariText}</td>
@@ -1070,6 +1515,7 @@
           const t = task.todos.find(td => td.id === todo.id);
           if(t) t.done = todo.done;
           updateProgressFromTodos(task);
+          await saveTaskProgress(task.id, task.progress);
           await api.put('/api/tasks/'+todo.taskId+'/todos/'+todo.id, { done: todo.done }).catch(e => console.error('Save notif todo failed:', e));
         }
         openNotifPanel();
@@ -1080,14 +1526,36 @@
       tr.querySelector('.todo-text').addEventListener('click', function(){
         els.notifOverlay.classList.remove('open');
         const task = tasks.find(t => t.id === todo.taskId);
-        if(task) openModal(task);
+        if(task) openModal(task, 'notification');
       });
 
       tr.querySelector('.todo-copy-btn').addEventListener('click', function(){
         navigator.clipboard.writeText(todo.text).then(() => showToast('Teks berhasil tercopy')).catch(() => showToast('Gagal copy teks', 'error'));
       });
 
-      els.notifBody.appendChild(tr);
+      const addBtn = tr.querySelector('.todo-add-btn');
+      if(addBtn){
+        addBtn.addEventListener('click', async function(e){
+          e.stopPropagation();
+          const dup = dailyTasks.some(dt => dt.taskId === todo.taskId && dt.taskName === todo.text);
+          if(dup){ showToast('Sudah ada di Daily Task', 'error'); return; }
+          try {
+            await api.post('/api/daily-tasks', {
+              taskId: todo.taskId,
+              taskName: todo.text,
+              status: 'not_start'
+            });
+            await loadDailyTasks();
+            openNotifPanel();
+            showToast('Ditambahkan ke Daily Task');
+          } catch(err){
+            console.error('Failed to add daily task:', err);
+            showToast('Gagal menambahkan', 'error');
+          }
+        });
+      }
+
+      tbody.appendChild(tr);
     });
   }
 
@@ -1140,6 +1608,365 @@
     els.evidenceTextInput.value = '';
     els.evidenceFileInput.value = '';
     els.evidenceImageKetInput.value = '';
+  }
+
+  /* ---------------- Daily Task Panel ---------------- */
+  let dailyTasks = [];
+  let dailyTaskChart = null;
+
+  function updateDateLabels(){
+    if(els.dailyTaskTitle) els.dailyTaskTitle.textContent = 'DAILY TASK ' + dateLabel();
+    renderOverviewCards();
+  }
+
+  function openDailyTaskPanel(){
+    els.dailyTaskOverlay.classList.add('open');
+    updateDateLabels();
+    loadDailyTasks();
+    setupDailyTaskResize();
+  }
+
+  function closeDailyTaskPanel(){
+    els.dailyTaskOverlay.classList.remove('open');
+  }
+
+  function setupDailyTaskResize(){
+    const modal = els.dailyTaskOverlay.querySelector('.bottom-modal');
+    const handle = els.dailyTaskDragHandle;
+    if(!modal || !handle) return;
+
+    let startY = 0;
+    let startHeight = 0;
+    const MIN_HEIGHT = 200;
+    const MAX_HEIGHT = window.innerHeight * 0.9;
+
+    function loadSavedHeight(){
+      const saved = localStorage.getItem('dailyTaskHeight');
+      if(saved){
+        const h = parseInt(saved, 10);
+        if(h >= MIN_HEIGHT && h <= MAX_HEIGHT){
+          modal.style.height = h + 'px';
+        }
+      }
+    }
+
+    function onMouseDown(e){
+      const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+      startY = clientY;
+      startHeight = modal.offsetHeight;
+      modal.classList.add('resizing');
+      handle.classList.add('dragging');
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+      document.addEventListener('touchmove', onMouseMove, { passive: false });
+      document.addEventListener('touchend', onMouseUp);
+      e.preventDefault();
+    }
+
+    function onMouseMove(e){
+      const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+      const deltaY = startY - clientY;
+      let newHeight = startHeight + deltaY;
+      newHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, newHeight));
+      modal.style.height = newHeight + 'px';
+    }
+
+    function onMouseUp(){
+      modal.classList.remove('resizing');
+      handle.classList.remove('dragging');
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.removeEventListener('touchmove', onMouseMove);
+      document.removeEventListener('touchend', onMouseUp);
+      localStorage.setItem('dailyTaskHeight', modal.offsetHeight.toString());
+    }
+
+    handle.addEventListener('mousedown', onMouseDown);
+    handle.addEventListener('touchstart', onMouseDown, { passive: false });
+
+    loadSavedHeight();
+  }
+
+  async function loadDailyTasks(){
+    try {
+      const res = await api.get('/api/daily-tasks');
+      dailyTasks = res.dailyTasks || [];
+    } catch(e) {
+      console.error('Failed to load daily tasks:', e);
+      dailyTasks = [];
+    }
+    renderDailyTasks();
+    renderDailyTaskChart();
+    renderOverviewCards();
+  }
+
+  async function syncTodoWithDailyStatus(dt, newStatus){
+    const wantDone = newStatus === 'done';
+    const task = tasks.find(t => t.id === dt.taskId);
+    const todo = task && (task.todos||[]).find(td => td.text === dt.taskName);
+    if(!task || !todo){
+      showToast('Todo "'+ (dt.taskName || '') +'" tidak ditemukan di task', 'info');
+      return;
+    }
+    if(!!todo.done === wantDone) return;
+    todo.done = wantDone;
+    try {
+      await api.put('/api/tasks/'+task.id+'/todos/'+todo.id, { done: todo.done });
+    } catch(e){
+      console.error('Sync todo from daily status failed:', e);
+      showToast('Gagal memperbarui todo: '+e.message, 'error');
+      todo.done = !wantDone;
+      return;
+    }
+    updateProgressFromTodos(task);
+    await saveTaskProgress(task.id, task.progress);
+    updateBellDot();
+    if(els.notifOverlay.classList.contains('open')) openNotifPanel();
+    if(editingId === task.id){
+      renderTodos(task);
+      loadTaskLog(editingId);
+    }
+    renderAll(false);
+  }
+
+  function renderDailyTasks(){
+    els.dailyTaskBody.innerHTML = '';
+
+    if(dailyTasks.length === 0){
+      els.dailyTaskBody.innerHTML = '<tr><td colspan="4" class="notif-empty">Belum ada tugas harian.</td></tr>';
+      return;
+    }
+
+    dailyTasks.forEach((dt, i) => {
+      const tr = document.createElement('tr');
+      const statusClass = dt.status || 'not_start';
+      const statusLabel = DAILY_STATUS_LABEL[statusClass] || statusClass;
+
+      // Determine button states
+      const isDone = statusClass === 'done';
+      const isStopped = statusClass === 'stopped';
+      const isInProgress = statusClass === 'in_progress';
+
+      const takeoutBtn = `
+          <button class="takeout-btn" data-id="${dt.id}" title="Take Out — keluarkan dari Daily Task">
+            <i class="bi bi-box-arrow-left"></i>
+          </button>
+      `;
+
+      // Explicit action buttons per status
+      const bStart = `<button class="status-action-btn start" data-id="${dt.id}" data-status="in_progress" title="Start"><i class="bi bi-play-circle-fill"></i></button>`;
+      const bHold = `<button class="status-action-btn hold" data-id="${dt.id}" data-status="hold" title="Hold"><i class="bi bi-pause-circle-fill"></i></button>`;
+      const bDone = `<button class="status-action-btn done" data-id="${dt.id}" data-status="done" title="Done"><i class="bi bi-check-circle-fill"></i></button>`;
+      const bStop = `<button class="status-action-btn stop" data-id="${dt.id}" data-status="stopped" title="Stop"><i class="bi bi-stop-circle-fill"></i></button>`;
+      const bReopenHold = `<button class="status-action-btn hold" data-id="${dt.id}" data-status="hold" title="Reopen as Hold"><i class="bi bi-pause-circle-fill"></i></button>`;
+      const bReopenProg = `<button class="status-action-btn in_progress" data-id="${dt.id}" data-status="in_progress" title="Reopen as In Progress"><i class="bi bi-play-circle-fill"></i></button>`;
+
+      let buttons = '';
+      if (isDone) {
+        buttons = bReopenHold + bReopenProg;
+      } else {
+        buttons = isInProgress ? bHold : bStart;
+        buttons += bDone;
+        if (!isStopped) buttons += bStop;
+      }
+
+      const statusActions = `
+        <div class="status-actions">
+          ${buttons}
+          ${takeoutBtn}
+        </div>
+      `;
+
+      tr.innerHTML = `
+        <td class="todo-num">${i+1}</td>
+        <td>${escapeHtml(dt.taskName)}</td>
+        <td class="todo-status">
+          <span class="status-badge ${statusClass}">${statusLabel}</span>
+        </td>
+        <td class="todo-act">
+          ${statusActions}
+        </td>
+      `;
+
+      // Handle take out: remove from daily task (and revert todo if it was done)
+      tr.querySelector('.takeout-btn').addEventListener('click', async function(){
+        const id = parseInt(this.dataset.id, 10);
+        const dt = dailyTasks.find(d => d.id === id);
+        if(!dt) return;
+
+        // If the item was marked done, revert the related todo to not-done
+        if((dt.status || 'not_start') === 'done'){
+          const task = tasks.find(t => t.id === dt.taskId);
+          const todo = task && (task.todos || []).find(td => td.text === dt.taskName);
+          if(task && todo){
+            todo.done = false;
+            try {
+              await api.put('/api/tasks/'+task.id+'/todos/'+todo.id, { done: false });
+              updateProgressFromTodos(task);
+              await saveTaskProgress(task.id, task.progress);
+            } catch(e) {
+              console.error('Revert todo on take out failed:', e);
+              showToast('Gagal mengembalikan status todo', 'error');
+              return;
+            }
+          }
+        }
+
+        try {
+          await api.del('/api/daily-tasks/'+id);
+          await loadDailyTasks();
+          updateBellDot();
+          renderAll(false);
+          if (els.notifOverlay.classList.contains('open')) openNotifPanel();
+          if (editingId) {
+            const t = tasks.find(x => x.id === editingId);
+            if (t) renderTodos(t);
+          }
+          showToast('Tugas dikeluarkan dari Daily Task');
+        } catch(e) {
+          console.error('Failed to take out daily task:', e);
+          showToast('Gagal mengeluarkan tugas', 'error');
+        }
+      });
+
+      // Add click handlers for all status buttons
+      tr.querySelectorAll('.status-action-btn').forEach(btn => {
+        btn.addEventListener('click', async function(){
+          const id = parseInt(this.dataset.id, 10);
+          const newStatus = this.dataset.status;
+          const dt = dailyTasks.find(d => d.id === id);
+          try {
+            await api.put('/api/daily-tasks/'+id, { status: newStatus });
+            if(dt) await syncTodoWithDailyStatus(dt, newStatus);
+            loadDailyTasks();
+            if (els.notifOverlay.classList.contains('open')) openNotifPanel();
+          } catch(e) {
+            console.error('Failed to update daily task status:', e);
+          }
+        });
+      });
+
+      els.dailyTaskBody.appendChild(tr);
+    });
+  }
+
+  function renderDailyTaskChart(){
+    const ctx = els.dailyTaskChart?.getContext('2d');
+    if(!ctx) return;
+
+    // Count statuses
+    const counts = { not_start: 0, hold: 0, in_progress: 0, done: 0, stopped: 0 };
+    dailyTasks.forEach(dt => {
+      const s = dt.status || 'not_start';
+      if(counts[s] !== undefined) counts[s]++;
+    });
+
+    const total = counts.not_start + counts.hold + counts.in_progress + counts.done + counts.stopped;
+
+    if(total === 0){
+      // Show empty state
+      els.dailyTaskLegend.innerHTML = '';
+      if(dailyTaskChart) { dailyTaskChart.destroy(); dailyTaskChart = null; }
+      ctx.clearRect(0, 0, els.dailyTaskChart.width, els.dailyTaskChart.height);
+      ctx.font = '14px Inter, sans-serif';
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ink-faint').trim() || '#8B9CB3';
+      ctx.textAlign = 'center';
+      const emptyMsg = 'Belum ada data tugas';
+      ctx.fillText(emptyMsg, els.dailyTaskChart.width/2, els.dailyTaskChart.height/2);
+      return;
+    }
+
+    // Destroy existing chart
+    if(dailyTaskChart) dailyTaskChart.destroy();
+
+    const colors = {
+      not_start: getComputedStyle(document.documentElement).getPropertyValue('--ink-faint').trim() || '#8B9CB3',
+      hold: getComputedStyle(document.documentElement).getPropertyValue('--purple').trim() || '#7C3AED',
+      in_progress: getComputedStyle(document.documentElement).getPropertyValue('--status-progress').trim() || '#2F6BA3',
+      done: getComputedStyle(document.documentElement).getPropertyValue('--status-done').trim() || '#3F8F63',
+      stopped: getComputedStyle(document.documentElement).getPropertyValue('--status-risk').trim() || '#B5482F',
+    };
+
+    const done = counts.done;
+    const notDone = total - done;
+
+    const centerTextPlugin = {
+      id: 'centerText',
+      afterDraw(chart) {
+        const { ctx, chartArea: { top, bottom, left, right } } = chart;
+        const centerX = (left + right) / 2;
+        const centerY = (top + bottom) / 2;
+
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        ctx.font = '12px Inter, sans-serif';
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ink-faint').trim() || '#8B9CB3';
+        ctx.fillText('Total', centerX, centerY - 12);
+
+        ctx.font = 'bold 22px Inter, sans-serif';
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim() || '#1A1F2E';
+        ctx.fillText(done + '/' + notDone, centerX, centerY + 14);
+
+        ctx.restore();
+      }
+    };
+
+    dailyTaskChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Not Start', 'Hold', 'In Progress', 'Done', 'Stop'],
+        datasets: [{
+          data: [counts.not_start, counts.hold, counts.in_progress, counts.done, counts.stopped],
+          backgroundColor: [colors.not_start, colors.hold, colors.in_progress, colors.done, colors.stopped],
+          borderWidth: 0,
+          borderRadius: 4,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        cutout: '65%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const value = context.raw;
+                const percent = total > 0 ? Math.round((value / total) * 100) : 0;
+                return context.label + ': ' + value + ' (' + percent + '%)';
+              }
+            }
+          }
+        }
+      },
+      plugins: [centerTextPlugin]
+    });
+
+    // Render custom legend
+    renderDailyTaskLegend(counts, total, colors);
+  }
+
+  function renderDailyTaskLegend(counts, total, colors){
+    const labels = [
+      { key: 'not_start', label: 'Not Start' },
+      { key: 'hold', label: 'Hold' },
+      { key: 'in_progress', label: 'In Progress' },
+      { key: 'done', label: 'Done' },
+      { key: 'stopped', label: 'Stop' }
+    ];
+    els.dailyTaskLegend.innerHTML = labels.map(l => {
+      const count = counts[l.key] || 0;
+      const percent = total > 0 ? Math.round((count / total) * 100) : 0;
+      return `
+        <div class="chart-legend-item">
+          <span class="chart-legend-color" style="background:${colors[l.key]}"></span>
+          <span class="chart-legend-label">${l.label}</span>
+          <span class="chart-legend-value">${count} (${percent}%)</span>
+        </div>
+      `;
+    }).join('');
   }
 
   function renderEvidences(){
@@ -1310,7 +2137,7 @@
     if(editingTodoId){
       const todo = t.todos.find(x=>x.id===editingTodoId);
       if(todo){ todo.text = text; todo.due = dueStr ? parseDate(dueStr) : null; }
-      api.put('/api/tasks/'+t.id+'/todos/'+editingTodoId, { text, due: dueStr }).catch(e => console.error('Save todo failed:', e));
+      await api.put('/api/tasks/'+t.id+'/todos/'+editingTodoId, { text, due: dueStr }).catch(e => console.error('Save todo failed:', e));
       cancelTodoEdit();
     } else {
       try {
@@ -1323,6 +2150,7 @@
     els.todoInput.focus();
     renderTodos(t);
     updateProgressFromTodos(t);
+    await saveTaskProgress(t.id, t.progress);
     updateProgressSlider(t);
     updateBellDot();
     renderAll(false);
@@ -1338,6 +2166,10 @@
 
   document.getElementById('cancel-btn').addEventListener('click', closeModal);
   document.getElementById('close-btn').addEventListener('click', closeModal);
+  document.getElementById('back-btn').addEventListener('click', ()=>{
+    closeModal();
+    openNotifPanel();
+  });
   els.overlay.addEventListener('click', (e)=>{ if(e.target===els.overlay) closeModal(); });
   els.confirmOverlay.addEventListener('click', (e)=>{ if(e.target===els.confirmOverlay) closeConfirm(); });
 
@@ -1358,7 +2190,13 @@
       if(!t) return;
       t.name = name; t.start = start; t.end = end;
       t.cat = cat; t.assignee = assignee; t.progress = progress;
-      api.put('/api/tasks/'+editingId, { name, start:fmt(start), end:fmt(end), cat, assignee, progress }).catch(e => console.error('Save task failed:', e));
+      try {
+        await api.put('/api/tasks/'+editingId, { name, start:fmt(start), end:fmt(end), cat, assignee, progress });
+      } catch(e){ 
+        console.error('Save task failed:', e); 
+        showToast('Gagal menyimpan tugas: ' + e.message, 'error');
+        return;
+      }
     } else {
       try {
         const result = await api.post('/api/tasks', { name, start:fmt(start), end:fmt(end), cat, assignee, progress });
@@ -1378,7 +2216,8 @@
   document.getElementById('delete-btn').addEventListener('click', async ()=>{
     if(!editingId) return;
     const name = tasks.find(t=>t.id===editingId)?.name||'';
-    await showConfirm('Yakin ingin menghapus tugas <strong>'+escapeHtml(name)+'</strong>?', 'Ya, Hapus', 'Batal', 'confirm-yes');
+    const confirmed = await showConfirm('Yakin ingin menghapus tugas <strong>'+escapeHtml(name)+'</strong>?', 'Ya, Hapus', 'Batal', 'confirm-yes');
+    if (!confirmed) return;
     api.del('/api/tasks/'+editingId).catch(e => console.error('Delete task failed:', e));
     tasks = tasks.filter(t=>t.id!==editingId);
     closeModal(true);
@@ -1391,10 +2230,42 @@
     if(editingId) openEvidencePanel(editingId);
   });
 
+  els.holdBtn.addEventListener('click', async ()=>{
+    if(!editingId) return;
+    const task = tasks.find(t => t.id === editingId);
+    if(!task) return;
+    
+    try {
+      const result = await api.put('/api/tasks/'+editingId+'/hold');
+      task.held = result.held;
+      task.heldAt = result.heldAt;
+      
+      // Update button text and style
+      if (result.held) {
+        els.holdBtn.textContent = 'Open Again';
+        els.holdBtn.classList.add('btn-success');
+        els.holdBtn.classList.remove('btn-ghost');
+        showToast('Tugas di-hold (dihentikan sementara)');
+      } else {
+        els.holdBtn.textContent = 'Hold';
+        els.holdBtn.classList.add('btn-ghost');
+        els.holdBtn.classList.remove('btn-success');
+        showToast('Tugas dibuka kembali (dilanjutkan)');
+      }
+      
+      // Reload task log to show the new entry
+      loadTaskLog(editingId);
+      renderSidebar();
+      renderAll(false);
+    } catch (e) {
+      console.error('Failed to toggle hold:', e);
+      showToast('Gagal mengubah status hold', 'error');
+    }
+  });
+
   /* ---------------- Notification Panel Events ---------------- */
   els.bellBtn.addEventListener('click', ()=>{
     openNotifPanel();
-    els.notifOverlay.classList.add('open');
   });
 
   els.notifOverlay.addEventListener('click', (e)=>{
@@ -1412,12 +2283,21 @@
 
   document.getElementById('evidence-close-btn').addEventListener('click', closeEvidencePanel);
 
+  /* ---------------- Daily Task Panel Events ---------------- */
+  els.dailyTaskOverlay.addEventListener('click', (e)=>{
+    if(e.target === els.dailyTaskOverlay) closeDailyTaskPanel();
+  });
+
+  els.dailyTaskCloseBtn.addEventListener('click', closeDailyTaskPanel);
+
   document.addEventListener('keydown', (e)=>{
     if(e.key==='Escape' && els.confirmOverlay.classList.contains('open')){ closeConfirm(); return; }
     if(e.key==='Escape' && els.overlay.classList.contains('open')) closeModal();
     if(e.key==='Escape' && els.notifOverlay.classList.contains('open')) els.notifOverlay.classList.remove('open');
     if(e.key==='Escape' && els.evidenceOverlay.classList.contains('open')) closeEvidencePanel();
+    if(e.key==='Escape' && els.dailyTaskOverlay.classList.contains('open')) closeDailyTaskPanel();
     if(e.key==='Escape' && els.imgPreviewOverlay.classList.contains('open')) closeImagePreview();
+    if(e.key==='Escape' && els.navSidebar.classList.contains('open')) closeMobileNav();
   });
 
   /* ---------------- Inline Title Edit ---------------- */
@@ -1445,6 +2325,7 @@
       span.textContent = val;
       input.replaceWith(span);
       els.title = span;
+      renderBreadcrumb();
       api.put('/api/metadata', { title: val }).catch(e => console.error('Save title failed:', e));
     }
 
@@ -1454,6 +2335,7 @@
       span.textContent = _savedTitle;
       input.replaceWith(span);
       els.title = span;
+      renderBreadcrumb();
     }
 
     input.addEventListener('keydown', function(e){
@@ -1463,7 +2345,7 @@
     input.addEventListener('blur', commit);
   }
 
-  document.querySelector('.title-row').addEventListener('click', function(e){
+  document.querySelector('.title-row')?.addEventListener('click', function(e){
     if(e.target.id === 'project-title' || e.target.id === 'title-edit-icon'){
       enableTitleEdit();
     }
@@ -1485,8 +2367,11 @@
   function setTheme(theme){
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
-    const btn = document.getElementById('theme-toggle');
-    if(btn) btn.innerHTML = theme === 'dark' ? '<i class="bi bi-sun-fill"></i>' : '<i class="bi bi-moon-fill"></i>';
+    const dark = theme === 'dark';
+    const icon = document.getElementById('theme-icon');
+    const label = document.getElementById('theme-label');
+    if(icon) icon.className = dark ? 'bi bi-sun' : 'bi bi-moon';
+    if(label) label.textContent = dark ? 'Mode Terang' : 'Mode Gelap';
   }
 
   function initTheme(){
@@ -1497,11 +2382,6 @@
   }
 
   setFavicon();
-
-  document.getElementById('theme-toggle').addEventListener('click', function(){
-    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    setTheme(next);
-  });
 
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e){
     if(!localStorage.getItem('theme')) setTheme(e.matches ? 'dark' : 'light');
@@ -1699,7 +2579,980 @@
     });
   });
 
+  /* ---------------- Minutes of Meeting ---------------- */
+  const MOM_TYPES = {
+    internal: 'Internal',
+    project: 'Project',
+    client: 'Client',
+    formal: 'Formal',
+    lainnya: 'Lainnya',
+  };
+  const MOM_ATTENDANCE = {
+    present: 'Hadir',
+    excused: 'Izin',
+    absent: 'Tidak Hadir',
+  };
+  const MOM_ACTION_STATUS = {
+    open: 'Open',
+    in_progress: 'In Progress',
+    done: 'Done',
+  };
+  const MOM_MONTHS_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+
+  let momMeetings = [];
+  let momEditingId = null;
+  let momPreviewId = null;
+  let momFilter = { search: '', status: '', month: '' };
+  let momDraft = null;
+  let momSearchTimer = null;
+
+  function momEsc(value){
+    return escapeHtml(String(value === undefined || value === null ? '' : value));
+  }
+
+  function momNl2br(value){
+    return momEsc(value).replace(/\n/g, '<br>');
+  }
+
+  function momVal(id){
+    const el = document.getElementById(id);
+    return el ? el.value : '';
+  }
+
+  function momSetVal(id, value){
+    const el = document.getElementById(id);
+    if(el) el.value = value === undefined || value === null ? '' : value;
+  }
+
+  function momFormatDate(value){
+    if(!value) return '—';
+    const parts = String(value).slice(0, 10).split('-');
+    if(parts.length !== 3) return value;
+    const month = MOM_MONTHS_ID[Number(parts[1]) - 1] || parts[1];
+    return `${Number(parts[2])} ${month} ${parts[0]}`;
+  }
+
+  function momTimeRange(meeting){
+    const start = meeting.startTime || '';
+    const end = meeting.endTime || '';
+    if(!start && !end) return '—';
+    return start + (end ? ' – ' + end : '');
+  }
+
+  function momOptions(map, selected){
+    return Object.keys(map).map(key =>
+      `<option value="${key}"${key === selected ? ' selected' : ''}>${map[key]}</option>`
+    ).join('');
+  }
+
+  function momEmptyDraft(){
+    return {
+      momNumber: '',
+      title: '',
+      meetingType: 'internal',
+      date: fmt(today()),
+      startTime: '',
+      endTime: '',
+      location: '',
+      chair: '',
+      notetaker: '',
+      status: 'draft',
+      attendees: [{ name: '', role: '', organization: '', attendance: 'present' }],
+      agenda: [{ topic: '', presenter: '', duration: '' }],
+      discussions: [{ agendaTopic: '', notes: '' }],
+      decisions: [{ text: '' }],
+      actionItems: [{ description: '', pic: '', dueDate: '', status: 'open' }],
+      nextSteps: '',
+      nextMeetingDate: '',
+      nextMeetingTime: '',
+      nextMeetingLocation: '',
+      preparedBy: { name: '', role: '', date: fmt(today()), signature: '' },
+      approvedBy: { name: '', role: '', date: fmt(today()), signature: '' },
+    };
+  }
+
+  function momNormalizeDraft(meeting){
+    const draft = meeting ? JSON.parse(JSON.stringify(meeting)) : momEmptyDraft();
+    draft.attendees = Array.isArray(draft.attendees) ? draft.attendees : [];
+    draft.agenda = Array.isArray(draft.agenda) ? draft.agenda : [];
+    draft.discussions = Array.isArray(draft.discussions) ? draft.discussions : [];
+    draft.decisions = Array.isArray(draft.decisions) ? draft.decisions : [];
+    draft.actionItems = Array.isArray(draft.actionItems) ? draft.actionItems : [];
+    draft.preparedBy = draft.preparedBy || { name: '', role: '', date: fmt(today()), signature: '' };
+    draft.approvedBy = draft.approvedBy || { name: '', role: '', date: fmt(today()), signature: '' };
+    if(!draft.preparedBy.date) draft.preparedBy.date = fmt(today());
+    if(!draft.approvedBy.date) draft.approvedBy.date = fmt(today());
+    draft.meetingType = draft.meetingType || 'internal';
+    draft.status = draft.status === 'final' ? 'final' : 'draft';
+    return draft;
+  }
+
+  function momUpdateAttendeeCount(){
+    const countEl = document.getElementById('mom-attendee-count');
+    if(!countEl || !momDraft) return;
+    countEl.textContent = (momDraft.attendees || []).filter(a => String(a.name || '').trim()).length;
+  }
+
+  function momRenderAttendees(){
+    const body = document.getElementById('mom-attendee-body');
+    if(!body || !momDraft) return;
+    if(!momDraft.attendees.length){
+      body.innerHTML = '<tr><td colspan="6" class="mom-input-empty">Belum ada peserta. Klik "Tambah Peserta".</td></tr>';
+      momUpdateAttendeeCount();
+      return;
+    }
+    body.innerHTML = momDraft.attendees.map((a, i) => `
+      <tr data-index="${i}">
+        <td class="mom-row-num">${i + 1}</td>
+        <td><input type="text" data-mom-array="attendees" data-field="name" value="${momEsc(a.name)}" placeholder="Nama peserta"></td>
+        <td><input type="text" data-mom-array="attendees" data-field="role" value="${momEsc(a.role)}" placeholder="Jabatan / Divisi"></td>
+        <td><input type="text" data-mom-array="attendees" data-field="organization" value="${momEsc(a.organization)}" placeholder="Instansi"></td>
+        <td><select data-mom-array="attendees" data-field="attendance">${momOptions(MOM_ATTENDANCE, a.attendance || 'present')}</select></td>
+        <td><button type="button" class="mom-row-del" data-mom-remove="attendees" data-index="${i}" title="Hapus peserta"><i class="bi bi-x-lg"></i></button></td>
+      </tr>
+    `).join('');
+    momUpdateAttendeeCount();
+  }
+
+  function momRenderAgenda(){
+    const body = document.getElementById('mom-agenda-body');
+    if(!body || !momDraft) return;
+    if(!momDraft.agenda.length){
+      body.innerHTML = '<tr><td colspan="5" class="mom-input-empty">Belum ada agenda. Klik "Tambah Agenda".</td></tr>';
+      return;
+    }
+    body.innerHTML = momDraft.agenda.map((a, i) => `
+      <tr data-index="${i}">
+        <td class="mom-row-num">${i + 1}</td>
+        <td><input type="text" data-mom-array="agenda" data-field="topic" value="${momEsc(a.topic)}" placeholder="Topik agenda"></td>
+        <td><input type="text" data-mom-array="agenda" data-field="presenter" value="${momEsc(a.presenter)}" placeholder="Presenter / PIC"></td>
+        <td><input type="text" data-mom-array="agenda" data-field="duration" value="${momEsc(a.duration)}" placeholder="cth. 15"></td>
+        <td><button type="button" class="mom-row-del" data-mom-remove="agenda" data-index="${i}" title="Hapus agenda"><i class="bi bi-x-lg"></i></button></td>
+      </tr>
+    `).join('');
+  }
+
+  function momRenderDiscussions(){
+    const body = document.getElementById('mom-discussion-body');
+    if(!body || !momDraft) return;
+    if(!momDraft.discussions.length){
+      body.innerHTML = '<tr><td colspan="4" class="mom-input-empty">Belum ada poin pembahasan. Klik "Tambah Pembahasan".</td></tr>';
+      return;
+    }
+    body.innerHTML = momDraft.discussions.map((d, i) => `
+      <tr data-index="${i}">
+        <td class="mom-row-num">${i + 1}</td>
+        <td><input type="text" data-mom-array="discussions" data-field="agendaTopic" value="${momEsc(d.agendaTopic)}" placeholder="Agenda terkait"></td>
+        <td><textarea data-mom-array="discussions" data-field="notes" rows="2" placeholder="Tulis poin pembahasan...">${momEsc(d.notes)}</textarea></td>
+        <td><button type="button" class="mom-row-del" data-mom-remove="discussions" data-index="${i}" title="Hapus pembahasan"><i class="bi bi-x-lg"></i></button></td>
+      </tr>
+    `).join('');
+  }
+
+  function momRenderDecisions(){
+    const body = document.getElementById('mom-decision-body');
+    if(!body || !momDraft) return;
+    if(!momDraft.decisions.length){
+      body.innerHTML = '<tr><td colspan="3" class="mom-input-empty">Belum ada keputusan. Klik "Tambah Keputusan".</td></tr>';
+      return;
+    }
+    body.innerHTML = momDraft.decisions.map((d, i) => `
+      <tr data-index="${i}">
+        <td class="mom-row-num">${i + 1}</td>
+        <td><input type="text" data-mom-array="decisions" data-field="text" value="${momEsc(d.text)}" placeholder="Tulis keputusan / kesepakatan..."></td>
+        <td><button type="button" class="mom-row-del" data-mom-remove="decisions" data-index="${i}" title="Hapus keputusan"><i class="bi bi-x-lg"></i></button></td>
+      </tr>
+    `).join('');
+  }
+
+  function momRenderActions(){
+    const body = document.getElementById('mom-action-body');
+    if(!body || !momDraft) return;
+    if(!momDraft.actionItems.length){
+      body.innerHTML = '<tr><td colspan="6" class="mom-input-empty">Belum ada action item. Klik "Tambah Action Item".</td></tr>';
+      return;
+    }
+    body.innerHTML = momDraft.actionItems.map((a, i) => `
+      <tr data-index="${i}">
+        <td class="mom-row-num">${i + 1}</td>
+        <td><input type="text" data-mom-array="actionItems" data-field="description" value="${momEsc(a.description)}" placeholder="Action item"></td>
+        <td><input type="text" data-mom-array="actionItems" data-field="pic" value="${momEsc(a.pic)}" placeholder="PIC"></td>
+        <td><input type="date" data-mom-array="actionItems" data-field="dueDate" value="${momEsc(a.dueDate)}"></td>
+        <td><select data-mom-array="actionItems" data-field="status">${momOptions(MOM_ACTION_STATUS, a.status || 'open')}</select></td>
+        <td><button type="button" class="mom-row-del" data-mom-remove="actionItems" data-index="${i}" title="Hapus action item"><i class="bi bi-x-lg"></i></button></td>
+      </tr>
+    `).join('');
+  }
+
+  function momRenderAllRows(){
+    momRenderAttendees();
+    momRenderAgenda();
+    momRenderDiscussions();
+    momRenderDecisions();
+    momRenderActions();
+  }
+
+  function momHandleArrayInput(e){
+    const el = e.target.closest('[data-mom-array]');
+    if(!el || !momDraft) return;
+    const arr = momDraft[el.dataset.momArray];
+    const tr = el.closest('tr[data-index]');
+    if(!Array.isArray(arr) || !tr) return;
+    const idx = Number(tr.dataset.index);
+    if(!arr[idx]) return;
+    arr[idx][el.dataset.field] = el.value;
+    if(el.dataset.momArray === 'attendees') momUpdateAttendeeCount();
+  }
+
+  function momHandleArrayRemove(e){
+    const btn = e.target.closest('[data-mom-remove]');
+    if(!btn || !momDraft) return;
+    const arr = momDraft[btn.dataset.momRemove];
+    const tr = btn.closest('tr[data-index]');
+    if(!Array.isArray(arr) || !tr) return;
+    arr.splice(Number(tr.dataset.index), 1);
+    momRenderAllRows();
+  }
+
+  function momSetupSignaturePad(canvasId, existingSignature){
+    const original = document.getElementById(canvasId);
+    if(!original) return;
+    const canvas = original.cloneNode(false);
+    original.parentNode.replaceChild(canvas, original);
+
+    const rect = canvas.getBoundingClientRect();
+    const width = Math.max(rect.width, 260);
+    const height = Math.max(rect.height, 120);
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#1B3350';
+
+    canvas.dataset.dirty = '0';
+    canvas.dataset.existing = existingSignature || '';
+
+    if(existingSignature){
+      const img = new Image();
+      img.onload = () => {
+        const ratio = Math.min(width / img.width, height / img.height);
+        const w = img.width * ratio;
+        const h = img.height * ratio;
+        ctx.drawImage(img, (width - w) / 2, (height - h) / 2, w, h);
+      };
+      img.src = existingSignature;
+    }
+
+    let drawing = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    function point(e){
+      const r = canvas.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      drawing = true;
+      canvas.dataset.dirty = '1';
+      const p = point(e);
+      lastX = p.x;
+      lastY = p.y;
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      try { canvas.setPointerCapture(e.pointerId); } catch(_) {}
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if(!drawing) return;
+      e.preventDefault();
+      const p = point(e);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      lastX = p.x;
+      lastY = p.y;
+    });
+
+    const stop = () => { drawing = false; };
+    canvas.addEventListener('pointerup', stop);
+    canvas.addEventListener('pointercancel', stop);
+    canvas.addEventListener('pointerleave', stop);
+  }
+
+  function momReadSignature(canvasId, fallback){
+    const canvas = document.getElementById(canvasId);
+    if(!canvas) return fallback || '';
+    if(canvas.dataset.dirty === '1') {
+      try { return canvas.toDataURL('image/png'); } catch(_) { return fallback || ''; }
+    }
+    return canvas.dataset.existing || fallback || '';
+  }
+
+  function momClearSignature(canvasId){
+    const canvas = document.getElementById(canvasId);
+    if(!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    canvas.dataset.dirty = '1';
+    canvas.dataset.existing = '';
+  }
+
+  function openMomForm(meeting){
+    momEditingId = meeting ? meeting.id : null;
+    momDraft = momNormalizeDraft(meeting);
+
+    document.getElementById('mom-form-title').textContent = meeting ? 'Edit MoM' : 'MoM Baru';
+    document.getElementById('mom-form-sub').textContent = meeting
+      ? 'Perbarui informasi rapat, keputusan, action item, dan pengesahan.'
+      : 'Lengkapi informasi rapat, peserta, agenda, keputusan, dan tindak lanjut.';
+
+    momSetVal('mom-number', momDraft.momNumber || '');
+    momSetVal('mom-title', momDraft.title);
+    momSetVal('mom-type', momDraft.meetingType);
+    momSetVal('mom-status', momDraft.status);
+    momSetVal('mom-date', momDraft.date);
+    momSetVal('mom-location', momDraft.location);
+    momSetVal('mom-start', momDraft.startTime);
+    momSetVal('mom-end', momDraft.endTime);
+    momSetVal('mom-chair', momDraft.chair);
+    momSetVal('mom-notetaker', momDraft.notetaker);
+
+    momSetVal('mom-next-steps', momDraft.nextSteps);
+    momSetVal('mom-next-date', momDraft.nextMeetingDate);
+    momSetVal('mom-next-time', momDraft.nextMeetingTime);
+    momSetVal('mom-next-location', momDraft.nextMeetingLocation);
+
+    momSetVal('mom-prepared-name', momDraft.preparedBy.name);
+    momSetVal('mom-prepared-role', momDraft.preparedBy.role);
+    momSetVal('mom-prepared-date', momDraft.preparedBy.date);
+    momSetVal('mom-approved-name', momDraft.approvedBy.name);
+    momSetVal('mom-approved-role', momDraft.approvedBy.role);
+    momSetVal('mom-approved-date', momDraft.approvedBy.date);
+
+    document.getElementById('mom-delete-btn').style.visibility = meeting ? 'visible' : 'hidden';
+    momRenderAllRows();
+
+    const overlay = document.getElementById('mom-form-overlay');
+    overlay.classList.add('open');
+
+    requestAnimationFrame(() => {
+      if(!momDraft) return;
+      momSetupSignaturePad('mom-prepared-canvas', momDraft.preparedBy.signature);
+      momSetupSignaturePad('mom-approved-canvas', momDraft.approvedBy.signature);
+    });
+  }
+
+  function closeMomForm(){
+    const overlay = document.getElementById('mom-form-overlay');
+    if(overlay) overlay.classList.remove('open');
+    momEditingId = null;
+    momDraft = null;
+  }
+
+  function momCollectPayload(status){
+    const draft = momDraft || momEmptyDraft();
+    draft.title = momVal('mom-title').trim();
+    draft.momNumber = momVal('mom-number').trim();
+    draft.meetingType = momVal('mom-type') || 'internal';
+    draft.status = status || momVal('mom-status') || 'draft';
+    draft.date = momVal('mom-date');
+    draft.startTime = momVal('mom-start');
+    draft.endTime = momVal('mom-end');
+    draft.location = momVal('mom-location').trim();
+    draft.chair = momVal('mom-chair').trim();
+    draft.notetaker = momVal('mom-notetaker').trim();
+
+    draft.nextSteps = momVal('mom-next-steps').trim();
+    draft.nextMeetingDate = momVal('mom-next-date');
+    draft.nextMeetingTime = momVal('mom-next-time');
+    draft.nextMeetingLocation = momVal('mom-next-location').trim();
+
+    draft.preparedBy = {
+      name: momVal('mom-prepared-name').trim(),
+      role: momVal('mom-prepared-role').trim(),
+      date: momVal('mom-prepared-date'),
+      signature: momReadSignature('mom-prepared-canvas', draft.preparedBy && draft.preparedBy.signature),
+    };
+    draft.approvedBy = {
+      name: momVal('mom-approved-name').trim(),
+      role: momVal('mom-approved-role').trim(),
+      date: momVal('mom-approved-date'),
+      signature: momReadSignature('mom-approved-canvas', draft.approvedBy && draft.approvedBy.signature),
+    };
+
+    draft.attendees = (draft.attendees || []).filter(a =>
+      String(a.name || '').trim() || String(a.role || '').trim() || String(a.organization || '').trim()
+    );
+    draft.agenda = (draft.agenda || []).filter(a =>
+      String(a.topic || '').trim() || String(a.presenter || '').trim() || String(a.duration || '').trim()
+    );
+    draft.discussions = (draft.discussions || []).filter(d =>
+      String(d.agendaTopic || '').trim() || String(d.notes || '').trim()
+    );
+    draft.decisions = (draft.decisions || []).filter(d => String(d.text || '').trim());
+    draft.actionItems = (draft.actionItems || []).filter(a =>
+      String(a.description || '').trim() || String(a.pic || '').trim() || String(a.dueDate || '').trim()
+    );
+
+    return JSON.parse(JSON.stringify(draft));
+  }
+
+  async function saveMom(status){
+    if(!momDraft) return;
+    const payload = momCollectPayload(status);
+    if(!payload.title){
+      showToast('Judul rapat wajib diisi.', 'error');
+      document.getElementById('mom-title').focus();
+      return;
+    }
+    if(!payload.date){
+      showToast('Tanggal rapat wajib diisi.', 'error');
+      document.getElementById('mom-date').focus();
+      return;
+    }
+
+    const btn = document.getElementById(status === 'final' ? 'mom-save-final-btn' : 'mom-save-draft-btn');
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.textContent = 'Menyimpan...';
+    try {
+      if(momEditingId){
+        await api.put('/api/mom/' + momEditingId, payload);
+      } else {
+        await api.post('/api/mom', payload);
+      }
+      const savedStatus = payload.status;
+      closeMomForm();
+      await loadMomMeetings();
+      showToast(savedStatus === 'final' ? 'MoM berhasil disimpan sebagai Final.' : 'MoM berhasil disimpan sebagai Draft.');
+    } catch(err){
+      showToast('Gagal menyimpan MoM: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
+  }
+
+  async function loadMomMeetings(){
+    try {
+      const data = await api.get('/api/mom');
+      momMeetings = Array.isArray(data.meetings) ? data.meetings : [];
+    } catch(err){
+      console.error('Gagal memuat Minutes of Meeting:', err);
+      momMeetings = [];
+    }
+    renderMomPage();
+  }
+
+  function momFilteredMeetings(){
+    const q = momFilter.search.toLowerCase();
+    return momMeetings.filter(m => {
+      if(momFilter.status && m.status !== momFilter.status) return false;
+      if(momFilter.month && String(m.date || '').slice(0, 7) !== momFilter.month) return false;
+      if(!q) return true;
+      const haystack = [
+        m.title,
+        m.momNumber,
+        m.chair,
+        m.notetaker,
+        m.location,
+        ...(m.attendees || []).map(a => a.name),
+      ].join(' ').toLowerCase();
+      return haystack.includes(q);
+    }).sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || (b.id || 0) - (a.id || 0));
+  }
+
+  function momActionCounts(){
+    let open = 0;
+    let overdue = 0;
+    const todayKey = fmt(today());
+    momMeetings.forEach(m => {
+      (m.actionItems || []).forEach(a => {
+        if(a.status === 'done') return;
+        open += 1;
+        const due = a.dueDate ? String(a.dueDate).slice(0, 10) : '';
+        if(due && due < todayKey) overdue += 1;
+      });
+    });
+    return { open, overdue };
+  }
+
+  function renderMomPage(){
+    const tbody = document.getElementById('mom-table-body');
+    if(!tbody) return;
+
+    const currentMonth = fmt(today()).slice(0, 7);
+    const monthCount = momMeetings.filter(m => String(m.date || '').slice(0, 7) === currentMonth).length;
+    const counts = momActionCounts();
+    const statsEl = document.getElementById('mom-stats');
+    if(statsEl){
+      statsEl.innerHTML = `
+        <div class="mom-stat">
+          <div class="mom-stat-icon total"><i class="bi bi-journal-check"></i></div>
+          <div><div class="mom-stat-num">${momMeetings.length}</div><div class="mom-stat-label">Total MoM</div></div>
+        </div>
+        <div class="mom-stat">
+          <div class="mom-stat-icon month"><i class="bi bi-calendar3"></i></div>
+          <div><div class="mom-stat-num">${monthCount}</div><div class="mom-stat-label">Rapat Bulan Ini</div></div>
+        </div>
+        <div class="mom-stat">
+          <div class="mom-stat-icon open"><i class="bi bi-list-task"></i></div>
+          <div><div class="mom-stat-num">${counts.open}</div><div class="mom-stat-label">Action Item Open</div></div>
+        </div>
+        <div class="mom-stat">
+          <div class="mom-stat-icon overdue"><i class="bi bi-exclamation-triangle"></i></div>
+          <div><div class="mom-stat-num">${counts.overdue}</div><div class="mom-stat-label">Action Item Overdue</div></div>
+        </div>
+      `;
+    }
+
+    const monthSelect = document.getElementById('mom-filter-month');
+    if(monthSelect){
+      const months = Array.from(new Set(
+        momMeetings.map(m => String(m.date || '').slice(0, 7)).filter(Boolean)
+      )).sort().reverse();
+      if(momFilter.month && !months.includes(momFilter.month)) momFilter.month = '';
+      monthSelect.innerHTML = '<option value="">Semua Bulan</option>' + months.map(ym => {
+        const parts = ym.split('-');
+        const label = `${MOM_MONTHS_ID[Number(parts[1]) - 1] || parts[1]} ${parts[0]}`;
+        return `<option value="${ym}"${ym === momFilter.month ? ' selected' : ''}>${label}</option>`;
+      }).join('');
+    }
+    const filtered = momFilteredMeetings();
+    const countLabel = document.getElementById('mom-count-label');
+    if(countLabel){
+      countLabel.textContent = filtered.length === momMeetings.length
+        ? `${momMeetings.length} MoM tercatat`
+        : `Menampilkan ${filtered.length} dari ${momMeetings.length} MoM`;
+    }
+
+    tbody.innerHTML = filtered.map((m, i) => {
+      const status = m.status === 'final' ? 'final' : 'draft';
+      const openActions = (m.actionItems || []).filter(a => a.status !== 'done').length;
+      const participantCount = (m.attendees || []).filter(a => String(a.name || '').trim()).length;
+      const typeLabel = MOM_TYPES[m.meetingType] || MOM_TYPES.lainnya;
+      return `
+        <tr data-mom-id="${m.id}">
+          <td class="mom-col-num">${i + 1}</td>
+          <td><span class="mom-number">${momEsc(m.momNumber || '—')}</span></td>
+          <td>
+            <div class="mom-title-cell">${momEsc(m.title || '(Tanpa judul)')}</div>
+            <div class="mom-sub-cell">${momEsc(typeLabel)}</div>
+          </td>
+          <td>${momEsc(momFormatDate(m.date))}</td>
+          <td class="mom-time-cell">${momEsc(momTimeRange(m))}</td>
+          <td>${momEsc(m.location || '—')}</td>
+          <td class="mom-people-cell">
+            <span><b>${momEsc(m.chair || '—')}</b></span>
+            <span>${momEsc(m.notetaker || '—')}</span>
+          </td>
+          <td class="mom-col-center">${participantCount}</td>
+          <td class="mom-col-center">${openActions}</td>
+          <td class="mom-col-center"><span class="mom-badge ${status}">${status === 'final' ? 'Final' : 'Draft'}</span></td>
+          <td class="mom-col-act">
+            <div class="mom-actions">
+              <button type="button" class="mom-icon-btn" data-mom-action="preview" data-id="${m.id}" title="Preview"><i class="bi bi-eye"></i></button>
+              <button type="button" class="mom-icon-btn" data-mom-action="edit" data-id="${m.id}" title="Edit"><i class="bi bi-pencil"></i></button>
+              <button type="button" class="mom-icon-btn danger" data-mom-action="delete" data-id="${m.id}" title="Hapus"><i class="bi bi-trash"></i></button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    const emptyEl = document.getElementById('mom-empty');
+    if(emptyEl) emptyEl.style.display = filtered.length === 0 ? 'block' : 'none';
+  }
+
+  function momSignatureBlock(label, sig){
+    const signature = sig && sig.signature
+      ? `<img src="${momEsc(sig.signature)}" alt="Tanda tangan">`
+      : '';
+    return `
+      <div class="mom-doc-sign">
+        <div class="mom-doc-sign-label">${label},</div>
+        <div class="mom-doc-sign-space">${signature}</div>
+        <div class="mom-doc-sign-line"></div>
+        <div class="mom-doc-sign-name">${momEsc(sig && sig.name ? sig.name : '................................')}</div>
+        <div class="mom-doc-sign-role">${momEsc(sig && sig.role ? sig.role : 'Jabatan')}</div>
+        <div class="mom-doc-sign-date">${sig && sig.date ? 'Tanggal: ' + momEsc(momFormatDate(sig.date)) : '&nbsp;'}</div>
+      </div>
+    `;
+  }
+
+  function momBuildDoc(m){
+    const infoRows = [
+      ['Nomor MoM', m.momNumber || '—'],
+      ['Jenis Rapat', MOM_TYPES[m.meetingType] || MOM_TYPES.lainnya],
+      ['Hari / Tanggal', momFormatDate(m.date)],
+      ['Waktu', momTimeRange(m)],
+      ['Lokasi / Link', m.location || '—'],
+      ['Pimpinan Rapat', m.chair || '—'],
+      ['Notulis', m.notetaker || '—'],
+      ['Status', m.status === 'final' ? 'Final' : 'Draft'],
+    ];
+
+    const attendees = (m.attendees || []).filter(a => String(a.name || '').trim());
+    const agenda = (m.agenda || []).filter(a => String(a.topic || '').trim());
+    const discussions = (m.discussions || []).filter(d => String(d.notes || '').trim() || String(d.agendaTopic || '').trim());
+    const decisions = (m.decisions || []).filter(d => String(d.text || '').trim());
+    const actions = (m.actionItems || []).filter(a => String(a.description || '').trim());
+
+    let html = `
+      <div class="mom-doc-head">
+        <div class="mom-doc-kicker">Minutes of Meeting</div>
+        <h1>${momEsc(m.title || '(Tanpa judul)')}</h1>
+        <div class="mom-doc-number">${momEsc(m.momNumber || '')}</div>
+      </div>
+      <table class="mom-doc-table mom-doc-info">
+        <tbody>
+          ${infoRows.map(([label, value]) => `<tr><th>${momEsc(label)}</th><td>${momEsc(value)}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    `;
+
+    html += '<div class="mom-doc-section"><h2>Peserta Meeting</h2>';
+    if(attendees.length){
+      html += `
+        <table class="mom-doc-table">
+          <thead><tr><th style="width:34px;">No.</th><th>Nama</th><th>Jabatan / Divisi</th><th>Instansi</th><th>Kehadiran</th></tr></thead>
+          <tbody>
+            ${attendees.map((a, i) => `
+              <tr>
+                <td>${i + 1}</td>
+                <td>${momEsc(a.name)}</td>
+                <td>${momEsc(a.role || '—')}</td>
+                <td>${momEsc(a.organization || '—')}</td>
+                <td>${momEsc(MOM_ATTENDANCE[a.attendance] || MOM_ATTENDANCE.present)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    } else {
+      html += '<p class="mom-doc-muted">Tidak ada data peserta.</p>';
+    }
+    html += '</div>';
+
+    if(agenda.length){
+      html += `
+        <div class="mom-doc-section">
+          <h2>Agenda Meeting</h2>
+          <table class="mom-doc-table">
+            <thead><tr><th style="width:34px;">No.</th><th>Agenda</th><th>Presenter / PIC</th><th>Durasi</th></tr></thead>
+            <tbody>
+              ${agenda.map((a, i) => `
+                <tr>
+                  <td>${i + 1}</td>
+                  <td>${momEsc(a.topic)}</td>
+                  <td>${momEsc(a.presenter || '—')}</td>
+                  <td>${momEsc(a.duration ? a.duration + ' menit' : '—')}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    if(discussions.length){
+      html += `
+        <div class="mom-doc-section">
+          <h2>Poin-poin Pembahasan</h2>
+          <ol class="mom-doc-list">
+            ${discussions.map(d => `
+              <li>
+                ${d.agendaTopic ? `<strong>${momEsc(d.agendaTopic)}</strong><br>` : ''}
+                <div class="mom-doc-p">${momNl2br(d.notes)}</div>
+              </li>
+            `).join('')}
+          </ol>
+        </div>
+      `;
+    }
+
+    if(decisions.length){
+      html += `
+        <div class="mom-doc-section">
+          <h2>Keputusan / Kesepakatan</h2>
+          <ol class="mom-doc-list">
+            ${decisions.map(d => `<li>${momNl2br(d.text)}</li>`).join('')}
+          </ol>
+        </div>
+      `;
+    }
+
+    if(actions.length){
+      html += `
+        <div class="mom-doc-section">
+          <h2>Action Item / Tindak Lanjut</h2>
+          <table class="mom-doc-table">
+            <thead><tr><th style="width:34px;">No.</th><th>Action Item</th><th>PIC</th><th>Due Date</th><th>Status</th></tr></thead>
+            <tbody>
+              ${actions.map((a, i) => `
+                <tr>
+                  <td>${i + 1}</td>
+                  <td>${momNl2br(a.description)}</td>
+                  <td>${momEsc(a.pic || '—')}</td>
+                  <td>${a.dueDate ? momEsc(momFormatDate(a.dueDate)) : '—'}</td>
+                  <td>${momEsc(MOM_ACTION_STATUS[a.status] || MOM_ACTION_STATUS.open)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    if(m.nextSteps || m.nextMeetingDate || m.nextMeetingTime || m.nextMeetingLocation){
+      html += `
+        <div class="mom-doc-section">
+          <h2>What's Next / Rencana Selanjutnya</h2>
+          ${m.nextSteps ? `<p class="mom-doc-p">${momNl2br(m.nextSteps)}</p>` : ''}
+          <div class="mom-doc-meta">
+            ${m.nextMeetingDate ? `<span><b>Rapat berikutnya:</b> ${momEsc(momFormatDate(m.nextMeetingDate))}</span>` : ''}
+            ${m.nextMeetingTime ? `<span><b>Waktu:</b> ${momEsc(m.nextMeetingTime)}</span>` : ''}
+            ${m.nextMeetingLocation ? `<span><b>Lokasi:</b> ${momEsc(m.nextMeetingLocation)}</span>` : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    html += `
+      <div class="mom-doc-signatures">
+        ${momSignatureBlock('Dibuat oleh', m.preparedBy)}
+        ${momSignatureBlock('Disetujui oleh', m.approvedBy)}
+      </div>
+    `;
+
+    return html;
+  }
+
+  function openMomPreview(id){
+    const meeting = momMeetings.find(m => m.id === id);
+    if(!meeting) return;
+    momPreviewId = id;
+    const sub = document.getElementById('mom-preview-sub');
+    if(sub) sub.textContent = `${meeting.momNumber || 'MoM'} · ${momFormatDate(meeting.date)} · ${meeting.status === 'final' ? 'Final' : 'Draft'}`;
+    const doc = document.getElementById('mom-printable');
+    if(doc) doc.innerHTML = momBuildDoc(meeting);
+    document.getElementById('mom-preview-overlay').classList.add('open');
+  }
+
+  function closeMomPreview(){
+    const overlay = document.getElementById('mom-preview-overlay');
+    if(overlay) overlay.classList.remove('open');
+  }
+
+  function openMomEdit(id){
+    const meeting = momMeetings.find(m => m.id === id);
+    if(!meeting) return;
+    closeMomPreview();
+    openMomForm(meeting);
+  }
+
+  async function deleteMom(id){
+    const meeting = momMeetings.find(m => m.id === id);
+    if(!meeting) return;
+    const confirmed = await showConfirm(
+      `Yakin ingin menghapus MoM <strong>${momEsc(meeting.title || 'ini')}</strong>?`,
+      'Ya, Hapus',
+      'Batal'
+    );
+    if(!confirmed) return;
+    try {
+      await api.del('/api/mom/' + id);
+      if(momPreviewId === id) closeMomPreview();
+      if(momEditingId === id) closeMomForm();
+      await loadMomMeetings();
+      showToast('MoM berhasil dihapus.');
+    } catch(err){
+      showToast('Gagal menghapus MoM: ' + err.message, 'error');
+    }
+  }
+
+  async function exportMomPdf(){
+    const el = document.getElementById('mom-printable');
+    if(!el) return;
+    if(typeof html2pdf === 'undefined'){
+      showToast('Library PDF belum dimuat. Silakan coba lagi.', 'error');
+      return;
+    }
+    const meeting = momMeetings.find(m => m.id === momPreviewId);
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    if(currentTheme === 'dark') document.documentElement.setAttribute('data-theme', 'light');
+    el.classList.add('mom-print-light');
+
+    const fileName = ((meeting && meeting.momNumber) || 'MoM').replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') + '.pdf';
+    const opt = {
+      margin: [10, 10, 10, 10],
+      filename: fileName || 'MoM.pdf',
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    };
+
+    try {
+      await html2pdf().set(opt).from(el).save();
+    } catch(err){
+      showToast('Gagal export PDF: ' + err.message, 'error');
+    } finally {
+      el.classList.remove('mom-print-light');
+      if(currentTheme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  }
+
+  function openMomTemplate(){
+    document.getElementById('mom-template-overlay').classList.add('open');
+  }
+
+  function closeMomTemplate(){
+    document.getElementById('mom-template-overlay').classList.remove('open');
+  }
+
+  function initMom(){
+    const addBtns = [document.getElementById('mom-add-btn'), document.getElementById('mom-add-btn-2')];
+    addBtns.forEach(btn => {
+      if(btn) btn.addEventListener('click', () => openMomForm(null));
+    });
+
+    document.getElementById('mom-template-btn').addEventListener('click', openMomTemplate);
+    document.getElementById('mom-template-close').addEventListener('click', closeMomTemplate);
+    document.getElementById('mom-template-ok').addEventListener('click', closeMomTemplate);
+    document.getElementById('mom-template-overlay').addEventListener('click', (e) => {
+      if(e.target === document.getElementById('mom-template-overlay')) closeMomTemplate();
+    });
+
+    const searchInput = document.getElementById('mom-search');
+    searchInput.addEventListener('input', () => {
+      clearTimeout(momSearchTimer);
+      momSearchTimer = setTimeout(() => {
+        momFilter.search = searchInput.value.trim();
+        renderMomPage();
+      }, 150);
+    });
+
+    document.getElementById('mom-filter-status').addEventListener('change', (e) => {
+      momFilter.status = e.target.value;
+      renderMomPage();
+    });
+    document.getElementById('mom-filter-month').addEventListener('change', (e) => {
+      momFilter.month = e.target.value;
+      renderMomPage();
+    });
+    document.getElementById('mom-filter-reset').addEventListener('click', () => {
+      momFilter = { search: '', status: '', month: '' };
+      searchInput.value = '';
+      document.getElementById('mom-filter-status').value = '';
+      document.getElementById('mom-filter-month').value = '';
+      renderMomPage();
+    });
+
+    document.getElementById('mom-table-body').addEventListener('click', (e) => {
+      const actionBtn = e.target.closest('[data-mom-action]');
+      if(actionBtn){
+        e.stopPropagation();
+        const id = Number(actionBtn.dataset.id);
+        const action = actionBtn.dataset.momAction;
+        if(action === 'preview') openMomPreview(id);
+        if(action === 'edit') openMomEdit(id);
+        if(action === 'delete') deleteMom(id);
+        return;
+      }
+      const row = e.target.closest('tr[data-mom-id]');
+      if(row) openMomPreview(Number(row.dataset.momId));
+    });
+
+    document.getElementById('mom-form-close').addEventListener('click', closeMomForm);
+    document.getElementById('mom-cancel-btn').addEventListener('click', closeMomForm);
+    document.getElementById('mom-form-overlay').addEventListener('click', (e) => {
+      if(e.target === document.getElementById('mom-form-overlay')) closeMomForm();
+    });
+
+    document.getElementById('mom-save-draft-btn').addEventListener('click', () => saveMom('draft'));
+    document.getElementById('mom-save-final-btn').addEventListener('click', () => saveMom('final'));
+    document.getElementById('mom-delete-btn').addEventListener('click', () => {
+      if(momEditingId) deleteMom(momEditingId);
+    });
+
+    document.getElementById('mom-form').addEventListener('input', momHandleArrayInput);
+    document.getElementById('mom-form').addEventListener('change', momHandleArrayInput);
+    document.getElementById('mom-form').addEventListener('click', momHandleArrayRemove);
+    document.getElementById('mom-form').addEventListener('submit', (e) => e.preventDefault());
+
+    document.getElementById('mom-add-attendee').addEventListener('click', () => {
+      momDraft.attendees.push({ name: '', role: '', organization: '', attendance: 'present' });
+      momRenderAttendees();
+    });
+    document.getElementById('mom-add-agenda').addEventListener('click', () => {
+      momDraft.agenda.push({ topic: '', presenter: '', duration: '' });
+      momRenderAgenda();
+    });
+    document.getElementById('mom-add-discussion').addEventListener('click', () => {
+      momDraft.discussions.push({ agendaTopic: '', notes: '' });
+      momRenderDiscussions();
+    });
+    document.getElementById('mom-add-decision').addEventListener('click', () => {
+      momDraft.decisions.push({ text: '' });
+      momRenderDecisions();
+    });
+    document.getElementById('mom-add-action').addEventListener('click', () => {
+      momDraft.actionItems.push({ description: '', pic: '', dueDate: '', status: 'open' });
+      momRenderActions();
+    });
+
+    document.querySelectorAll('[data-sign-clear]').forEach(btn => {
+      btn.addEventListener('click', () => momClearSignature(btn.dataset.signClear));
+    });
+
+    document.getElementById('mom-preview-close').addEventListener('click', closeMomPreview);
+    document.getElementById('mom-preview-overlay').addEventListener('click', (e) => {
+      if(e.target === document.getElementById('mom-preview-overlay')) closeMomPreview();
+    });
+    document.getElementById('mom-preview-edit').addEventListener('click', () => {
+      if(momPreviewId) openMomEdit(momPreviewId);
+    });
+    document.getElementById('mom-export-pdf').addEventListener('click', exportMomPdf);
+
+    document.addEventListener('keydown', (e) => {
+      if(e.key === 'Escape'){
+        if(document.getElementById('mom-form-overlay').classList.contains('open')) closeMomForm();
+        else if(document.getElementById('mom-preview-overlay').classList.contains('open')) closeMomPreview();
+        else if(document.getElementById('mom-template-overlay').classList.contains('open')) closeMomTemplate();
+      }
+    });
+  }
+
+  initMom();
+
   /* ---------------- Init ---------------- */
-  loadTasks();
+  (async () => {
+    await Promise.all([loadTasks(), loadDailyTasks(), loadMomMeetings()]);
+  })();
+
+  // Update date labels when the day rolls over (checked every 30s)
+  let lastDateKey = fmt(today());
+  setInterval(() => {
+    const key = fmt(today());
+    if(key !== lastDateKey){
+      lastDateKey = key;
+      updateDateLabels();
+      loadDailyTasks();
+    }
+  }, 30000);
+
+  // Daily Task card click handler (delegated)
+  els.overviewCards.addEventListener('click', (e) => {
+    const card = e.target.closest('#card-daily-task');
+    if (card) {
+      openDailyTaskPanel();
+    }
+  });
 
 })();
