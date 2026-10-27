@@ -298,6 +298,21 @@
       return;
     }
 
+    if(currentView === 'uat-process'){
+      const uat = uats.find(u => u.id === activeUatId);
+      els.breadcrumbCard.innerHTML = `
+        <span class="breadcrumb-item">
+          <i class="bi bi-house-door"></i>
+          <span>Beranda</span>
+        </span>
+        <span class="breadcrumb-sep"><i class="bi bi-chevron-right"></i></span>
+        <span class="breadcrumb-item">Quality Assurance</span>
+        <span class="breadcrumb-sep"><i class="bi bi-chevron-right"></i></span>
+        <span class="breadcrumb-item active" aria-current="page">Proses UAT${uat ? ' — ' + escapeHtml(uat.title || '') : ''}</span>
+      `;
+      return;
+    }
+
     const title = els.title?.textContent?.trim() || 'Timeframe';
     els.breadcrumbCard.innerHTML = `
       <span class="breadcrumb-item">
@@ -858,7 +873,9 @@
   function setActiveView(view){
     currentView = view;
     els.navItems.forEach(item => {
-      item.classList.toggle('active', item.dataset.view === view);
+      // Halaman proses UAT adalah sub-halaman dari Quality Assurance
+      const isActive = item.dataset.view === view || (view === 'uat-process' && item.dataset.view === 'qa');
+      item.classList.toggle('active', isActive);
     });
     
     // Update header data attribute for CSS targeting (dashboard/uat cleanup)
@@ -895,6 +912,10 @@
 
     if(view === 'qa'){
       renderQaPage();
+    }
+
+    if(view === 'uat-process'){
+      renderUatProcessPage();
     }
   }
 
@@ -3153,6 +3174,7 @@
           </td>
           <td class="qa-col-act">
             <div class="qa-actions">
+              <button type="button" class="qa-icon-btn process" data-uat-action="process" data-id="${u.id}" title="Buka Proses UAT"><i class="bi bi-clipboard-data"></i></button>
               <button type="button" class="qa-icon-btn" data-uat-action="edit" data-id="${u.id}" title="Edit"><i class="bi bi-pencil"></i></button>
               <button type="button" class="qa-icon-btn danger" data-uat-action="delete" data-id="${u.id}" title="Hapus"><i class="bi bi-trash"></i></button>
             </div>
@@ -3302,12 +3324,622 @@
         if(uat) openUatForm(uat);
       } else if(actionBtn.dataset.uatAction === 'delete'){
         deleteUat(id);
+      } else if(actionBtn.dataset.uatAction === 'process'){
+        openUatProcess(id);
       }
     });
 
     document.addEventListener('keydown', (e) => {
       if(e.key === 'Escape' && document.getElementById('uat-form-overlay').classList.contains('open')){
         closeUatForm();
+      }
+    });
+  }
+
+  /* ---------------- Proses UAT (test case dashboard) ---------------- */
+  const TC_STATUSES = ['Pass', 'Fail', 'Blocked', 'Not Run', 'N/A'];
+  const TC_PRIORITIES = ['Critical', 'High', 'Medium', 'Low'];
+  const TC_TYPES = ['Functional', 'Negative', 'Boundary / Functional'];
+  const TC_SEVERITIES = ['', 'Critical', 'Major', 'Minor', 'Trivial'];
+  const TC_STATUS_CLASS = { 'Pass': 's-Pass', 'Fail': 's-Fail', 'Blocked': 's-Blocked', 'Not Run': 's-NotRun', 'N/A': 's-NA' };
+  const TC_STATUS_ICON = {
+    'Pass': 'bi-check-circle-fill',
+    'Fail': 'bi-x-circle-fill',
+    'Blocked': 'bi-slash-circle-fill',
+    'Not Run': 'bi-circle',
+    'N/A': 'bi-dash-circle'
+  };
+  const TC_STATUS_COLOR = {
+    'Pass': 'var(--up-pass)',
+    'Fail': 'var(--up-fail)',
+    'Blocked': 'var(--up-blocked)',
+    'Not Run': 'var(--up-notrun)',
+    'N/A': 'var(--up-na)'
+  };
+
+  let activeUatId = null;
+  let upTestCases = [];
+  let upEditingId = null;
+  let upIdTouched = false;
+  let upOpenRows = new Set();
+  let upFilter = { q: '', module: '', status: '', priority: '' };
+
+  const upEsc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const upPct = (n, d) => d ? Math.round(n / d * 100) : 0;
+
+  function upCounts(list, keyFn){
+    const m = {};
+    list.forEach(t => {
+      const k = keyFn(t);
+      m[k] = m[k] || { total: 0, Pass: 0, Fail: 0, Blocked: 0, 'Not Run': 0, 'N/A': 0 };
+      m[k].total++;
+      if(m[k][t.status] !== undefined) m[k][t.status]++;
+    });
+    return m;
+  }
+
+  function upBarHtml(c, total){
+    return TC_STATUSES
+      .map(s => c[s] ? `<span title="${s}: ${c[s]}" style="width:${c[s] / total * 100}%;background:${TC_STATUS_COLOR[s]}"></span>` : '')
+      .join('');
+  }
+
+  function renderUatProcessPage(){
+    const list = upTestCases;
+    const total = list.length;
+    const c = upCounts(list, () => 'all').all || { total: 0, Pass: 0, Fail: 0, Blocked: 0, 'Not Run': 0, 'N/A': 0 };
+    const executed = total - c['Not Run'] - c['N/A'];
+    const bugs = list.filter(t => t.defect || t.status === 'Fail');
+
+    // KPI cards
+    const kpiEl = document.getElementById('up-kpis');
+    if(kpiEl){
+      const items = [
+        ['Total Test Case', total, '', null],
+        ['Pass', c.Pass, upPct(c.Pass, total) + '%', 'Pass'],
+        ['Fail', c.Fail, upPct(c.Fail, total) + '%', 'Fail'],
+        ['Blocked', c.Blocked, upPct(c.Blocked, total) + '%', 'Blocked'],
+        ['Not Run', c['Not Run'], upPct(c['Not Run'], total) + '%', 'Not Run'],
+        ['N/A', c['N/A'], upPct(c['N/A'], total) + '%', 'N/A'],
+        ['Bug / Defect', bugs.length, 'dari test Fail / Defect ID', null],
+        ['Pass Rate', upPct(c.Pass, executed) + '%', executed + ' test dieksekusi', null],
+      ];
+      kpiEl.innerHTML = items.map(([label, val, pctText, status]) => `
+        <div class="up-kpi">
+          <div class="up-kpi-label">${status ? `<i class="bi ${TC_STATUS_ICON[status]}" style="color:${TC_STATUS_COLOR[status]}"></i>` : label === 'Bug / Defect' ? '<i class="bi bi-bug-fill" style="color:var(--gold)"></i>' : ''}${label}</div>
+          <div class="up-kpi-val">${val}</div>
+          <div class="up-kpi-pct">${pctText || '&nbsp;'}</div>
+        </div>`).join('');
+    }
+
+    // Progress bar + legend
+    const barEl = document.getElementById('up-main-bar');
+    if(barEl) barEl.innerHTML = total ? upBarHtml(c, total) : `<span style="width:100%;background:${TC_STATUS_COLOR['Not Run']}"></span>`;
+    const progressText = document.getElementById('up-progress-text');
+    if(progressText) progressText.textContent = `· ${upPct(executed, total)}% selesai dieksekusi (${executed}/${total})`;
+    const legendEl = document.getElementById('up-legend');
+    if(legendEl) legendEl.innerHTML = TC_STATUSES.map(s => `<span><i style="background:${TC_STATUS_COLOR[s]}"></i>${s} ${c[s]}</span>`).join('');
+
+    // Donut (conic-gradient, tanpa library chart)
+    let acc = 0;
+    const stops = TC_STATUSES.filter(s => c[s]).map(s => {
+      const a = acc;
+      acc += c[s] / total * 100;
+      return `${TC_STATUS_COLOR[s]} ${a}% ${acc}%`;
+    });
+    const donutEl = document.getElementById('up-donut');
+    if(donutEl) donutEl.style.background = stops.length ? `conic-gradient(${stops.join(',')})` : 'var(--up-notrun)';
+    const donutLabel = document.getElementById('up-donut-label');
+    if(donutLabel) donutLabel.innerHTML = `<span>${upPct(c.Pass, total)}%<small>Pass</small></span>`;
+    const donutLegend = document.getElementById('up-donut-legend');
+    if(donutLegend) donutLegend.innerHTML = TC_STATUSES.map(s => `<span><i style="background:${TC_STATUS_COLOR[s]}"></i>${s}: <b>${c[s]}</b></span>`).join('');
+
+    // Bugs panel
+    const bugsEl = document.getElementById('up-bugs');
+    if(bugsEl){
+      bugsEl.innerHTML = bugs.length ? bugs.map(t => `
+        <div class="up-bug">
+          <div>
+            <b>${upEsc(t.defect || '(belum ada Defect ID)')}</b> · ${upEsc(t.id)}
+            <div class="up-bug-sub">${upEsc(t.scenario)}</div>
+          </div>
+          <div class="up-bug-right">
+            <span class="up-tc-badge ${TC_STATUS_CLASS[t.status] || ''}">${upEsc(t.status)}</span>
+            <div class="up-bug-sub">${upEsc(t.severity || 'severity –')}</div>
+          </div>
+        </div>`).join('') : '<div class="up-empty-note">Belum ada bug tercatat 🎉</div>';
+    }
+
+    // Breakdowns
+    upBreakdown('up-by-module', upCounts(list, t => t.module));
+    upBreakdown('up-by-priority', upCounts(list, t => t.priority), TC_PRIORITIES);
+
+    // Filters + tabel
+    upRefreshFilters();
+    upRenderTable();
+
+    const countLabel = document.getElementById('up-count-label');
+    if(countLabel) countLabel.textContent = `${total} test case tercatat`;
+  }
+
+  function upBreakdown(elId, map, order){
+    const el = document.getElementById(elId);
+    if(!el) return;
+    const keys = order ? order.filter(k => map[k]) : Object.keys(map);
+    el.innerHTML = keys.length ? keys.map(k => {
+      const c = map[k];
+      return `<div class="up-row">
+        <div class="up-row-top"><span>${upEsc(k)}</span><span>${c.Pass} pass · ${c.Fail} fail · ${c.Blocked} blocked · ${c['Not Run']} not run / ${c.total}</span></div>
+        <div class="up-bar up-bar-sm">${upBarHtml(c, c.total)}</div>
+      </div>`;
+    }).join('') : '<div class="up-empty-note">Belum ada data test case.</div>';
+  }
+
+  function upModuleNames(){
+    return [...new Set(upTestCases.map(t => t.module).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  }
+
+  function upRefreshFilters(){
+    const moduleSel = document.getElementById('up-filter-module');
+    if(moduleSel){
+      moduleSel.innerHTML = '<option value="">Semua module</option>' + upModuleNames().map(m => `<option value="${upEsc(m)}">${upEsc(m)}</option>`).join('');
+      moduleSel.value = upFilter.module;
+      if(moduleSel.value !== upFilter.module) upFilter.module = ''; // pilihan sudah tidak ada di data
+    }
+    const statusSel = document.getElementById('up-filter-status');
+    if(statusSel){
+      if(statusSel.options.length <= 1){
+        statusSel.innerHTML = '<option value="">Semua status</option>' + TC_STATUSES.map(s => `<option value="${s}">${s}</option>`).join('');
+      }
+      statusSel.value = upFilter.status;
+    }
+    const prioritySel = document.getElementById('up-filter-priority');
+    if(prioritySel){
+      if(prioritySel.options.length <= 1){
+        prioritySel.innerHTML = '<option value="">Semua prioritas</option>' + TC_PRIORITIES.map(s => `<option value="${s}">${s}</option>`).join('');
+      }
+      prioritySel.value = upFilter.priority;
+    }
+    const dl = document.getElementById('up-module-list');
+    if(dl) dl.innerHTML = upModuleNames().map(m => `<option value="${upEsc(m)}"></option>`).join('');
+  }
+
+  function upFiltered(){
+    const q = upFilter.q.toLowerCase();
+    return upTestCases.filter(t =>
+      (!upFilter.module || t.module === upFilter.module) &&
+      (!upFilter.status || t.status === upFilter.status) &&
+      (!upFilter.priority || t.priority === upFilter.priority) &&
+      (!q || [t.id, t.feature, t.scenario, t.module, t.notes, t.defect, t.tester].join(' ').toLowerCase().includes(q))
+    );
+  }
+
+  function upRenderTable(){
+    const tbody = document.getElementById('up-table-body');
+    if(!tbody) return;
+    const hasAny = upTestCases.length > 0;
+    const wrap = document.getElementById('up-table-wrap');
+    const emptyEl = document.getElementById('up-empty');
+    if(emptyEl) emptyEl.style.display = hasAny ? 'none' : '';
+    if(wrap) wrap.style.display = hasAny ? 'block' : 'none';
+    if(!hasAny){ tbody.innerHTML = ''; return; }
+
+    const filtered = upFiltered();
+    tbody.innerHTML = filtered.length ? filtered.map((t, i) => {
+      let h = `<tr class="up-tc" data-tc-id="${upEsc(t.id)}">
+        <td class="qa-col-num">${i + 1}</td>
+        <td class="up-tc-id">${upEsc(t.id)}</td>
+        <td>${upEsc(t.module)}</td>
+        <td>${upEsc(t.feature)}</td>
+        <td>${upEsc(t.scenario)}</td>
+        <td>${upEsc(t.type)}</td>
+        <td class="up-p-${(t.priority || '').toLowerCase()}">${upEsc(t.priority)}</td>
+        <td><span class="up-tc-badge ${TC_STATUS_CLASS[t.status] || ''}">${upEsc(t.status)}</span></td>
+        <td class="up-col-act">
+          <div class="up-actions">
+            <div class="up-quick">
+              ${TC_STATUSES.map(s => `<button type="button" class="up-status-btn ${TC_STATUS_CLASS[s]}${s === t.status ? ' active' : ''}" data-tc-action="status" data-status="${s}" data-id="${upEsc(t.id)}" title="Ubah status ke ${s}"><i class="bi ${TC_STATUS_ICON[s]}"></i></button>`).join('')}
+            </div>
+            <button type="button" class="qa-icon-btn" data-tc-action="edit" data-id="${upEsc(t.id)}" title="Edit"><i class="bi bi-pencil"></i></button>
+            <button type="button" class="qa-icon-btn danger" data-tc-action="delete" data-id="${upEsc(t.id)}" title="Hapus"><i class="bi bi-trash"></i></button>
+          </div>
+        </td>
+      </tr>`;
+      if(upOpenRows.has(t.id)){
+        h += `<tr class="up-detail"><td colspan="9"><div class="up-dgrid">
+          <div><h4>Requirement</h4><p>${upEsc(t.req) || '–'}</p></div>
+          <div><h4>Precondition</h4><p>${upEsc(t.pre) || '–'}</p></div>
+          <div><h4>Test Data</h4><p>${upEsc(t.data) || '–'}</p></div>
+          <div><h4>Langkah</h4><ol>${(t.steps || []).map(x => `<li>${upEsc(String(x).replace(/^\s*\d+[.)]\s*/, ''))}</li>`).join('')}</ol></div>
+          <div><h4>Expected Result</h4><p>${upEsc(t.expected) || '–'}</p></div>
+          <div><h4>Actual Result</h4><p>${upEsc(t.actual) || '–'}</p></div>
+          <div><h4>Tester / Tanggal</h4><p>${upEsc(t.tester) || '–'}${t.date ? ' · ' + upEsc(t.date) : ''}</p></div>
+          <div><h4>Defect / Severity</h4><p>${upEsc(t.defect) || '–'}${t.severity ? ' · ' + upEsc(t.severity) : ''}</p></div>
+          <div><h4>Catatan</h4><p>${upEsc(t.notes) || '–'}</p></div>
+        </div></td></tr>`;
+      }
+      return h;
+    }).join('') : '<tr><td colspan="9" class="up-tc-empty">Tidak ada test case yang cocok dengan filter.</td></tr>';
+  }
+
+  function openUatProcess(id){
+    const uat = uats.find(u => u.id === id);
+    if(!uat){
+      showToast('Item UAT tidak ditemukan.', 'error');
+      return;
+    }
+    activeUatId = id;
+    upTestCases = [];
+    upOpenRows.clear();
+    upFilter = { q: '', module: '', status: '', priority: '' };
+    const qInput = document.getElementById('up-search');
+    if(qInput) qInput.value = '';
+
+    const status = UAT_STATUS_LABEL[uat.status] ? uat.status : 'not_started';
+    const titleEl = document.getElementById('uat-process-title');
+    if(titleEl) titleEl.textContent = uat.title || '—';
+    const subEl = document.getElementById('uat-process-sub');
+    if(subEl){
+      subEl.innerHTML = `Developer: <b>${escapeHtml(uat.developer || '—')}</b> · PIC UAT: <b>${escapeHtml(uat.pic || '—')}</b> · Due Date: <b>${escapeHtml(momFormatDate(uat.dueDate) || '—')}</b> · <span class="uat-status-badge ${status}">${UAT_STATUS_LABEL[status]}</span>`;
+    }
+    setActiveView('uat-process');
+    loadUatTestCases();
+  }
+
+  function closeUatProcess(){
+    activeUatId = null;
+    upTestCases = [];
+    upOpenRows.clear();
+    setActiveView('qa');
+  }
+
+  async function loadUatTestCases(){
+    if(activeUatId === null) return;
+    const tbody = document.getElementById('up-table-body');
+    if(tbody) tbody.innerHTML = '<tr><td colspan="9" class="up-tc-empty">Memuat data…</td></tr>';
+    const wrap = document.getElementById('up-table-wrap');
+    if(wrap) wrap.style.display = 'block';
+    const emptyEl = document.getElementById('up-empty');
+    if(emptyEl) emptyEl.style.display = 'none';
+    try {
+      const data = await api.get('/api/uat/' + activeUatId + '/test-cases');
+      upTestCases = Array.isArray(data.testCases) ? data.testCases : [];
+      renderUatProcessPage();
+    } catch(err){
+      console.error('Gagal memuat test case:', err);
+      if(tbody) tbody.innerHTML = `<tr><td colspan="9" class="up-tc-empty">Gagal memuat test case. Muat ulang halaman atau coba lagi.</td></tr>`;
+      showToast('Gagal memuat test case.', 'error');
+    }
+  }
+
+  function upVal(id){
+    const el = document.getElementById(id);
+    return el ? el.value : '';
+  }
+
+  function upSetVal(id, value){
+    const el = document.getElementById(id);
+    if(el) el.value = value === undefined || value === null ? '' : value;
+  }
+
+  function upToday(){
+    const d = new Date(), p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  }
+
+  function upNextId(module){
+    const word = String(module || '').trim().split(/[\s/_-]+/).filter(Boolean)[0] || 'NEW';
+    const prefix = word.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4) || 'NEW';
+    const ids = new Set(upTestCases.map(t => t.id));
+    let n = 1;
+    while(ids.has(`TC-${prefix}-${String(n).padStart(3, '0')}`)) n++;
+    return `TC-${prefix}-${String(n).padStart(3, '0')}`;
+  }
+
+  function openTcForm(tcId){
+    const tc = tcId ? upTestCases.find(t => t.id === tcId) : null;
+    if(tcId && !tc){
+      showToast('Test case tidak ditemukan.', 'error');
+      return;
+    }
+    upEditingId = tcId || null;
+    upIdTouched = !!tc;
+    document.getElementById('tc-form-title').textContent = tc ? 'Edit Test Case' : 'Tambah Test Case';
+    document.getElementById('tc-form-sub').textContent = tc
+      ? `Perbarui detail ${tc.id}.`
+      : 'Lengkapi field bertanda *. ID disarankan otomatis.';
+
+    if(tc){
+      upSetVal('tc-id', tc.id);
+      upSetVal('tc-module', tc.module);
+      upSetVal('tc-feature', tc.feature);
+      upSetVal('tc-scenario', tc.scenario);
+      upSetVal('tc-type', TC_TYPES.includes(tc.type) ? tc.type : TC_TYPES[0]);
+      upSetVal('tc-priority', TC_PRIORITIES.includes(tc.priority) ? tc.priority : 'Medium');
+      upSetVal('tc-req', tc.req);
+      upSetVal('tc-pre', tc.pre);
+      upSetVal('tc-data', tc.data);
+      upSetVal('tc-steps', (tc.steps || [])
+        .map(s => String(s).replace(/^\s*\d+[.)]\s*/, '').trim())
+        .filter(Boolean)
+        .map((s, i) => `${i + 1}. ${s}`)
+        .join('\n'));
+      upSetVal('tc-expected', tc.expected);
+      upSetVal('tc-actual', tc.actual);
+      upSetVal('tc-status', TC_STATUSES.includes(tc.status) ? tc.status : 'Not Run');
+      upSetVal('tc-severity', TC_SEVERITIES.includes(tc.severity) ? tc.severity : '');
+      upSetVal('tc-defect', tc.defect);
+      upSetVal('tc-tester', tc.tester);
+      upSetVal('tc-date', tc.date);
+      upSetVal('tc-notes', tc.notes);
+    } else {
+      upSetVal('tc-id', '');
+      upSetVal('tc-module', '');
+      upSetVal('tc-feature', '');
+      upSetVal('tc-scenario', '');
+      upSetVal('tc-type', TC_TYPES[0]);
+      upSetVal('tc-priority', 'Medium');
+      upSetVal('tc-req', '');
+      upSetVal('tc-pre', '');
+      upSetVal('tc-data', '');
+      upSetVal('tc-steps', '');
+      upSetVal('tc-expected', '');
+      upSetVal('tc-actual', '');
+      upSetVal('tc-status', 'Not Run');
+      upSetVal('tc-severity', '');
+      upSetVal('tc-defect', '');
+      upSetVal('tc-tester', '');
+      upSetVal('tc-date', '');
+      upSetVal('tc-notes', '');
+      upSetVal('tc-id', upNextId(''));
+    }
+    const idEl = document.getElementById('tc-id');
+    if(idEl){
+      idEl.readOnly = !!tc;
+      idEl.title = tc ? 'ID test case tidak dapat diubah saat mengedit' : 'ID disarankan otomatis (TC-MOD-NNN)';
+    }
+    document.getElementById('tc-form-overlay').classList.add('open');
+    setTimeout(() => {
+      const focusEl = document.getElementById(tc ? 'tc-feature' : 'tc-module');
+      if(focusEl) focusEl.focus();
+    }, 80);
+  }
+
+  function closeTcForm(){
+    const overlay = document.getElementById('tc-form-overlay');
+    if(overlay) overlay.classList.remove('open');
+    upEditingId = null;
+  }
+
+  function readTcForm(){
+    const get = id => upVal(id).trim();
+    const steps = get('tc-steps')
+      .split(/\r?\n/)
+      .map(s => s.replace(/^\s*\d+[.)]\s*/, '').trim())
+      .filter(Boolean)
+      .map((s, i) => `${i + 1}. ${s}`);
+    return {
+      id: get('tc-id'),
+      module: get('tc-module'),
+      feature: get('tc-feature'),
+      req: get('tc-req'),
+      scenario: get('tc-scenario'),
+      type: upVal('tc-type'),
+      priority: upVal('tc-priority'),
+      pre: get('tc-pre'),
+      data: get('tc-data'),
+      steps,
+      expected: get('tc-expected'),
+      actual: get('tc-actual'),
+      status: upVal('tc-status'),
+      severity: upVal('tc-severity'),
+      defect: get('tc-defect'),
+      tester: get('tc-tester'),
+      date: get('tc-date'),
+      notes: get('tc-notes'),
+    };
+  }
+
+  function upFocusField(id){
+    const el = document.getElementById(id);
+    if(el) el.focus();
+  }
+
+  function upFocusRow(tcId){
+    const btn = [...document.querySelectorAll('#up-table-body [data-tc-action="edit"]')].find(b => b.dataset.id === tcId);
+    if(btn) btn.focus();
+  }
+
+  function validateTc(rec){
+    if(!rec.id){ showToast('ID test case wajib diisi.', 'error'); upFocusField('tc-id'); return false; }
+    if(!rec.module){ showToast('Module wajib diisi.', 'error'); upFocusField('tc-module'); return false; }
+    if(!rec.feature){ showToast('Fitur wajib diisi.', 'error'); upFocusField('tc-feature'); return false; }
+    if(!rec.scenario){ showToast('Skenario wajib diisi.', 'error'); upFocusField('tc-scenario'); return false; }
+    if(!rec.expected){ showToast('Expected result wajib diisi.', 'error'); upFocusField('tc-expected'); return false; }
+    if(!rec.steps.length){ showToast('Minimal satu langkah.', 'error'); upFocusField('tc-steps'); return false; }
+    if(rec.id !== upEditingId && upTestCases.some(t => t.id === rec.id)){
+      showToast('ID sudah digunakan test case lain.', 'error');
+      upFocusField('tc-id');
+      return false;
+    }
+    return true;
+  }
+
+  async function saveTc(){
+    const rec = readTcForm();
+    if(!validateTc(rec)) return;
+    if(rec.status !== 'Not Run' && !rec.date) rec.date = upToday();
+    const isEdit = !!upEditingId;
+    try {
+      const saved = isEdit
+        ? await api.put('/api/uat/' + activeUatId + '/test-cases/' + encodeURIComponent(upEditingId), rec)
+        : await api.post('/api/uat/' + activeUatId + '/test-cases', rec);
+      closeTcForm();
+      if(!isEdit){
+        // Seperti versi asli: reset filter agar test case baru langsung terlihat
+        upFilter = { q: '', module: '', status: '', priority: '' };
+        upSetVal('up-search', '');
+        upSetVal('up-filter-module', '');
+        upSetVal('up-filter-status', '');
+        upSetVal('up-filter-priority', '');
+      }
+      await loadUatTestCases();
+      const id = (saved && saved.testCase && saved.testCase.id) || rec.id;
+      showToast(isEdit ? `Perubahan untuk ${id} tersimpan.` : `Test case ${id} tersimpan.`);
+      upFocusRow(id);
+    } catch(err){
+      showToast(uatErrorMessage(err, 'Gagal menyimpan test case'), 'error');
+    }
+  }
+
+  async function changeTcStatus(tcId, status){
+    const tc = upTestCases.find(t => t.id === tcId);
+    if(!tc || tc.status === status) return;
+    const body = { status };
+    if(status !== 'Not Run' && !tc.date) body.date = upToday(); // aturan auto-date versi asli
+    try {
+      await api.put('/api/uat/' + activeUatId + '/test-cases/' + encodeURIComponent(tcId), body);
+      await loadUatTestCases();
+      showToast(`${tcId} → ${status}`);
+    } catch(err){
+      showToast(uatErrorMessage(err, 'Gagal mengubah status test case'), 'error');
+    }
+  }
+
+  async function deleteTc(tcId){
+    const confirmed = await showConfirm(
+      `Yakin ingin menghapus test case <strong>${escapeHtml(tcId)}</strong>?`,
+      'Ya, Hapus',
+      'Batal'
+    );
+    if(!confirmed) return;
+    try {
+      await api.del('/api/uat/' + activeUatId + '/test-cases/' + encodeURIComponent(tcId));
+      upOpenRows.delete(tcId);
+      await loadUatTestCases();
+      showToast(`Test case ${tcId} dihapus.`);
+    } catch(err){
+      showToast(uatErrorMessage(err, 'Gagal menghapus test case'), 'error');
+    }
+  }
+
+  function upDownload(name, text, type){
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type }));
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function upExportCsv(){
+    const list = upFiltered();
+    const header = ['id', 'module', 'feature', 'scenario', 'type', 'priority', 'status', 'severity', 'defect', 'tester', 'date', 'actual'];
+    const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+    upDownload(
+      'uat-test-cases-' + activeUatId + '.csv',
+      [header.join(',')].concat(list.map(t => header.map(k => q(t[k])).join(','))).join('\n'),
+      'text/csv'
+    );
+    showToast(`${list.length} test case diekspor ke CSV.`);
+  }
+
+  function upExportJson(){
+    const uat = uats.find(u => u.id === activeUatId);
+    const payload = {
+      uatTitle: uat ? uat.title : '',
+      updatedAt: new Date().toISOString(),
+      count: upTestCases.length,
+      testCases: upTestCases,
+    };
+    upDownload(
+      'uat-test-cases-' + activeUatId + '.json',
+      JSON.stringify(payload, null, 2) + '\n',
+      'application/json'
+    );
+    showToast('Test case diekspor ke JSON.');
+  }
+
+  function initUatProcess(){
+    const backBtn = document.getElementById('uat-process-back');
+    if(backBtn) backBtn.addEventListener('click', closeUatProcess);
+    const addBtn = document.getElementById('up-add-btn');
+    if(addBtn) addBtn.addEventListener('click', () => openTcForm(null));
+    const csvBtn = document.getElementById('up-export-csv');
+    if(csvBtn) csvBtn.addEventListener('click', upExportCsv);
+    const jsonBtn = document.getElementById('up-export-json');
+    if(jsonBtn) jsonBtn.addEventListener('click', upExportJson);
+
+    // Filter & pencarian (debounce seperti MoM)
+    let searchTimer;
+    const searchInput = document.getElementById('up-search');
+    if(searchInput) searchInput.addEventListener('input', (e) => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        upFilter.q = e.target.value.trim();
+        upRenderTable();
+      }, 250);
+    });
+    const moduleSel = document.getElementById('up-filter-module');
+    if(moduleSel) moduleSel.addEventListener('change', (e) => { upFilter.module = e.target.value; upRenderTable(); });
+    const statusSel = document.getElementById('up-filter-status');
+    if(statusSel) statusSel.addEventListener('change', (e) => { upFilter.status = e.target.value; upRenderTable(); });
+    const prioritySel = document.getElementById('up-filter-priority');
+    if(prioritySel) prioritySel.addEventListener('change', (e) => { upFilter.priority = e.target.value; upRenderTable(); });
+    const resetBtn = document.getElementById('up-filter-reset');
+    if(resetBtn) resetBtn.addEventListener('click', () => {
+      upFilter = { q: '', module: '', status: '', priority: '' };
+      upSetVal('up-search', '');
+      upSetVal('up-filter-module', '');
+      upSetVal('up-filter-status', '');
+      upSetVal('up-filter-priority', '');
+      upRenderTable();
+    });
+
+    // Delegasi klik tabel (row expand + quick status + edit + hapus)
+    const tbody = document.getElementById('up-table-body');
+    if(tbody) tbody.addEventListener('click', (e) => {
+      const actionBtn = e.target.closest('[data-tc-action]');
+      if(actionBtn){
+        const id = actionBtn.dataset.id;
+        const action = actionBtn.dataset.tcAction;
+        if(action === 'status') changeTcStatus(id, actionBtn.dataset.status);
+        else if(action === 'edit') openTcForm(id);
+        else if(action === 'delete') deleteTc(id);
+        return;
+      }
+      const tr = e.target.closest('tr.up-tc');
+      if(!tr) return;
+      const id = tr.dataset.tcId;
+      if(upOpenRows.has(id)) upOpenRows.delete(id);
+      else upOpenRows.add(id);
+      upRenderTable();
+    });
+
+    // Form test case
+    const closeBtn = document.getElementById('tc-form-close');
+    if(closeBtn) closeBtn.addEventListener('click', closeTcForm);
+    const cancelBtn = document.getElementById('tc-cancel-btn');
+    if(cancelBtn) cancelBtn.addEventListener('click', closeTcForm);
+    const overlay = document.getElementById('tc-form-overlay');
+    if(overlay) overlay.addEventListener('click', (e) => {
+      if(e.target === overlay) closeTcForm();
+    });
+    const saveBtn = document.getElementById('tc-save-btn');
+    if(saveBtn) saveBtn.addEventListener('click', saveTc);
+    const form = document.getElementById('tc-form');
+    if(form) form.addEventListener('submit', (e) => { e.preventDefault(); saveTc(); });
+
+    // Auto-ID saat mengetik module (sampai user menyentuh field ID)
+    const moduleInput = document.getElementById('tc-module');
+    if(moduleInput) moduleInput.addEventListener('input', () => {
+      if(!upEditingId && !upIdTouched) upSetVal('tc-id', upNextId(upVal('tc-module')));
+    });
+    const idInput = document.getElementById('tc-id');
+    if(idInput) idInput.addEventListener('input', () => { if(!upEditingId) upIdTouched = true; });
+
+    document.addEventListener('keydown', (e) => {
+      if(e.key === 'Escape' && document.getElementById('tc-form-overlay').classList.contains('open')){
+        closeTcForm();
       }
     });
   }
@@ -3760,6 +4392,7 @@
 
   initMom();
   initUat();
+  initUatProcess();
 
   /* ---------------- Init ---------------- */
   (async () => {

@@ -718,9 +718,60 @@ class JsonStorage {
       pic: momString(data.pic !== undefined ? data.pic : base.pic).trim(),
       dueDate: momString(data.dueDate !== undefined ? data.dueDate : base.dueDate).slice(0, 10),
       status: ['not_started', 'finish', 'in_progress', 'hold', 'reopen'].includes(status) ? status : 'not_started',
+      testCases: this._normalizeUatTestCases(
+        data.testCases !== undefined ? data.testCases : base.testCases
+      ),
       createdAt: base.createdAt || now,
       updatedAt: now,
     };
+  }
+
+  _normalizeUatTestCase(input, existing) {
+    const data = input || {};
+    const base = existing || {};
+    const pick = (key) => momString(data[key] !== undefined ? data[key] : base[key]).trim();
+    let steps = data.steps !== undefined ? data.steps : base.steps;
+    if (!Array.isArray(steps)) {
+      steps = momString(steps).split(/\r?\n/).filter(Boolean);
+    }
+    steps = steps.map(s => momString(s).replace(/^\s*\d+[.)]\s*/, '').trim()).filter(Boolean);
+    const status = momString(data.status !== undefined ? data.status : base.status).trim();
+    const type = momString(data.type !== undefined ? data.type : base.type).trim();
+    const priority = momString(data.priority !== undefined ? data.priority : base.priority).trim();
+    const severity = momString(data.severity !== undefined ? data.severity : base.severity).trim();
+    return {
+      id: pick('id'),
+      module: pick('module'),
+      feature: pick('feature'),
+      req: pick('req'),
+      scenario: pick('scenario'),
+      type: ['Functional', 'Negative', 'Boundary / Functional'].includes(type) ? type : 'Functional',
+      priority: ['Critical', 'High', 'Medium', 'Low'].includes(priority) ? priority : 'Medium',
+      pre: pick('pre'),
+      data: pick('data'),
+      steps,
+      expected: pick('expected'),
+      actual: pick('actual'),
+      status: ['Pass', 'Fail', 'Blocked', 'Not Run', 'N/A'].includes(status) ? status : 'Not Run',
+      severity: ['', 'Critical', 'Major', 'Minor', 'Trivial'].includes(severity) ? severity : '',
+      defect: pick('defect'),
+      tester: pick('tester'),
+      date: pick('date').slice(0, 10),
+      notes: pick('notes'),
+    };
+  }
+
+  _normalizeUatTestCases(list) {
+    const src = Array.isArray(list) ? list : [];
+    const seen = new Set();
+    const out = [];
+    src.forEach(item => {
+      const tc = this._normalizeUatTestCase(item, null);
+      if (!tc.id || seen.has(tc.id)) return;
+      seen.add(tc.id);
+      out.push(tc);
+    });
+    return out;
   }
 
   getUats() {
@@ -763,6 +814,51 @@ class JsonStorage {
     const idx = data.uats.findIndex(u => u.id === id);
     if (idx === -1) return false;
     data.uats.splice(idx, 1);
+    this._saveUat(data);
+    return true;
+  }
+
+  /* ---------- UAT test cases ---------- */
+  getUatTestCases(id) {
+    const uat = this.getUatById(id);
+    if (!uat) return null;
+    return Array.isArray(uat.testCases) ? uat.testCases : [];
+  }
+
+  createUatTestCase(uatId, input) {
+    const data = this._loadUat();
+    const uat = data.uats.find(u => u.id === uatId);
+    if (!uat) return null;
+    if (!Array.isArray(uat.testCases)) uat.testCases = [];
+    const tc = this._normalizeUatTestCase(input, null);
+    uat.testCases.push(tc);
+    uat.updatedAt = new Date().toISOString();
+    this._saveUat(data);
+    return tc;
+  }
+
+  updateUatTestCase(uatId, tcId, input) {
+    const data = this._loadUat();
+    const uat = data.uats.find(u => u.id === uatId);
+    if (!uat || !Array.isArray(uat.testCases)) return null;
+    const idx = uat.testCases.findIndex(t => t.id === tcId);
+    if (idx === -1) return null;
+    // ID tidak dapat diubah saat edit
+    const merged = this._normalizeUatTestCase({ ...input, id: uat.testCases[idx].id }, uat.testCases[idx]);
+    uat.testCases[idx] = merged;
+    uat.updatedAt = new Date().toISOString();
+    this._saveUat(data);
+    return merged;
+  }
+
+  deleteUatTestCase(uatId, tcId) {
+    const data = this._loadUat();
+    const uat = data.uats.find(u => u.id === uatId);
+    if (!uat || !Array.isArray(uat.testCases)) return false;
+    const idx = uat.testCases.findIndex(t => t.id === tcId);
+    if (idx === -1) return false;
+    uat.testCases.splice(idx, 1);
+    uat.updatedAt = new Date().toISOString();
     this._saveUat(data);
     return true;
   }

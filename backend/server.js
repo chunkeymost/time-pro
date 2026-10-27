@@ -357,6 +357,93 @@ app.delete('/api/uat/:id', async (req, res) => {
   }
 });
 
+/* ---------- UAT test cases (Proses UAT) ---------- */
+
+const UAT_TC_STATUSES = ['Pass', 'Fail', 'Blocked', 'Not Run', 'N/A'];
+
+function validateUatTestCaseBody(body, partial) {
+  if (!partial || body.id !== undefined) {
+    if (!body.id || !String(body.id).trim()) return 'ID test case wajib diisi';
+  }
+  if (!partial || body.module !== undefined) {
+    if (!body.module || !String(body.module).trim()) return 'Module wajib diisi';
+  }
+  if (!partial || body.feature !== undefined) {
+    if (!body.feature || !String(body.feature).trim()) return 'Fitur wajib diisi';
+  }
+  if (!partial || body.scenario !== undefined) {
+    if (!body.scenario || !String(body.scenario).trim()) return 'Skenario wajib diisi';
+  }
+  if (!partial || body.expected !== undefined) {
+    if (!body.expected || !String(body.expected).trim()) return 'Expected result wajib diisi';
+  }
+  if (!partial || body.steps !== undefined) {
+    const steps = Array.isArray(body.steps) ? body.steps : [];
+    if (!steps.filter(s => String(s || '').trim()).length) return 'Minimal satu langkah';
+  }
+  if (body.status !== undefined && !UAT_TC_STATUSES.includes(body.status)) {
+    return 'Status harus salah satu dari: ' + UAT_TC_STATUSES.join(', ');
+  }
+  return null;
+}
+
+app.get('/api/uat/:id/test-cases', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const uat = await storage.getUatById(id);
+    if (!uat) return res.status(404).json({ error: 'UAT not found' });
+    const testCases = await storage.getUatTestCases(id);
+    res.json({ testCases });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/uat/:id/test-cases', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const uat = await storage.getUatById(id);
+    if (!uat) return res.status(404).json({ error: 'UAT not found' });
+    const err = validateUatTestCaseBody(req.body, false);
+    if (err) return res.status(400).json({ error: err });
+    const tcId = String(req.body.id).trim();
+    const exists = (uat.testCases || []).some(t => t.id === tcId);
+    if (exists) return res.status(409).json({ error: 'ID test case sudah digunakan' });
+    const testCase = await storage.createUatTestCase(id, req.body);
+    res.status(201).json({ testCase });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/uat/:id/test-cases/:tcId', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const uat = await storage.getUatById(id);
+    if (!uat) return res.status(404).json({ error: 'UAT not found' });
+    const err = validateUatTestCaseBody(req.body, true);
+    if (err) return res.status(400).json({ error: err });
+    const testCase = await storage.updateUatTestCase(id, req.params.tcId, req.body);
+    if (!testCase) return res.status(404).json({ error: 'Test case not found' });
+    res.json({ testCase });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/uat/:id/test-cases/:tcId', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const uat = await storage.getUatById(id);
+    if (!uat) return res.status(404).json({ error: 'UAT not found' });
+    const ok = await storage.deleteUatTestCase(id, req.params.tcId);
+    if (!ok) return res.status(404).json({ error: 'Test case not found' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ---------- Backup ---------- */
 
 function copyIfExist(src, dest) {

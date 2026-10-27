@@ -151,6 +151,22 @@
     </section>
   </header>
 
+  <header class="page-header" id="uat-process-header">
+    <section class="page-header-section">
+      <span class="page-header-eyebrow">Quality Assurance — Proses UAT</span>
+      <div class="title-row">
+        <button class="up-back" id="uat-process-back" title="Kembali ke daftar UAT" aria-label="Kembali ke daftar UAT"><i class="bi bi-arrow-left"></i></button>
+        <span id="uat-process-title">—</span>
+      </div>
+      <span class="project-sub" id="uat-process-sub">—</span>
+    </section>
+    <section class="page-header-view" aria-label="Aksi Proses UAT">
+      <button class="btn btn-ghost" id="up-export-csv" title="Export test case ke CSV"><i class="bi bi-download"></i> CSV</button>
+      <button class="btn btn-ghost" id="up-export-json" title="Export test case ke JSON"><i class="bi bi-file-earmark-arrow-down"></i> JSON</button>
+      <button class="btn btn-primary" id="up-add-btn">+ TAMBAH TEST CASE</button>
+    </section>
+  </header>
+
   <nav class="breadcrumb-card" id="breadcrumb-card" aria-label="Breadcrumb"></nav>
 
   <div class="overview-cards" id="overview-cards"></div>
@@ -269,6 +285,87 @@
     </div>
   </div>
 
+  <div class="uat-process-page" id="uat-process-page">
+    <div class="up-kpis" id="up-kpis"></div>
+
+    <div class="up-card">
+      <h2 class="up-card-title">Progres Eksekusi <span class="up-sub" id="up-progress-text"></span></h2>
+      <div class="up-bar" id="up-main-bar"></div>
+      <div class="up-legend" id="up-legend"></div>
+    </div>
+
+    <div class="up-grid">
+      <div class="up-card">
+        <h2 class="up-card-title">Distribusi Status</h2>
+        <div class="up-donut-wrap">
+          <div class="up-donut" id="up-donut"><b id="up-donut-label"></b></div>
+          <div class="up-legend up-donut-legend" id="up-donut-legend"></div>
+        </div>
+      </div>
+      <div class="up-card">
+        <h2 class="up-card-title">Bug / Defect</h2>
+        <div class="up-bugs" id="up-bugs"></div>
+      </div>
+    </div>
+
+    <div class="up-grid">
+      <div class="up-card">
+        <h2 class="up-card-title">Per Module</h2>
+        <div class="up-rows" id="up-by-module"></div>
+      </div>
+      <div class="up-card">
+        <h2 class="up-card-title">Per Prioritas</h2>
+        <div class="up-rows" id="up-by-priority"></div>
+      </div>
+    </div>
+
+    <div class="up-card">
+      <div class="qa-panel-head">
+        <div>
+          <h2 class="qa-panel-title">Daftar Test Case</h2>
+          <p class="qa-panel-sub" id="up-count-label">Memuat data...</p>
+        </div>
+      </div>
+
+      <div class="mom-toolbar">
+        <div class="mom-search">
+          <i class="bi bi-search"></i>
+          <input type="text" id="up-search" placeholder="Cari ID, fitur, skenario, module, tester...">
+        </div>
+        <select id="up-filter-module" class="mom-filter-select"><option value="">Semua module</option></select>
+        <select id="up-filter-status" class="mom-filter-select"><option value="">Semua status</option></select>
+        <select id="up-filter-priority" class="mom-filter-select"><option value="">Semua prioritas</option></select>
+        <button class="btn btn-ghost mom-filter-reset" id="up-filter-reset"><i class="bi bi-arrow-counterclockwise"></i> Reset</button>
+      </div>
+
+      <div class="qa-table-wrap" id="up-table-wrap" style="display:none;">
+        <table class="up-table">
+          <thead>
+            <tr>
+              <th class="qa-col-num">No.</th>
+              <th>ID</th>
+              <th>Module</th>
+              <th>Fitur</th>
+              <th>Skenario</th>
+              <th>Tipe</th>
+              <th>Prioritas</th>
+              <th>Status</th>
+              <th class="up-col-act">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="up-table-body"></tbody>
+        </table>
+      </div>
+
+      <div class="qa-empty" id="up-empty">
+        <div class="qa-empty-icon"><i class="bi bi-clipboard-data"></i></div>
+        <span class="qa-empty-badge">PROSES UAT</span>
+        <h2 class="qa-empty-title">Belum ada test case</h2>
+        <p class="qa-empty-sub">Klik tombol "Tambah Test Case" untuk menambahkan test case pertama pada UAT ini.</p>
+      </div>
+    </div>
+  </div>
+
   <div class="toast-container" id="toast-container"></div>
   </main>
   </div>
@@ -307,6 +404,135 @@
       <div class="uat-form-footer-right">
         <button type="button" class="btn btn-ghost" id="uat-cancel-btn">Batal</button>
         <button type="button" class="btn btn-primary" id="uat-save-btn">Simpan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Test case form sidepeek (Proses UAT) -->
+<div class="overlay" id="tc-form-overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="tc-form-title">Tambah Test Case</h2>
+      <button class="modal-close" id="tc-form-close">&times;</button>
+    </div>
+    <div class="modal-sub" id="tc-form-sub">Lengkapi field bertanda *.</div>
+
+    <form id="tc-form" autocomplete="off" novalidate>
+      <div class="row-2">
+        <div class="field">
+          <label for="tc-id">ID Test Case *</label>
+          <input type="text" id="tc-id" placeholder="otomatis dari module" title="ID disarankan otomatis (TC-MOD-NNN)">
+        </div>
+        <div class="field">
+          <label for="tc-module">Module *</label>
+          <input type="text" id="tc-module" list="up-module-list" placeholder="cth. Authentication">
+          <datalist id="up-module-list"></datalist>
+        </div>
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label for="tc-feature">Fitur *</label>
+          <input type="text" id="tc-feature" placeholder="cth. Login SSO">
+        </div>
+        <div class="field">
+          <label for="tc-scenario">Skenario *</label>
+          <input type="text" id="tc-scenario" placeholder="cth. Login dengan kredensial valid">
+        </div>
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label for="tc-type">Tipe</label>
+          <select id="tc-type">
+            <option>Functional</option>
+            <option>Negative</option>
+            <option>Boundary / Functional</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="tc-priority">Prioritas</label>
+          <select id="tc-priority">
+            <option>Critical</option>
+            <option>High</option>
+            <option>Medium</option>
+            <option>Low</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="tc-req">Requirement</label>
+        <input type="text" id="tc-req" placeholder="cth. REQ-AUTH-01">
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label for="tc-pre">Precondition</label>
+          <input type="text" id="tc-pre" placeholder="cth. User sudah terdaftar">
+        </div>
+        <div class="field">
+          <label for="tc-data">Test Data</label>
+          <input type="text" id="tc-data" placeholder="cth. user valid / user nonaktif">
+        </div>
+      </div>
+      <div class="field">
+        <label for="tc-steps">Langkah * <span class="tc-form-hint">(satu langkah per baris)</span></label>
+        <textarea id="tc-steps" rows="4" placeholder="1. Buka halaman login&#10;2. Masukkan kredensial&#10;3. Klik tombol Masuk"></textarea>
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label for="tc-expected">Expected Result *</label>
+          <input type="text" id="tc-expected" placeholder="cth. Berhasil masuk ke dashboard">
+        </div>
+        <div class="field">
+          <label for="tc-actual">Actual Result</label>
+          <input type="text" id="tc-actual" placeholder="diisi saat eksekusi">
+        </div>
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label for="tc-status">Status</label>
+          <select id="tc-status">
+            <option>Pass</option>
+            <option>Fail</option>
+            <option>Blocked</option>
+            <option selected>Not Run</option>
+            <option>N/A</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="tc-severity">Severity</label>
+          <select id="tc-severity">
+            <option value="">(tidak ada)</option>
+            <option>Critical</option>
+            <option>Major</option>
+            <option>Minor</option>
+            <option>Trivial</option>
+          </select>
+        </div>
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label for="tc-defect">Defect ID</label>
+          <input type="text" id="tc-defect" placeholder="cth. BUG-001">
+        </div>
+        <div class="field">
+          <label for="tc-tester">Tester</label>
+          <input type="text" id="tc-tester" placeholder="cth. Asep">
+        </div>
+      </div>
+      <div class="field">
+        <label for="tc-date">Tanggal</label>
+        <input type="date" id="tc-date">
+      </div>
+      <div class="field">
+        <label for="tc-notes">Catatan</label>
+        <textarea id="tc-notes" rows="2" placeholder="Catatan tambahan (opsional)"></textarea>
+      </div>
+    </form>
+
+    <div class="uat-form-footer">
+      <div class="uat-form-footer-right">
+        <button type="button" class="btn btn-ghost" id="tc-cancel-btn">Batal</button>
+        <button type="button" class="btn btn-primary" id="tc-save-btn">Simpan</button>
       </div>
     </div>
   </div>

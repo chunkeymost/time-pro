@@ -3513,7 +3513,7 @@ body{
 .qa-table tbody tr:last-child td{ border-bottom:none; }
 .qa-col-num{ width:44px; text-align:center; }
 .qa-table td.qa-col-num{ text-align:center; }
-.qa-col-act{ width:96px; text-align:right; }
+.qa-col-act{ width:132px; text-align:right; }
 .qa-table td.qa-col-act{ text-align:right; white-space:nowrap; }
 .qa-title-cell{ font-weight:600; font-size:13px; max-width:280px; }
 .qa-date-cell{
@@ -3676,4 +3676,400 @@ body{
     font-size:30px;
   }
   .qa-empty-title{ font-size:20px; }
+}
+
+/* =========================================================
+   Proses UAT (test case dashboard) — dibuka dari tabel UAT
+   ========================================================= */
+
+#uat-process-header,
+.uat-process-page{ display:none; }
+
+#app-main[data-active-view="uat-process"] #page-header,
+#app-main[data-active-view="uat-process"] #dashboard-header,
+#app-main[data-active-view="uat-process"] #mom-header,
+#app-main[data-active-view="uat-process"] #qa-header,
+#app-main[data-active-view="uat-process"] #overview-cards,
+#app-main[data-active-view="uat-process"] #legend,
+#app-main[data-active-view="uat-process"] .scroll-area,
+#app-main[data-active-view="uat-process"] .mom-page,
+#app-main[data-active-view="uat-process"] .qa-page{
+  display:none;
+}
+
+#app-main[data-active-view="uat-process"] #uat-process-header{ display:grid; }
+#app-main[data-active-view="uat-process"] .uat-process-page{ display:block; }
+
+/* Tombol aksi "buka proses" di tabel UAT */
+.qa-icon-btn.process{ color:var(--gold); border-color:var(--gold-soft); background:var(--gold-soft); }
+.qa-icon-btn.process:hover{ color:#fff; border-color:var(--gold); background:var(--gold); }
+
+.up-back{
+  width:30px;
+  height:30px;
+  flex:none;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid var(--paper-line-strong);
+  border-radius:7px;
+  background:var(--surface);
+  color:var(--ink-soft);
+  cursor:pointer;
+  font-size:14px;
+  transition:all .15s;
+}
+.up-back:hover{ color:var(--gold); border-color:var(--gold); background:var(--gold-soft); }
+
+.uat-process-page{
+  flex:1;
+  min-height:0;
+  overflow-y:auto;
+  padding:0 clamp(12px,3.5vw,28px) clamp(12px,3.5vw,28px);
+  --up-pass:var(--status-done);
+  --up-fail:var(--status-risk);
+  --up-blocked:var(--gold);
+  --up-notrun:var(--status-planned);
+  --up-na:var(--ink-faint);
+}
+
+/* KPI */
+.up-kpis{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:12px;
+  margin-bottom:16px;
+}
+.up-kpi{
+  padding:14px 16px;
+  background:var(--surface);
+  border:1px solid var(--paper-line-strong);
+  border-radius:10px;
+  box-shadow:var(--shadow);
+}
+.up-kpi-label{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  font-size:11px;
+  color:var(--ink-soft);
+}
+.up-kpi-label i{ font-size:13px; }
+.up-kpi-val{
+  font-family:'Space Grotesk', sans-serif;
+  font-size:22px;
+  font-weight:700;
+  line-height:1.1;
+  color:var(--ink);
+  margin-top:6px;
+}
+.up-kpi-pct{
+  font-size:11px;
+  color:var(--ink-faint);
+  margin-top:2px;
+  min-height:14px;
+}
+
+/* Kartu */
+.up-card{
+  background:var(--surface);
+  border:1px solid var(--paper-line-strong);
+  border-radius:10px;
+  box-shadow:var(--shadow);
+  padding:18px;
+  margin-bottom:16px;
+}
+.up-card-title{
+  margin:0 0 14px;
+  font-family:'Space Grotesk', sans-serif;
+  font-size:15px;
+  color:var(--ink);
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.up-sub{ font-size:12px; font-weight:400; color:var(--ink-faint); }
+.up-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:16px;
+}
+
+/* Bar progres */
+.up-bar{
+  display:flex;
+  height:14px;
+  border-radius:999px;
+  overflow:hidden;
+  background:var(--paper);
+  border:1px solid var(--paper-line);
+}
+.up-bar span{ display:block; height:100%; }
+.up-bar-sm{ height:8px; margin-top:6px; }
+.up-legend{
+  display:flex;
+  flex-wrap:wrap;
+  gap:14px;
+  margin-top:12px;
+  font-size:12px;
+  color:var(--ink-soft);
+}
+.up-legend i{
+  display:inline-block;
+  width:10px;
+  height:10px;
+  border-radius:3px;
+  margin-right:6px;
+}
+
+/* Donut distribusi status (conic-gradient, tanpa library) */
+.up-donut-wrap{
+  display:flex;
+  align-items:center;
+  gap:24px;
+  flex-wrap:wrap;
+}
+.up-donut{
+  position:relative;
+  width:160px;
+  height:160px;
+  border-radius:50%;
+  background:var(--up-notrun);
+  flex:none;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.up-donut::after{
+  content:'';
+  position:absolute;
+  inset:26px;
+  border-radius:50%;
+  background:var(--surface);
+}
+.up-donut b{
+  position:relative;
+  z-index:1;
+  font-family:'Space Grotesk', sans-serif;
+  font-size:20px;
+  font-weight:700;
+  color:var(--ink);
+  text-align:center;
+  line-height:1.2;
+}
+.up-donut b small{
+  display:block;
+  font-family:'Inter', sans-serif;
+  font-size:11px;
+  font-weight:500;
+  color:var(--ink-soft);
+}
+.up-donut-legend{ flex-direction:column; gap:8px; margin-top:0; }
+
+/* Panel bug */
+.up-bugs{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  max-height:280px;
+  overflow-y:auto;
+}
+.up-bug{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  padding:10px 12px;
+  border:1px solid var(--paper-line);
+  border-radius:8px;
+  font-size:12.5px;
+  color:var(--ink);
+}
+.up-bug-sub{ font-size:11px; color:var(--ink-faint); margin-top:3px; }
+.up-bug-right{ text-align:right; flex:none; }
+.up-empty-note{ font-size:12.5px; color:var(--ink-faint); padding:6px 0; }
+
+/* Breakdown per module / prioritas */
+.up-row{ margin-bottom:14px; }
+.up-row:last-child{ margin-bottom:0; }
+.up-row-top{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  font-size:12px;
+  color:var(--ink-soft);
+}
+.up-row-top span:first-child{ font-weight:600; color:var(--ink); font-size:12.5px; }
+
+/* Tabel test case */
+.up-table{
+  width:100%;
+  min-width:1000px;
+  border-collapse:collapse;
+  font-size:12.5px;
+  font-family:'Inter', sans-serif;
+}
+.up-table thead th{
+  text-align:left;
+  padding:10px 12px;
+  font-size:10.5px;
+  letter-spacing:.05em;
+  text-transform:uppercase;
+  color:var(--ink-soft);
+  background:var(--paper);
+  border-top:1px solid var(--paper-line);
+  border-bottom:1px solid var(--paper-line-strong);
+  white-space:nowrap;
+}
+.up-table tbody td{
+  padding:10px 12px;
+  border-bottom:1px solid var(--paper-line);
+  color:var(--ink);
+  vertical-align:middle;
+}
+.up-table tbody tr.up-tc{ cursor:pointer; }
+.up-table tbody tr.up-tc:hover{ background:var(--paper); }
+.up-table tbody tr:last-child td{ border-bottom:none; }
+.up-tc-id{
+  font-family:'IBM Plex Mono', monospace;
+  font-size:11.5px;
+  font-weight:600;
+  color:#a97c22;
+  white-space:nowrap;
+}
+[data-theme="dark"] .up-tc-id{ color:var(--gold); }
+.up-p-critical{ color:var(--status-risk); font-weight:600; }
+.up-p-high{ color:#a97c22; font-weight:600; }
+[data-theme="dark"] .up-p-high{ color:var(--gold); }
+.up-p-medium,
+.up-p-low{ color:var(--ink-soft); }
+
+.up-col-act{ width:232px; }
+.up-table td.up-col-act{ text-align:left; white-space:nowrap; }
+.up-actions{ display:inline-flex; align-items:center; gap:6px; }
+.up-quick{
+  display:inline-flex;
+  gap:2px;
+  padding-right:6px;
+  border-right:1px dashed var(--paper-line-strong);
+}
+.up-status-btn{
+  width:24px;
+  height:24px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid transparent;
+  border-radius:6px;
+  background:transparent;
+  color:var(--ink-faint);
+  cursor:pointer;
+  font-size:12px;
+  transition:all .15s;
+}
+.up-status-btn:hover{ background:var(--paper); border-color:var(--paper-line-strong); }
+.up-status-btn.s-Pass{ color:var(--status-done); }
+.up-status-btn.s-Fail{ color:var(--status-risk); }
+.up-status-btn.s-Blocked{ color:var(--gold); }
+.up-status-btn.s-NotRun{ color:var(--status-planned); }
+.up-status-btn.s-NA{ color:var(--ink-soft); }
+.up-status-btn.active{
+  background:color-mix(in srgb, currentColor 14%, transparent);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb, currentColor 45%, transparent);
+}
+
+/* Badge status test case */
+.up-tc-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  padding:3px 8px;
+  border-radius:999px;
+  font-family:'IBM Plex Mono', monospace;
+  font-size:10.5px;
+  font-weight:600;
+  white-space:nowrap;
+  line-height:1.4;
+}
+.up-tc-badge.s-Pass{ background:rgba(63,143,99,.13); color:var(--status-done); }
+.up-tc-badge.s-Fail{ background:rgba(217,48,37,.12); color:var(--status-risk); }
+.up-tc-badge.s-Blocked{ background:var(--gold-soft); color:#a97c22; }
+.up-tc-badge.s-NotRun{ background:rgba(139,156,179,.15); color:var(--ink-faint); }
+.up-tc-badge.s-NA{ background:rgba(137,150,168,.12); color:var(--ink-soft); }
+[data-theme="dark"] .up-tc-badge.s-Pass{ background:rgba(76,175,80,.16); color:var(--status-done); }
+[data-theme="dark"] .up-tc-badge.s-Fail{ background:rgba(248,113,113,.16); color:var(--status-risk); }
+[data-theme="dark"] .up-tc-badge.s-Blocked{ background:rgba(201,154,59,.16); color:var(--gold); }
+[data-theme="dark"] .up-tc-badge.s-NotRun{ background:rgba(144,164,174,.18); color:var(--ink-faint); }
+[data-theme="dark"] .up-tc-badge.s-NA{ background:rgba(137,150,168,.14); color:var(--ink-soft); }
+
+/* Baris detail (expand) */
+.up-table tr.up-detail td{
+  background:var(--paper);
+  padding:16px 18px;
+  border-bottom:1px solid var(--paper-line-strong);
+}
+.up-dgrid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:14px 24px;
+}
+.up-dgrid h4{
+  margin:0 0 4px;
+  font-size:10.5px;
+  letter-spacing:.05em;
+  text-transform:uppercase;
+  color:var(--ink-faint);
+}
+.up-dgrid p,
+.up-dgrid ol{
+  margin:0;
+  font-size:12.5px;
+  color:var(--ink);
+  line-height:1.6;
+}
+.up-dgrid ol{ padding-left:18px; }
+
+.up-table tbody td.up-tc-empty{
+  text-align:center;
+  color:var(--ink-faint);
+  padding:28px 12px;
+}
+
+/* Empty state di dalam kartu proses (tanpa border/shadow ganda) */
+.up-card .qa-empty{
+  min-height:240px;
+  padding:40px 24px;
+  border:none;
+  border-radius:0;
+  box-shadow:none;
+}
+.up-card .qa-empty-icon{
+  width:64px;
+  height:64px;
+  font-size:30px;
+  border-radius:16px;
+  margin-bottom:14px;
+}
+.up-card .qa-empty-title{
+  font-size:20px;
+  margin:12px 0 6px;
+}
+
+/* Form test case */
+.tc-form-hint{
+  font-weight:400;
+  font-size:10.5px;
+  color:var(--ink-faint);
+}
+
+/* Responsif proses UAT */
+@media (max-width: 1100px){
+  .up-grid{ grid-template-columns:1fr; }
+}
+@media (max-width: 860px){
+  .up-kpis{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 600px){
+  .up-kpis{ grid-template-columns:1fr; }
+  .up-donut{ width:130px; height:130px; }
+  .up-donut::after{ inset:22px; }
 }
