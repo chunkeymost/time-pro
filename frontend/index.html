@@ -147,7 +147,7 @@
       <span class="project-sub">Halaman untuk kebutuhan quality assurance.</span>
     </section>
     <section class="page-header-view" aria-label="Aksi Quality Assurance">
-      <!-- Sengaja kosong: halaman QA belum memiliki aksi -->
+      <button class="btn btn-primary" id="uat-add-btn">+ TAMBAH UAT</button>
     </section>
   </header>
 
@@ -233,17 +233,84 @@
   </div>
 
   <div class="qa-page" id="qa-page">
-    <div class="qa-empty">
-      <div class="qa-empty-icon"><i class="bi bi-sd-card-fill"></i></div>
-      <span class="qa-empty-badge">COMING SOON</span>
-      <h2 class="qa-empty-title">Quality Assurance</h2>
-      <p class="qa-empty-sub">Halaman ini disiapkan untuk kebutuhan Quality Assurance. Konten akan ditambahkan pada tahap berikutnya.</p>
+    <div class="qa-stats" id="qa-stats"></div>
+
+    <div class="qa-panel">
+      <div class="qa-panel-head">
+        <div>
+          <h2 class="qa-panel-title">Daftar UAT</h2>
+          <p class="qa-panel-sub" id="uat-count-label">Memuat data...</p>
+        </div>
+      </div>
+
+      <div class="qa-table-wrap" style="display:none;">
+        <table class="qa-table">
+          <thead>
+            <tr>
+              <th class="qa-col-num">No.</th>
+              <th>Title UAT</th>
+              <th>Developer</th>
+              <th>PIC UAT</th>
+              <th>Due Date</th>
+              <th>Status</th>
+              <th class="qa-col-act">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="uat-table-body"></tbody>
+        </table>
+      </div>
+
+      <div class="qa-empty" id="uat-empty">
+        <div class="qa-empty-icon"><i class="bi bi-clipboard-check"></i></div>
+        <span class="qa-empty-badge">QUALITY ASSURANCE</span>
+        <h2 class="qa-empty-title">Belum ada data UAT</h2>
+        <p class="qa-empty-sub">Klik tombol "Tambah UAT" untuk menambahkan item User Acceptance Test pertama Anda.</p>
+      </div>
     </div>
   </div>
 
   <div class="toast-container" id="toast-container"></div>
   </main>
   </div>
+
+<!-- UAT form sidepeek -->
+<div class="overlay" id="uat-form-overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="uat-form-title">Tambah UAT</h2>
+      <button class="modal-close" id="uat-form-close">&times;</button>
+    </div>
+    <div class="modal-sub" id="uat-form-sub">Lengkapi detail item User Acceptance Test.</div>
+
+    <form id="uat-form" autocomplete="off" novalidate>
+      <div class="field">
+        <label for="uat-title">Title UAT *</label>
+        <input type="text" id="uat-title" placeholder="cth. Verifikasi alur checkout">
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label for="uat-developer">Developer *</label>
+          <input type="text" id="uat-developer" placeholder="cth. Budi">
+        </div>
+        <div class="field">
+          <label for="uat-pic">PIC UAT *</label>
+          <input type="text" id="uat-pic" placeholder="cth. Sari">
+        </div>
+      </div>
+      <div class="field">
+        <label for="uat-due-date">Due Date *</label>
+        <input type="date" id="uat-due-date">
+      </div>
+    </form>
+
+    <div class="uat-form-footer">
+      <div class="uat-form-footer-right">
+        <button type="button" class="btn btn-ghost" id="uat-cancel-btn">Batal</button>
+        <button type="button" class="btn btn-primary" id="uat-save-btn">Simpan</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Modal -->
 <div class="overlay" id="overlay">

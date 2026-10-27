@@ -892,6 +892,10 @@
     if(view === 'mom'){
       renderMomPage();
     }
+
+    if(view === 'qa'){
+      renderQaPage();
+    }
   }
 
   function toggleMobileNav(){
@@ -3083,6 +3087,249 @@
     return { open, overdue };
   }
 
+  /* ---------------- Quality Assurance (UAT) ---------------- */
+  const QA_STATUS_CARDS = [
+    { key:'finish',      label:'Finish',      icon:'bi-check-circle-fill',      cls:'finish' },
+    { key:'in_progress', label:'In Progress', icon:'bi-arrow-repeat',           cls:'in-progress' },
+    { key:'hold',        label:'Hold',        icon:'bi-pause-circle-fill',      cls:'hold' },
+    { key:'reopen',      label:'Re-Open',     icon:'bi-arrow-counterclockwise', cls:'reopen' },
+  ];
+
+  const UAT_STATUS_LABEL = { finish:'Finish', in_progress:'In Progress', hold:'Hold', reopen:'Re-Open' };
+
+  let uats = [];
+  let uatEditingId = null;
+
+  function qaStatusCounts(){
+    const counts = { finish:0, in_progress:0, hold:0, reopen:0 };
+    uats.forEach(u => {
+      if(Object.prototype.hasOwnProperty.call(counts, u.status)) counts[u.status]++;
+    });
+    return counts;
+  }
+
+  async function loadUats(){
+    try {
+      const data = await api.get('/api/uat');
+      uats = Array.isArray(data.uats) ? data.uats : [];
+    } catch(err){
+      console.error('Gagal memuat data UAT:', err);
+      uats = [];
+    }
+    renderQaPage();
+  }
+
+  function renderQaPage(){
+    const statsEl = document.getElementById('qa-stats');
+    if(statsEl){
+      const counts = qaStatusCounts();
+      statsEl.innerHTML = QA_STATUS_CARDS.map(card => `
+        <div class="qa-stat">
+          <div class="qa-stat-icon ${card.cls}"><i class="bi ${card.icon}"></i></div>
+          <div>
+            <div class="qa-stat-num">${counts[card.key] ?? 0}</div>
+            <div class="qa-stat-label">${card.label}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    const tbody = document.getElementById('uat-table-body');
+    if(!tbody) return;
+
+    tbody.innerHTML = uats.map((u, i) => {
+      const status = UAT_STATUS_LABEL[u.status] ? u.status : 'in_progress';
+      const options = Object.keys(UAT_STATUS_LABEL).map(key =>
+        `<option value="${key}"${key === status ? ' selected' : ''}>${UAT_STATUS_LABEL[key]}</option>`
+      ).join('');
+      return `
+        <tr data-uat-id="${u.id}">
+          <td class="qa-col-num">${i + 1}</td>
+          <td class="qa-title-cell">${escapeHtml(u.title || '')}</td>
+          <td>${escapeHtml(u.developer || '—')}</td>
+          <td>${escapeHtml(u.pic || '—')}</td>
+          <td class="qa-date-cell">${escapeHtml(momFormatDate(u.dueDate))}</td>
+          <td class="qa-status-cell">
+            <select class="uat-status-select ${status}" data-uat-status data-id="${u.id}" aria-label="Status UAT">${options}</select>
+          </td>
+          <td class="qa-col-act">
+            <div class="qa-actions">
+              <button type="button" class="qa-icon-btn" data-uat-action="edit" data-id="${u.id}" title="Edit"><i class="bi bi-pencil"></i></button>
+              <button type="button" class="qa-icon-btn danger" data-uat-action="delete" data-id="${u.id}" title="Hapus"><i class="bi bi-trash"></i></button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    const tableWrap = document.querySelector('.qa-table-wrap');
+    if(tableWrap) tableWrap.style.display = uats.length ? 'block' : 'none';
+    const emptyEl = document.getElementById('uat-empty');
+    // '' = lepas inline style agar kembali ke display:flex dari stylesheet
+    if(emptyEl) emptyEl.style.display = uats.length ? 'none' : '';
+    const countLabel = document.getElementById('uat-count-label');
+    if(countLabel) countLabel.textContent = `${uats.length} UAT tercatat`;
+  }
+
+  function uatVal(id){
+    const el = document.getElementById(id);
+    return el ? el.value : '';
+  }
+
+  function uatSetVal(id, value){
+    const el = document.getElementById(id);
+    if(el) el.value = value === undefined || value === null ? '' : value;
+  }
+
+  function uatErrorMessage(err, fallback){
+    let msg = err && err.message ? err.message : fallback;
+    try { msg = JSON.parse(msg).error || msg; } catch(_){}
+    return msg;
+  }
+
+  function openUatForm(uat){
+    uatEditingId = uat ? uat.id : null;
+    document.getElementById('uat-form-title').textContent = uat ? 'Edit UAT' : 'Tambah UAT';
+    document.getElementById('uat-form-sub').textContent = uat
+      ? 'Perbarui detail item User Acceptance Test.'
+      : 'Lengkapi detail item User Acceptance Test.';
+    uatSetVal('uat-title', uat ? uat.title : '');
+    uatSetVal('uat-developer', uat ? uat.developer : '');
+    uatSetVal('uat-pic', uat ? uat.pic : '');
+    uatSetVal('uat-due-date', uat ? uat.dueDate : '');
+    document.getElementById('uat-form-overlay').classList.add('open');
+    const titleEl = document.getElementById('uat-title');
+    if(titleEl) titleEl.focus();
+  }
+
+  function closeUatForm(){
+    const overlay = document.getElementById('uat-form-overlay');
+    if(overlay) overlay.classList.remove('open');
+    uatEditingId = null;
+  }
+
+  function uatCollectPayload(){
+    return {
+      title: uatVal('uat-title').trim(),
+      developer: uatVal('uat-developer').trim(),
+      pic: uatVal('uat-pic').trim(),
+      dueDate: uatVal('uat-due-date'),
+    };
+  }
+
+  async function saveUat(){
+    const payload = uatCollectPayload();
+    if(!payload.title){
+      showToast('Title UAT wajib diisi.', 'error');
+      document.getElementById('uat-title').focus();
+      return;
+    }
+    if(!payload.developer){
+      showToast('Developer wajib diisi.', 'error');
+      document.getElementById('uat-developer').focus();
+      return;
+    }
+    if(!payload.pic){
+      showToast('PIC UAT wajib diisi.', 'error');
+      document.getElementById('uat-pic').focus();
+      return;
+    }
+    if(!payload.dueDate){
+      showToast('Due Date wajib diisi.', 'error');
+      document.getElementById('uat-due-date').focus();
+      return;
+    }
+
+    const btn = document.getElementById('uat-save-btn');
+    const original = btn.innerHTML;
+    const isEdit = !!uatEditingId;
+    btn.disabled = true;
+    btn.textContent = 'Menyimpan...';
+    try {
+      if(uatEditingId){
+        await api.put('/api/uat/' + uatEditingId, payload);
+      } else {
+        await api.post('/api/uat', payload);
+      }
+      closeUatForm();
+      await loadUats();
+      showToast(isEdit ? 'UAT berhasil diperbarui.' : 'UAT berhasil ditambahkan.');
+    } catch(err){
+      showToast('Gagal menyimpan UAT: ' + uatErrorMessage(err, 'terjadi kesalahan'), 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
+  }
+
+  async function deleteUat(id){
+    const uat = uats.find(u => u.id === id);
+    if(!uat) return;
+    const confirmed = await showConfirm(
+      `Yakin ingin menghapus UAT <strong>${escapeHtml(uat.title || 'ini')}</strong>?`,
+      'Ya, Hapus',
+      'Batal'
+    );
+    if(!confirmed) return;
+    try {
+      await api.del('/api/uat/' + id);
+      if(uatEditingId === id) closeUatForm();
+      await loadUats();
+      showToast('UAT berhasil dihapus.');
+    } catch(err){
+      showToast(uatErrorMessage(err, 'Gagal menghapus UAT'), 'error');
+    }
+  }
+
+  async function changeUatStatus(id, status){
+    if(!UAT_STATUS_LABEL[status]) return;
+    try {
+      await api.put('/api/uat/' + id, { status });
+      await loadUats();
+      showToast('Status UAT diperbarui.');
+    } catch(err){
+      showToast(uatErrorMessage(err, 'Gagal memperbarui status UAT'), 'error');
+      await loadUats();
+    }
+  }
+
+  function initUat(){
+    const addBtn = document.getElementById('uat-add-btn');
+    if(addBtn) addBtn.addEventListener('click', () => openUatForm(null));
+
+    document.getElementById('uat-form-close').addEventListener('click', closeUatForm);
+    document.getElementById('uat-cancel-btn').addEventListener('click', closeUatForm);
+    document.getElementById('uat-form-overlay').addEventListener('click', (e) => {
+      if(e.target === document.getElementById('uat-form-overlay')) closeUatForm();
+    });
+    document.getElementById('uat-save-btn').addEventListener('click', saveUat);
+    document.getElementById('uat-form').addEventListener('submit', (e) => e.preventDefault());
+
+    const tbody = document.getElementById('uat-table-body');
+    tbody.addEventListener('click', (e) => {
+      const actionBtn = e.target.closest('[data-uat-action]');
+      if(!actionBtn) return;
+      const id = Number(actionBtn.dataset.id);
+      if(actionBtn.dataset.uatAction === 'edit'){
+        const uat = uats.find(u => u.id === id);
+        if(uat) openUatForm(uat);
+      } else if(actionBtn.dataset.uatAction === 'delete'){
+        deleteUat(id);
+      }
+    });
+    tbody.addEventListener('change', (e) => {
+      const select = e.target.closest('[data-uat-status]');
+      if(!select) return;
+      changeUatStatus(Number(select.dataset.id), select.value);
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if(e.key === 'Escape' && document.getElementById('uat-form-overlay').classList.contains('open')){
+        closeUatForm();
+      }
+    });
+  }
+
   function renderMomPage(){
     const tbody = document.getElementById('mom-table-body');
     if(!tbody) return;
@@ -3530,10 +3777,11 @@
   }
 
   initMom();
+  initUat();
 
   /* ---------------- Init ---------------- */
   (async () => {
-    await Promise.all([loadTasks(), loadDailyTasks(), loadMomMeetings()]);
+    await Promise.all([loadTasks(), loadDailyTasks(), loadMomMeetings(), loadUats()]);
   })();
 
   // Update date labels when the day rolls over (checked every 30s)

@@ -675,6 +675,97 @@ class JsonStorage {
     this._saveMom(data);
     return true;
   }
+
+  /* ---------- UAT (Quality Assurance) ---------- */
+  _getUatPath() {
+    return path.join(path.dirname(this.filePath), 'uat.json');
+  }
+
+  _loadUat() {
+    try {
+      const p = this._getUatPath();
+      if (!fs.existsSync(p)) {
+        const seed = { uats: [], nextId: 1 };
+        fs.writeFileSync(p, JSON.stringify(seed, null, 2), 'utf-8');
+        return seed;
+      }
+      const raw = fs.readFileSync(p, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed.uats)) parsed.uats = [];
+      if (!parsed.nextId) parsed.nextId = 1;
+      return parsed;
+    } catch (err) {
+      console.error('Failed to load UAT data:', err.message);
+      const seed = { uats: [], nextId: 1 };
+      fs.writeFileSync(this._getUatPath(), JSON.stringify(seed, null, 2), 'utf-8');
+      return seed;
+    }
+  }
+
+  _saveUat(data) {
+    fs.writeFileSync(this._getUatPath(), JSON.stringify(data, null, 2), 'utf-8');
+  }
+
+  _normalizeUat(input, existing) {
+    const data = input || {};
+    const base = existing || {};
+    const now = new Date().toISOString();
+    const status = momString(data.status !== undefined ? data.status : base.status);
+    return {
+      id: base.id,
+      title: momString(data.title !== undefined ? data.title : base.title).trim(),
+      developer: momString(data.developer !== undefined ? data.developer : base.developer).trim(),
+      pic: momString(data.pic !== undefined ? data.pic : base.pic).trim(),
+      dueDate: momString(data.dueDate !== undefined ? data.dueDate : base.dueDate).slice(0, 10),
+      status: ['finish', 'in_progress', 'hold', 'reopen'].includes(status) ? status : 'in_progress',
+      createdAt: base.createdAt || now,
+      updatedAt: now,
+    };
+  }
+
+  getUats() {
+    const data = this._loadUat();
+    return data.uats.slice().sort((a, b) => {
+      const da = momString(a.dueDate);
+      const db = momString(b.dueDate);
+      if (da === db) return (b.id || 0) - (a.id || 0);
+      return da.localeCompare(db);
+    });
+  }
+
+  getUatById(id) {
+    const data = this._loadUat();
+    return data.uats.find(u => u.id === id) || null;
+  }
+
+  createUat(input) {
+    const data = this._loadUat();
+    const uat = this._normalizeUat(input, null);
+    uat.id = data.nextId++;
+    data.uats.push(uat);
+    this._saveUat(data);
+    return uat;
+  }
+
+  updateUat(id, input) {
+    const data = this._loadUat();
+    const idx = data.uats.findIndex(u => u.id === id);
+    if (idx === -1) return null;
+    const merged = this._normalizeUat(input, data.uats[idx]);
+    merged.id = data.uats[idx].id;
+    data.uats[idx] = merged;
+    this._saveUat(data);
+    return merged;
+  }
+
+  deleteUat(id) {
+    const data = this._loadUat();
+    const idx = data.uats.findIndex(u => u.id === id);
+    if (idx === -1) return false;
+    data.uats.splice(idx, 1);
+    this._saveUat(data);
+    return true;
+  }
 }
 
 module.exports = JsonStorage;

@@ -262,6 +262,101 @@ app.delete('/api/mom/:id', async (req, res) => {
   }
 });
 
+/* ---------- UAT (Quality Assurance) ---------- */
+
+// UAT mengikuti MoM: sementara hanya didukung pada penyimpanan JSON.
+// MySQL ditangguhkan sampai implementasi dan migration-nya diaktifkan kembali.
+function requireJsonUatStorage(req, res, next) {
+  if (!(storage instanceof JsonStorage)) {
+    return res.status(501).json({
+      error: 'UAT sementara hanya tersedia pada penyimpanan JSON.',
+    });
+  }
+  next();
+}
+
+app.use('/api/uat', requireJsonUatStorage);
+
+const UAT_STATUSES = ['finish', 'in_progress', 'hold', 'reopen'];
+
+function validateUatBody(body, partial) {
+  if (!partial || body.title !== undefined) {
+    if (!body.title || !String(body.title).trim()) return 'Title UAT wajib diisi';
+  }
+  if (!partial || body.developer !== undefined) {
+    if (!body.developer || !String(body.developer).trim()) return 'Developer wajib diisi';
+  }
+  if (!partial || body.pic !== undefined) {
+    if (!body.pic || !String(body.pic).trim()) return 'PIC UAT wajib diisi';
+  }
+  if (!partial || body.dueDate !== undefined) {
+    if (!body.dueDate || !/^\d{4}-\d{2}-\d{2}$/.test(body.dueDate)) {
+      return 'Due Date wajib diisi dengan format YYYY-MM-DD';
+    }
+  }
+  if (body.status !== undefined && !UAT_STATUSES.includes(body.status)) {
+    return 'Status harus salah satu dari: ' + UAT_STATUSES.join(', ');
+  }
+  return null;
+}
+
+app.get('/api/uat', async (req, res) => {
+  try {
+    const uats = await storage.getUats();
+    res.json({ uats });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/uat/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const uat = await storage.getUatById(id);
+    if (!uat) return res.status(404).json({ error: 'UAT not found' });
+    res.json({ uat });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/uat', async (req, res) => {
+  try {
+    const err = validateUatBody(req.body, false);
+    if (err) return res.status(400).json({ error: err });
+    const uat = await storage.createUat(req.body);
+    res.status(201).json({ uat });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/uat/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const existing = await storage.getUatById(id);
+    if (!existing) return res.status(404).json({ error: 'UAT not found' });
+    const err = validateUatBody(req.body, true);
+    if (err) return res.status(400).json({ error: err });
+    const uat = await storage.updateUat(id, req.body);
+    if (!uat) return res.status(404).json({ error: 'UAT not found' });
+    res.json({ uat });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/uat/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const ok = await storage.deleteUat(id);
+    if (!ok) return res.status(404).json({ error: 'UAT not found' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ---------- Backup ---------- */
 
 function copyIfExist(src, dest) {
@@ -308,6 +403,13 @@ app.post('/api/backup', async (req, res) => {
     if (fs.existsSync(momPath)) {
       try {
         srcData.mom = JSON.parse(fs.readFileSync(momPath, 'utf-8'));
+      } catch (_) {}
+    }
+    // Sertakan data UAT ke file backup agar ikut tersimpan
+    const uatPath = path.join(dataDir, 'uat.json');
+    if (fs.existsSync(uatPath)) {
+      try {
+        srcData.uat = JSON.parse(fs.readFileSync(uatPath, 'utf-8'));
       } catch (_) {}
     }
     fs.writeFileSync(path.join(backupDir, taskFile), JSON.stringify(srcData, null, 2), 'utf-8');
@@ -407,6 +509,13 @@ app.post('/api/restore', async (req, res) => {
       momRestored = true;
     }
 
+    // Restore data UAT bila tersedia di file backup
+    let uatRestored = false;
+    if (srcData.uat && Array.isArray(srcData.uat.uats)) {
+      fs.writeFileSync(path.join(dataDir, 'uat.json'), JSON.stringify(srcData.uat, null, 2), 'utf-8');
+      uatRestored = true;
+    }
+
     // Restore log history files dari backup
     const timestamp = filename.replace(/^task-/, '').replace(/\.json$/, '');
     const logFiles = [
@@ -428,7 +537,7 @@ app.post('/api/restore', async (req, res) => {
     for (const f of restoredFiles) {
       await storage.addRestoreLog('Restored', f);
     }
-    res.json({ success: true, taskCount: srcData.tasks.length, imageCount, momRestored });
+    res.json({ success: true, taskCount: srcData.tasks.length, imageCount, momRestored, uatRestored });
   } catch (err) {
     await storage.addRestoreLog('Failed', filename);
     res.status(500).json({ error: err.message });

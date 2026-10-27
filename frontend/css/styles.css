@@ -3409,8 +3409,175 @@ body{
   padding:0 clamp(12px,3.5vw,28px) clamp(12px,3.5vw,28px);
 }
 
+.qa-stats{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:12px;
+  margin-bottom:16px;
+}
+.qa-stat{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:14px 16px;
+  background:var(--surface);
+  border:1px solid var(--paper-line-strong);
+  border-radius:10px;
+  box-shadow:var(--shadow);
+}
+.qa-stat-icon{
+  width:38px;
+  height:38px;
+  border-radius:8px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-shrink:0;
+  font-size:18px;
+  background:var(--paper);
+  color:var(--ink-soft);
+}
+.qa-stat-icon.finish{ background:rgba(63,143,99,.12); color:var(--status-done); }
+.qa-stat-icon.in-progress{ background:rgba(47,107,163,.12); color:var(--status-progress); }
+.qa-stat-icon.hold{ background:rgba(124,58,237,.12); color:var(--purple); }
+.qa-stat-icon.reopen{ background:var(--gold-soft); color:var(--gold); }
+.qa-stat-num{
+  font-family:'Space Grotesk', sans-serif;
+  font-size:22px;
+  font-weight:700;
+  line-height:1.1;
+  color:var(--ink);
+}
+.qa-stat-label{
+  font-size:11px;
+  color:var(--ink-soft);
+  margin-top:2px;
+}
+
+/* ---------- Panel & tabel UAT ---------- */
+.qa-panel{
+  background:var(--surface);
+  border:1px solid var(--paper-line-strong);
+  border-radius:10px;
+  box-shadow:var(--shadow);
+  overflow:hidden;
+}
+.qa-panel-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:16px;
+  padding:18px 18px 12px;
+}
+.qa-panel-title{
+  margin:0;
+  font-family:'Space Grotesk', sans-serif;
+  font-size:17px;
+  color:var(--ink);
+}
+.qa-panel-sub{
+  margin:4px 0 0;
+  font-family:'IBM Plex Mono', monospace;
+  font-size:11px;
+  color:var(--ink-soft);
+}
+
+.qa-table-wrap{ overflow-x:auto; }
+.qa-table{
+  width:100%;
+  min-width:760px;
+  border-collapse:collapse;
+  font-size:12.5px;
+  font-family:'Inter', sans-serif;
+}
+.qa-table thead th{
+  text-align:left;
+  padding:10px 12px;
+  font-size:10.5px;
+  letter-spacing:.05em;
+  text-transform:uppercase;
+  color:var(--ink-soft);
+  background:var(--paper);
+  border-top:1px solid var(--paper-line);
+  border-bottom:1px solid var(--paper-line-strong);
+  white-space:nowrap;
+}
+.qa-table tbody td{
+  padding:11px 12px;
+  border-bottom:1px solid var(--paper-line);
+  color:var(--ink);
+  vertical-align:middle;
+}
+.qa-table tbody tr:hover{ background:var(--paper); }
+.qa-table tbody tr:last-child td{ border-bottom:none; }
+.qa-col-num{ width:44px; text-align:center; }
+.qa-table td.qa-col-num{ text-align:center; }
+.qa-col-act{ width:96px; text-align:right; }
+.qa-table td.qa-col-act{ text-align:right; white-space:nowrap; }
+.qa-title-cell{ font-weight:600; font-size:13px; max-width:280px; }
+.qa-date-cell{
+  font-family:'IBM Plex Mono', monospace;
+  font-size:11.5px;
+  white-space:nowrap;
+}
+.qa-status-cell{ min-width:140px; }
+
+.qa-actions{ display:inline-flex; gap:4px; }
+.qa-icon-btn{
+  width:28px; height:28px;
+  display:inline-flex; align-items:center; justify-content:center;
+  border:1px solid var(--paper-line-strong);
+  border-radius:6px;
+  background:var(--surface);
+  color:var(--ink-soft);
+  cursor:pointer;
+  font-size:13px;
+  transition:all .15s;
+}
+.qa-icon-btn:hover{ color:var(--ink); border-color:var(--ink-soft); background:var(--paper); }
+.qa-icon-btn.danger:hover{ color:var(--status-risk); border-color:var(--status-risk); }
+
+/* Select status inline di tabel UAT */
+.uat-status-select{
+  padding:4px 8px;
+  border-radius:999px;
+  border:1px solid transparent;
+  font-family:'IBM Plex Mono', monospace;
+  font-size:11px;
+  font-weight:600;
+  cursor:pointer;
+  background:var(--paper);
+  color:var(--ink);
+}
+.uat-status-select.finish{ background:rgba(63,143,99,.13); color:var(--status-done); }
+.uat-status-select.in_progress{ background:rgba(47,107,163,.12); color:var(--status-progress); }
+.uat-status-select.hold{ background:rgba(124,58,237,.12); color:var(--purple); }
+.uat-status-select.reopen{ background:var(--gold-soft); color:#a97c22; }
+[data-theme="dark"] .uat-status-select{ background:var(--paper); color:var(--ink); }
+[data-theme="dark"] .uat-status-select.finish{ background:rgba(76,175,80,.16); color:var(--status-done); }
+[data-theme="dark"] .uat-status-select.in_progress{ background:rgba(66,165,245,.16); color:var(--status-progress); }
+[data-theme="dark"] .uat-status-select.hold{ background:rgba(124,58,237,.2); color:var(--purple); }
+[data-theme="dark"] .uat-status-select.reopen{ background:rgba(201,154,59,.16); color:var(--gold); }
+
+/* Footer form UAT */
+.uat-form-footer{
+  position:sticky;
+  bottom:0;
+  z-index:5;
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:12px;
+  flex-wrap:wrap;
+  padding:14px 0 20px;
+  margin-top:6px;
+  background:var(--surface);
+  border-top:1px solid var(--paper-line-strong);
+}
+.uat-form-footer-right{ display:flex; align-items:center; gap:8px; }
+
 .qa-empty{
-  min-height:420px;
+  min-height:320px;
   display:flex;
   flex-direction:column;
   align-items:center;
@@ -3465,9 +3632,36 @@ body{
   color:var(--ink-soft);
 }
 
+/* Empty state di dalam panel UAT: tanpa border/shadow ganda (panel sudah punya) */
+.qa-panel .qa-empty{
+  min-height:260px;
+  padding:40px 24px;
+  border:none;
+  border-radius:0;
+  box-shadow:none;
+}
+.qa-panel .qa-empty-icon{
+  width:64px;
+  height:64px;
+  font-size:30px;
+  border-radius:16px;
+  margin-bottom:14px;
+}
+.qa-panel .qa-empty-title{
+  font-size:20px;
+  margin:12px 0 6px;
+}
+
+@media (max-width: 860px){
+  .qa-stats{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 430px){
+  .qa-stats{ grid-template-columns:1fr; }
+}
+
 @media (max-width: 640px){
   .qa-empty{
-    min-height:360px;
+    min-height:280px;
     padding:40px 18px;
   }
   .qa-empty-icon{
