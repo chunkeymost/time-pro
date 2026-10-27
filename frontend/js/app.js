@@ -3089,19 +3089,20 @@
 
   /* ---------------- Quality Assurance (UAT) ---------------- */
   const QA_STATUS_CARDS = [
+    { key:'not_started', label:'Not Started', icon:'bi-circle',                cls:'not-started' },
     { key:'finish',      label:'Finish',      icon:'bi-check-circle-fill',      cls:'finish' },
     { key:'in_progress', label:'In Progress', icon:'bi-arrow-repeat',           cls:'in-progress' },
     { key:'hold',        label:'Hold',        icon:'bi-pause-circle-fill',      cls:'hold' },
     { key:'reopen',      label:'Re-Open',     icon:'bi-arrow-counterclockwise', cls:'reopen' },
   ];
 
-  const UAT_STATUS_LABEL = { finish:'Finish', in_progress:'In Progress', hold:'Hold', reopen:'Re-Open' };
+  const UAT_STATUS_LABEL = { not_started:'Not Started', finish:'Finish', in_progress:'In Progress', hold:'Hold', reopen:'Re-Open' };
 
   let uats = [];
   let uatEditingId = null;
 
   function qaStatusCounts(){
-    const counts = { finish:0, in_progress:0, hold:0, reopen:0 };
+    const counts = { not_started:0, finish:0, in_progress:0, hold:0, reopen:0 };
     uats.forEach(u => {
       if(Object.prototype.hasOwnProperty.call(counts, u.status)) counts[u.status]++;
     });
@@ -3138,10 +3139,8 @@
     if(!tbody) return;
 
     tbody.innerHTML = uats.map((u, i) => {
-      const status = UAT_STATUS_LABEL[u.status] ? u.status : 'in_progress';
-      const options = Object.keys(UAT_STATUS_LABEL).map(key =>
-        `<option value="${key}"${key === status ? ' selected' : ''}>${UAT_STATUS_LABEL[key]}</option>`
-      ).join('');
+      const status = UAT_STATUS_LABEL[u.status] ? u.status : 'not_started';
+      const statusLabel = UAT_STATUS_LABEL[status];
       return `
         <tr data-uat-id="${u.id}">
           <td class="qa-col-num">${i + 1}</td>
@@ -3150,7 +3149,7 @@
           <td>${escapeHtml(u.pic || '—')}</td>
           <td class="qa-date-cell">${escapeHtml(momFormatDate(u.dueDate))}</td>
           <td class="qa-status-cell">
-            <select class="uat-status-select ${status}" data-uat-status data-id="${u.id}" aria-label="Status UAT">${options}</select>
+            <span class="uat-status-badge ${status}">${statusLabel}</span>
           </td>
           <td class="qa-col-act">
             <div class="qa-actions">
@@ -3281,18 +3280,6 @@
     }
   }
 
-  async function changeUatStatus(id, status){
-    if(!UAT_STATUS_LABEL[status]) return;
-    try {
-      await api.put('/api/uat/' + id, { status });
-      await loadUats();
-      showToast('Status UAT diperbarui.');
-    } catch(err){
-      showToast(uatErrorMessage(err, 'Gagal memperbarui status UAT'), 'error');
-      await loadUats();
-    }
-  }
-
   function initUat(){
     const addBtn = document.getElementById('uat-add-btn');
     if(addBtn) addBtn.addEventListener('click', () => openUatForm(null));
@@ -3316,11 +3303,6 @@
       } else if(actionBtn.dataset.uatAction === 'delete'){
         deleteUat(id);
       }
-    });
-    tbody.addEventListener('change', (e) => {
-      const select = e.target.closest('[data-uat-status]');
-      if(!select) return;
-      changeUatStatus(Number(select.dataset.id), select.value);
     });
 
     document.addEventListener('keydown', (e) => {

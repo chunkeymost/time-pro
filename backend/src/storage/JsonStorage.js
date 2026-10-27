@@ -717,7 +717,7 @@ class JsonStorage {
       developer: momString(data.developer !== undefined ? data.developer : base.developer).trim(),
       pic: momString(data.pic !== undefined ? data.pic : base.pic).trim(),
       dueDate: momString(data.dueDate !== undefined ? data.dueDate : base.dueDate).slice(0, 10),
-      status: ['finish', 'in_progress', 'hold', 'reopen'].includes(status) ? status : 'in_progress',
+      status: ['not_started', 'finish', 'in_progress', 'hold', 'reopen'].includes(status) ? status : 'not_started',
       createdAt: base.createdAt || now,
       updatedAt: now,
     };

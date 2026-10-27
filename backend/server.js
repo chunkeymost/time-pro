@@ -277,7 +277,7 @@ function requireJsonUatStorage(req, res, next) {
 
 app.use('/api/uat', requireJsonUatStorage);
 
-const UAT_STATUSES = ['finish', 'in_progress', 'hold', 'reopen'];
+const UAT_STATUSES = ['not_started', 'finish', 'in_progress', 'hold', 'reopen'];
 
 function validateUatBody(body, partial) {
   if (!partial || body.title !== undefined) {

@@ -3411,7 +3411,7 @@ body{
 
 .qa-stats{
   display:grid;
-  grid-template-columns:repeat(4,minmax(0,1fr));
+  grid-template-columns:repeat(5,minmax(0,1fr));
   gap:12px;
   margin-bottom:16px;
 }
@@ -3441,6 +3441,7 @@ body{
 .qa-stat-icon.in-progress{ background:rgba(47,107,163,.12); color:var(--status-progress); }
 .qa-stat-icon.hold{ background:rgba(124,58,237,.12); color:var(--purple); }
 .qa-stat-icon.reopen{ background:var(--gold-soft); color:var(--gold); }
+.qa-stat-icon.not-started{ background:rgba(137,150,168,.12); color:var(--status-planned); }
 .qa-stat-num{
   font-family:'Space Grotesk', sans-serif;
   font-size:22px;
@@ -3537,27 +3538,29 @@ body{
 .qa-icon-btn:hover{ color:var(--ink); border-color:var(--ink-soft); background:var(--paper); }
 .qa-icon-btn.danger:hover{ color:var(--status-risk); border-color:var(--status-risk); }
 
-/* Select status inline di tabel UAT */
-.uat-status-select{
-  padding:4px 8px;
+/* Badge status di tabel UAT (statis; perubahan status menyusul dari aksi) */
+.uat-status-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  padding:3px 8px;
   border-radius:999px;
-  border:1px solid transparent;
   font-family:'IBM Plex Mono', monospace;
-  font-size:11px;
+  font-size:10.5px;
   font-weight:600;
-  cursor:pointer;
-  background:var(--paper);
-  color:var(--ink);
+  white-space:nowrap;
+  line-height:1.4;
 }
-.uat-status-select.finish{ background:rgba(63,143,99,.13); color:var(--status-done); }
-.uat-status-select.in_progress{ background:rgba(47,107,163,.12); color:var(--status-progress); }
-.uat-status-select.hold{ background:rgba(124,58,237,.12); color:var(--purple); }
-.uat-status-select.reopen{ background:var(--gold-soft); color:#a97c22; }
-[data-theme="dark"] .uat-status-select{ background:var(--paper); color:var(--ink); }
-[data-theme="dark"] .uat-status-select.finish{ background:rgba(76,175,80,.16); color:var(--status-done); }
-[data-theme="dark"] .uat-status-select.in_progress{ background:rgba(66,165,245,.16); color:var(--status-progress); }
-[data-theme="dark"] .uat-status-select.hold{ background:rgba(124,58,237,.2); color:var(--purple); }
-[data-theme="dark"] .uat-status-select.reopen{ background:rgba(201,154,59,.16); color:var(--gold); }
+.uat-status-badge.not_started{ background:rgba(139,156,179,.15); color:var(--ink-faint); }
+.uat-status-badge.finish{ background:rgba(63,143,99,.13); color:var(--status-done); }
+.uat-status-badge.in_progress{ background:rgba(47,107,163,.12); color:var(--status-progress); }
+.uat-status-badge.hold{ background:rgba(124,58,237,.12); color:var(--purple); }
+.uat-status-badge.reopen{ background:var(--gold-soft); color:#a97c22; }
+[data-theme="dark"] .uat-status-badge.not_started{ background:rgba(144,164,174,.18); color:var(--ink-faint); }
+[data-theme="dark"] .uat-status-badge.finish{ background:rgba(76,175,80,.16); color:var(--status-done); }
+[data-theme="dark"] .uat-status-badge.in_progress{ background:rgba(66,165,245,.16); color:var(--status-progress); }
+[data-theme="dark"] .uat-status-badge.hold{ background:rgba(124,58,237,.2); color:var(--purple); }
+[data-theme="dark"] .uat-status-badge.reopen{ background:rgba(201,154,59,.16); color:var(--gold); }
 
 /* Footer form UAT */
 .uat-form-footer{
@@ -3653,6 +3656,9 @@ body{
 }
 
 @media (max-width: 860px){
+  .qa-stats{ grid-template-columns:repeat(3,minmax(0,1fr)); }
+}
+@media (max-width: 600px){
   .qa-stats{ grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
 @media (max-width: 430px){
