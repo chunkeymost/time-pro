@@ -752,13 +752,42 @@ class JsonStorage {
       steps,
       expected: pick('expected'),
       actual: pick('actual'),
-      status: ['Pass', 'Fail', 'Blocked', 'Not Run', 'N/A'].includes(status) ? status : 'Not Run',
+      status: ['Pass', 'Fail', 'Blocked', 'In Progress', 'Not Run', 'N/A'].includes(status) ? status : 'Not Run',
       severity: ['', 'Critical', 'Major', 'Minor', 'Trivial'].includes(severity) ? severity : '',
-      defect: pick('defect'),
       tester: pick('tester'),
       date: pick('date').slice(0, 10),
       notes: pick('notes'),
+      bugs: this._normalizeUatBugs(
+        data.bugs !== undefined ? data.bugs : base.bugs
+      ),
     };
+  }
+
+  _normalizeUatBug(input, existing) {
+    const data = input || {};
+    const base = existing || {};
+    const pick = (key) => momString(data[key] !== undefined ? data[key] : base[key]).trim();
+    const severity = momString(data.severity !== undefined ? data.severity : base.severity).trim();
+    return {
+      id: pick('id'),
+      title: pick('title'),
+      severity: ['Critical', 'Major', 'Minor', 'Trivial'].includes(severity) ? severity : '',
+      date: pick('date').slice(0, 10),
+      notes: pick('notes'),
+    };
+  }
+
+  _normalizeUatBugs(list) {
+    const src = Array.isArray(list) ? list : [];
+    const seen = new Set();
+    const out = [];
+    src.forEach(item => {
+      const bug = this._normalizeUatBug(item, null);
+      if (!bug.id || seen.has(bug.id)) return;
+      seen.add(bug.id);
+      out.push(bug);
+    });
+    return out;
   }
 
   _normalizeUatTestCases(list) {
@@ -858,6 +887,72 @@ class JsonStorage {
     const idx = uat.testCases.findIndex(t => t.id === tcId);
     if (idx === -1) return false;
     uat.testCases.splice(idx, 1);
+    uat.updatedAt = new Date().toISOString();
+    this._saveUat(data);
+    return true;
+  }
+
+  /* ---------- UAT test case bugs ---------- */
+  _nextUatBugId(uat) {
+    let max = 0;
+    (uat.testCases || []).forEach(tc => {
+      (tc.bugs || []).forEach(b => {
+        const m = /^BUG-(\d+)$/.exec(String(b.id || ''));
+        if (m) max = Math.max(max, parseInt(m[1], 10));
+      });
+    });
+    return 'BUG-' + String(max + 1).padStart(3, '0');
+  }
+
+  getUatTestCaseBugs(uatId, tcId) {
+    const data = this._loadUat();
+    const uat = data.uats.find(u => u.id === uatId);
+    if (!uat) return null;
+    const tc = (uat.testCases || []).find(t => t.id === tcId);
+    if (!tc) return null;
+    return Array.isArray(tc.bugs) ? tc.bugs : [];
+  }
+
+  createUatTestCaseBug(uatId, tcId, input) {
+    const data = this._loadUat();
+    const uat = data.uats.find(u => u.id === uatId);
+    if (!uat) return null;
+    const tc = (uat.testCases || []).find(t => t.id === tcId);
+    if (!tc) return null;
+    if (!Array.isArray(tc.bugs)) tc.bugs = [];
+    const bug = this._normalizeUatBug(input, null);
+    bug.id = this._nextUatBugId(uat); // auto-ID per UAT: BUG-001, BUG-002, ...
+    tc.bugs.push(bug);
+    uat.updatedAt = new Date().toISOString();
+    this._saveUat(data);
+    return bug;
+  }
+
+  updateUatTestCaseBug(uatId, tcId, bugId, input) {
+    const data = this._loadUat();
+    const uat = data.uats.find(u => u.id === uatId);
+    if (!uat) return null;
+    const tc = (uat.testCases || []).find(t => t.id === tcId);
+    if (!tc || !Array.isArray(tc.bugs)) return null;
+    const idx = tc.bugs.findIndex(b => b.id === bugId);
+    if (idx === -1) return null;
+    // ID tidak dapat diubah saat edit
+    const merged = this._normalizeUatBug({ ...input, id: tc.bugs[idx].id }, tc.bugs[idx]);
+    tc.bugs[idx] = merged;
+    uat.updatedAt = new Date().toISOString();
+    this._saveUat(data);
+    return merged;
+  }
+
+  deleteUatTestCaseBug(uatId, tcId, bugId) {
+    const data = this._loadUat();
+    const uat = data.uats.find(u => u.id === uatId);
+    if (!uat) return false;
+    const tc = (uat.testCases || []).find(t => t.id === tcId);
+    if (!tc || !Array.isArray(tc.bugs)) return false;
+    const idx = tc.bugs.findIndex(b => b.id === bugId);
+    if (idx === -1) return false;
+    tc.bugs.splice(idx, 1);
     uat.updatedAt = new Date().toISOString();
     this._saveUat(data);
     return true;

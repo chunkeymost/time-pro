@@ -1185,6 +1185,74 @@ body{
 [data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator{
   filter:invert(1);
 }
+/* ---------- QA Sidepeek — styling input khusus per modal ---------- */
+#uat-form-overlay .field input[type="text"],
+#uat-form-overlay .field input[type="date"],
+#uat-form-overlay .field select{
+  border-color:var(--status-progress);
+}
+#uat-form-overlay .field input:focus,
+#uat-form-overlay .field select:focus{
+  outline-color:var(--status-progress);
+}
+
+#tc-form-overlay .field input[type="text"],
+#tc-form-overlay .field input[type="date"],
+#tc-form-overlay .field select{
+  border-color:var(--purple);
+}
+#tc-form-overlay .field input:focus,
+#tc-form-overlay .field select:focus{
+  outline-color:var(--purple);
+}
+
+#bug-form-overlay .field input[type="text"],
+#bug-form-overlay .field input[type="date"],
+#bug-form-overlay .field select{
+  border-color:var(--status-risk);
+}
+#bug-form-overlay .field input:focus,
+#bug-form-overlay .field select:focus{
+  outline-color:var(--status-risk);
+}
+
+/* Textarea di sidepeek QA */
+#tc-form-overlay .field textarea,
+#bug-form-overlay .field textarea{
+  background:var(--paper);
+  border:1px solid var(--paper-line-strong);
+  border-radius:7px;
+  padding:9px 10px;
+  font-size:13.5px;
+  font-family:'Inter', sans-serif;
+  color:var(--ink);
+  width:100%;
+}
+#tc-form-overlay .field textarea:focus{
+  outline:2px solid var(--purple);
+  outline-offset:1px;
+}
+#bug-form-overlay .field textarea:focus{
+  outline:2px solid var(--status-risk);
+  outline-offset:1px;
+}
+#tc-form-overlay #tc-steps{
+  font-family:'IBM Plex Mono', monospace;
+  font-size:12.5px;
+  line-height:1.6;
+  min-height:96px;
+  resize:vertical;
+  background:var(--gold-soft);
+}
+#tc-form-overlay #tc-notes{
+  min-height:54px;
+  resize:vertical;
+}
+#bug-form-overlay #bug-notes{
+  min-height:96px;
+  resize:vertical;
+  background:rgba(181,72,47,.05);
+}
 .row-2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 .range-row{ display:flex; align-items:center; gap:10px; }
 .range-row input[type=range]{ flex:1; accent-color:var(--ink); }
@@ -3729,6 +3797,7 @@ body{
   --up-pass:var(--status-done);
   --up-fail:var(--status-risk);
   --up-blocked:var(--gold);
+  --up-progress:var(--status-progress);
   --up-notrun:var(--status-planned);
   --up-na:var(--ink-faint);
 }
@@ -3736,7 +3805,7 @@ body{
 /* KPI */
 .up-kpis{
   display:grid;
-  grid-template-columns:repeat(4,minmax(0,1fr));
+  grid-template-columns:repeat(3,minmax(0,1fr));
   gap:12px;
   margin-bottom:16px;
 }
@@ -3970,6 +4039,7 @@ body{
 .up-status-btn.s-Pass{ color:var(--status-done); }
 .up-status-btn.s-Fail{ color:var(--status-risk); }
 .up-status-btn.s-Blocked{ color:var(--gold); }
+.up-status-btn.s-InProgress{ color:var(--status-progress); }
 .up-status-btn.s-NotRun{ color:var(--status-planned); }
 .up-status-btn.s-NA{ color:var(--ink-soft); }
 .up-status-btn.active{
@@ -3993,11 +4063,13 @@ body{
 .up-tc-badge.s-Pass{ background:rgba(63,143,99,.13); color:var(--status-done); }
 .up-tc-badge.s-Fail{ background:rgba(217,48,37,.12); color:var(--status-risk); }
 .up-tc-badge.s-Blocked{ background:var(--gold-soft); color:#a97c22; }
+.up-tc-badge.s-InProgress{ background:rgba(47,107,163,.12); color:var(--status-progress); }
 .up-tc-badge.s-NotRun{ background:rgba(139,156,179,.15); color:var(--ink-faint); }
 .up-tc-badge.s-NA{ background:rgba(137,150,168,.12); color:var(--ink-soft); }
 [data-theme="dark"] .up-tc-badge.s-Pass{ background:rgba(76,175,80,.16); color:var(--status-done); }
 [data-theme="dark"] .up-tc-badge.s-Fail{ background:rgba(248,113,113,.16); color:var(--status-risk); }
 [data-theme="dark"] .up-tc-badge.s-Blocked{ background:rgba(201,154,59,.16); color:var(--gold); }
+[data-theme="dark"] .up-tc-badge.s-InProgress{ background:rgba(66,165,245,.16); color:var(--status-progress); }
 [data-theme="dark"] .up-tc-badge.s-NotRun{ background:rgba(144,164,174,.18); color:var(--ink-faint); }
 [data-theme="dark"] .up-tc-badge.s-NA{ background:rgba(137,150,168,.14); color:var(--ink-soft); }
 
@@ -4027,6 +4099,121 @@ body{
   line-height:1.6;
 }
 .up-dgrid ol{ padding-left:18px; }
+
+/* Seksi Bug / Defect di baris detail */
+.up-bugsec{
+  margin-top:14px;
+  padding-top:12px;
+  border-top:1px dashed var(--paper-line-strong);
+}
+.up-bugsec-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:10px;
+}
+.up-bugsec-head h4{
+  margin:0;
+  font-size:10.5px;
+  letter-spacing:.05em;
+  text-transform:uppercase;
+  color:var(--ink-faint);
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.up-bugsec-count{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:20px;
+  padding:1px 7px;
+  border-radius:999px;
+  background:var(--gold-soft);
+  color:#a97c22;
+  font-family:'IBM Plex Mono', monospace;
+  font-size:10.5px;
+  font-weight:600;
+}
+[data-theme="dark"] .up-bugsec-count{ color:var(--gold); }
+.up-bugsec-add{ font-size:11px; padding:6px 12px; }
+.up-bugsec-list{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.up-bugsec-item{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:8px 12px;
+  background:var(--surface);
+  border:1px solid var(--paper-line);
+  border-radius:8px;
+}
+.up-bugsec-info{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  font-size:12.5px;
+  color:var(--ink);
+  min-width:0;
+}
+.up-bug-id{
+  font-family:'IBM Plex Mono', monospace;
+  font-size:11px;
+  font-weight:600;
+  color:#a97c22;
+  white-space:nowrap;
+}
+[data-theme="dark"] .up-bug-id{ color:var(--gold); }
+.up-bug-title{ font-weight:600; }
+.up-bug-date{
+  font-family:'IBM Plex Mono', monospace;
+  font-size:11px;
+  color:var(--ink-faint);
+  white-space:nowrap;
+}
+.up-bug-notes{
+  font-size:11.5px;
+  color:var(--ink-soft);
+  font-style:italic;
+}
+.up-bugsec-acts{
+  display:inline-flex;
+  gap:4px;
+  flex:none;
+}
+.up-bugsec-empty{
+  font-size:12px;
+  color:var(--ink-faint);
+  padding:4px 0;
+}
+
+/* Badge severity bug */
+.up-bug-badge{
+  display:inline-flex;
+  align-items:center;
+  padding:2px 7px;
+  border-radius:999px;
+  font-family:'IBM Plex Mono', monospace;
+  font-size:10px;
+  font-weight:600;
+  white-space:nowrap;
+}
+.up-bug-badge.sev-critical{ background:rgba(217,48,37,.12); color:var(--status-risk); }
+.up-bug-badge.sev-major{ background:var(--gold-soft); color:#a97c22; }
+.up-bug-badge.sev-minor{ background:rgba(47,107,163,.12); color:var(--status-progress); }
+.up-bug-badge.sev-trivial{ background:rgba(139,156,179,.15); color:var(--ink-faint); }
+.up-bug-badge.sev-none{ background:rgba(137,150,168,.12); color:var(--ink-soft); }
+[data-theme="dark"] .up-bug-badge.sev-critical{ background:rgba(248,113,113,.16); color:var(--status-risk); }
+[data-theme="dark"] .up-bug-badge.sev-major{ background:rgba(201,154,59,.16); color:var(--gold); }
+[data-theme="dark"] .up-bug-badge.sev-minor{ background:rgba(66,165,245,.16); color:var(--status-progress); }
+[data-theme="dark"] .up-bug-badge.sev-trivial{ background:rgba(144,164,174,.18); color:var(--ink-faint); }
+[data-theme="dark"] .up-bug-badge.sev-none{ background:rgba(137,150,168,.14); color:var(--ink-soft); }
 
 .up-table tbody td.up-tc-empty{
   text-align:center;

@@ -494,6 +494,7 @@
             <option>Pass</option>
             <option>Fail</option>
             <option>Blocked</option>
+            <option>In Progress</option>
             <option selected>Not Run</option>
             <option>N/A</option>
           </select>
@@ -511,17 +512,13 @@
       </div>
       <div class="row-2">
         <div class="field">
-          <label for="tc-defect">Defect ID</label>
-          <input type="text" id="tc-defect" placeholder="cth. BUG-001">
-        </div>
-        <div class="field">
           <label for="tc-tester">Tester</label>
           <input type="text" id="tc-tester" placeholder="cth. Asep">
         </div>
-      </div>
-      <div class="field">
-        <label for="tc-date">Tanggal</label>
-        <input type="date" id="tc-date">
+        <div class="field">
+          <label for="tc-date">Tanggal</label>
+          <input type="date" id="tc-date">
+        </div>
       </div>
       <div class="field">
         <label for="tc-notes">Catatan</label>
@@ -533,6 +530,51 @@
       <div class="uat-form-footer-right">
         <button type="button" class="btn btn-ghost" id="tc-cancel-btn">Batal</button>
         <button type="button" class="btn btn-primary" id="tc-save-btn">Simpan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bug form sidepeek (relasi per test case) -->
+<div class="overlay" id="bug-form-overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="bug-form-title">Tambah Bug</h2>
+      <button class="modal-close" id="bug-form-close">&times;</button>
+    </div>
+    <div class="modal-sub" id="bug-form-sub">Lengkapi detail bug.</div>
+
+    <form id="bug-form" autocomplete="off" novalidate>
+      <div class="field">
+        <label for="bug-title">Judul Bug *</label>
+        <input type="text" id="bug-title" placeholder="cth. Aplikasi crash saat upload file besar">
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label for="bug-severity">Severity</label>
+          <select id="bug-severity">
+            <option value="">(tidak ada)</option>
+            <option>Critical</option>
+            <option>Major</option>
+            <option>Minor</option>
+            <option>Trivial</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="bug-date">Tanggal</label>
+          <input type="date" id="bug-date">
+        </div>
+      </div>
+      <div class="field">
+        <label for="bug-notes">Catatan</label>
+        <textarea id="bug-notes" rows="3" placeholder="Deskripsi detail, langkah reproduksi, dampak (opsional)"></textarea>
+      </div>
+    </form>
+
+    <div class="uat-form-footer">
+      <div class="uat-form-footer-right">
+        <button type="button" class="btn btn-ghost" id="bug-cancel-btn">Batal</button>
+        <button type="button" class="btn btn-primary" id="bug-save-btn">Simpan</button>
       </div>
     </div>
   </div>

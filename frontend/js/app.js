@@ -3337,15 +3337,16 @@
   }
 
   /* ---------------- Proses UAT (test case dashboard) ---------------- */
-  const TC_STATUSES = ['Pass', 'Fail', 'Blocked', 'Not Run', 'N/A'];
+  const TC_STATUSES = ['Pass', 'Fail', 'Blocked', 'In Progress', 'Not Run', 'N/A'];
   const TC_PRIORITIES = ['Critical', 'High', 'Medium', 'Low'];
   const TC_TYPES = ['Functional', 'Negative', 'Boundary / Functional'];
   const TC_SEVERITIES = ['', 'Critical', 'Major', 'Minor', 'Trivial'];
-  const TC_STATUS_CLASS = { 'Pass': 's-Pass', 'Fail': 's-Fail', 'Blocked': 's-Blocked', 'Not Run': 's-NotRun', 'N/A': 's-NA' };
+  const TC_STATUS_CLASS = { 'Pass': 's-Pass', 'Fail': 's-Fail', 'Blocked': 's-Blocked', 'In Progress': 's-InProgress', 'Not Run': 's-NotRun', 'N/A': 's-NA' };
   const TC_STATUS_ICON = {
     'Pass': 'bi-check-circle-fill',
     'Fail': 'bi-x-circle-fill',
     'Blocked': 'bi-slash-circle-fill',
+    'In Progress': 'bi-arrow-repeat',
     'Not Run': 'bi-circle',
     'N/A': 'bi-dash-circle'
   };
@@ -3353,9 +3354,12 @@
     'Pass': 'var(--up-pass)',
     'Fail': 'var(--up-fail)',
     'Blocked': 'var(--up-blocked)',
+    'In Progress': 'var(--up-progress)',
     'Not Run': 'var(--up-notrun)',
     'N/A': 'var(--up-na)'
   };
+  const BUG_SEVERITY_CLASS = { 'Critical': 'sev-critical', 'Major': 'sev-major', 'Minor': 'sev-minor', 'Trivial': 'sev-trivial' };
+  const upBugSeverityClass = (sev) => BUG_SEVERITY_CLASS[sev] || 'sev-none';
 
   let activeUatId = null;
   let upTestCases = [];
@@ -3363,6 +3367,8 @@
   let upIdTouched = false;
   let upOpenRows = new Set();
   let upFilter = { q: '', module: '', status: '', priority: '' };
+  let upBugTcId = null;
+  let upBugEditingId = null;
 
   const upEsc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const upPct = (n, d) => d ? Math.round(n / d * 100) : 0;
@@ -3371,7 +3377,7 @@
     const m = {};
     list.forEach(t => {
       const k = keyFn(t);
-      m[k] = m[k] || { total: 0, Pass: 0, Fail: 0, Blocked: 0, 'Not Run': 0, 'N/A': 0 };
+      m[k] = m[k] || { total: 0, Pass: 0, Fail: 0, Blocked: 0, 'In Progress': 0, 'Not Run': 0, 'N/A': 0 };
       m[k].total++;
       if(m[k][t.status] !== undefined) m[k][t.status]++;
     });
@@ -3387,9 +3393,11 @@
   function renderUatProcessPage(){
     const list = upTestCases;
     const total = list.length;
-    const c = upCounts(list, () => 'all').all || { total: 0, Pass: 0, Fail: 0, Blocked: 0, 'Not Run': 0, 'N/A': 0 };
-    const executed = total - c['Not Run'] - c['N/A'];
-    const bugs = list.filter(t => t.defect || t.status === 'Fail');
+    const c = upCounts(list, () => 'all').all || { total: 0, Pass: 0, Fail: 0, Blocked: 0, 'In Progress': 0, 'Not Run': 0, 'N/A': 0 };
+    // In Progress belum dihitung selesai dieksekusi → Pass Rate = Pass / (Pass+Fail+Blocked)
+    const executed = c.Pass + c.Fail + c.Blocked;
+    const bugRecords = [];
+    list.forEach(t => (t.bugs || []).forEach(b => bugRecords.push({ tc: t, bug: b })));
 
     // KPI cards
     const kpiEl = document.getElementById('up-kpis');
@@ -3399,9 +3407,10 @@
         ['Pass', c.Pass, upPct(c.Pass, total) + '%', 'Pass'],
         ['Fail', c.Fail, upPct(c.Fail, total) + '%', 'Fail'],
         ['Blocked', c.Blocked, upPct(c.Blocked, total) + '%', 'Blocked'],
+        ['In Progress', c['In Progress'], upPct(c['In Progress'], total) + '%', 'In Progress'],
         ['Not Run', c['Not Run'], upPct(c['Not Run'], total) + '%', 'Not Run'],
         ['N/A', c['N/A'], upPct(c['N/A'], total) + '%', 'N/A'],
-        ['Bug / Defect', bugs.length, 'dari test Fail / Defect ID', null],
+        ['Bug / Defect', bugRecords.length, 'dari seluruh test case', null],
         ['Pass Rate', upPct(c.Pass, executed) + '%', executed + ' test dieksekusi', null],
       ];
       kpiEl.innerHTML = items.map(([label, val, pctText, status]) => `
@@ -3434,18 +3443,18 @@
     const donutLegend = document.getElementById('up-donut-legend');
     if(donutLegend) donutLegend.innerHTML = TC_STATUSES.map(s => `<span><i style="background:${TC_STATUS_COLOR[s]}"></i>${s}: <b>${c[s]}</b></span>`).join('');
 
-    // Bugs panel
+    // Bugs panel (dari record bug relasi, bukan turunan status)
     const bugsEl = document.getElementById('up-bugs');
     if(bugsEl){
-      bugsEl.innerHTML = bugs.length ? bugs.map(t => `
+      bugsEl.innerHTML = bugRecords.length ? bugRecords.map(({ tc, bug }) => `
         <div class="up-bug">
           <div>
-            <b>${upEsc(t.defect || '(belum ada Defect ID)')}</b> · ${upEsc(t.id)}
-            <div class="up-bug-sub">${upEsc(t.scenario)}</div>
+            <b>${upEsc(bug.title)}</b> · ${upEsc(tc.id)}
+            <div class="up-bug-sub">${upEsc(bug.notes || '—')}</div>
           </div>
           <div class="up-bug-right">
-            <span class="up-tc-badge ${TC_STATUS_CLASS[t.status] || ''}">${upEsc(t.status)}</span>
-            <div class="up-bug-sub">${upEsc(t.severity || 'severity –')}</div>
+            <span class="up-bug-badge ${upBugSeverityClass(bug.severity)}">${upEsc(bug.severity || 'severity –')}</span>
+            <div class="up-bug-sub">${upEsc(bug.id)}${bug.date ? ' · ' + upEsc(bug.date) : ''}</div>
           </div>
         </div>`).join('') : '<div class="up-empty-note">Belum ada bug tercatat 🎉</div>';
     }
@@ -3510,7 +3519,7 @@
       (!upFilter.module || t.module === upFilter.module) &&
       (!upFilter.status || t.status === upFilter.status) &&
       (!upFilter.priority || t.priority === upFilter.priority) &&
-      (!q || [t.id, t.feature, t.scenario, t.module, t.notes, t.defect, t.tester].join(' ').toLowerCase().includes(q))
+      (!q || [t.id, t.feature, t.scenario, t.module, t.notes, t.tester].join(' ').toLowerCase().includes(q))
     );
   }
 
@@ -3546,17 +3555,39 @@
         </td>
       </tr>`;
       if(upOpenRows.has(t.id)){
-        h += `<tr class="up-detail"><td colspan="9"><div class="up-dgrid">
-          <div><h4>Requirement</h4><p>${upEsc(t.req) || '–'}</p></div>
-          <div><h4>Precondition</h4><p>${upEsc(t.pre) || '–'}</p></div>
-          <div><h4>Test Data</h4><p>${upEsc(t.data) || '–'}</p></div>
-          <div><h4>Langkah</h4><ol>${(t.steps || []).map(x => `<li>${upEsc(String(x).replace(/^\s*\d+[.)]\s*/, ''))}</li>`).join('')}</ol></div>
-          <div><h4>Expected Result</h4><p>${upEsc(t.expected) || '–'}</p></div>
-          <div><h4>Actual Result</h4><p>${upEsc(t.actual) || '–'}</p></div>
-          <div><h4>Tester / Tanggal</h4><p>${upEsc(t.tester) || '–'}${t.date ? ' · ' + upEsc(t.date) : ''}</p></div>
-          <div><h4>Defect / Severity</h4><p>${upEsc(t.defect) || '–'}${t.severity ? ' · ' + upEsc(t.severity) : ''}</p></div>
-          <div><h4>Catatan</h4><p>${upEsc(t.notes) || '–'}</p></div>
-        </div></td></tr>`;
+        const tcBugs = t.bugs || [];
+        h += `<tr class="up-detail"><td colspan="9">
+          <div class="up-dgrid">
+            <div><h4>Requirement</h4><p>${upEsc(t.req) || '–'}</p></div>
+            <div><h4>Precondition</h4><p>${upEsc(t.pre) || '–'}</p></div>
+            <div><h4>Test Data</h4><p>${upEsc(t.data) || '–'}</p></div>
+            <div><h4>Langkah</h4><ol>${(t.steps || []).map(x => `<li>${upEsc(String(x).replace(/^\s*\d+[.)]\s*/, ''))}</li>`).join('')}</ol></div>
+            <div><h4>Expected Result</h4><p>${upEsc(t.expected) || '–'}</p></div>
+            <div><h4>Actual Result</h4><p>${upEsc(t.actual) || '–'}</p></div>
+            <div><h4>Tester / Tanggal</h4><p>${upEsc(t.tester) || '–'}${t.date ? ' · ' + upEsc(t.date) : ''}</p></div>
+            <div><h4>Catatan</h4><p>${upEsc(t.notes) || '–'}</p></div>
+          </div>
+          <div class="up-bugsec">
+            <div class="up-bugsec-head">
+              <h4>Bug / Defect <span class="up-bugsec-count">${tcBugs.length}</span></h4>
+              <button type="button" class="btn btn-primary up-bugsec-add" data-tc-action="add-bug" data-id="${upEsc(t.id)}"><i class="bi bi-bug"></i> TAMBAH BUG</button>
+            </div>
+            ${tcBugs.length ? `<div class="up-bugsec-list">${tcBugs.map(b => `
+              <div class="up-bugsec-item">
+                <div class="up-bugsec-info">
+                  <span class="up-bug-id">${upEsc(b.id)}</span>
+                  <span class="up-bug-title">${upEsc(b.title)}</span>
+                  <span class="up-bug-badge ${upBugSeverityClass(b.severity)}">${upEsc(b.severity || 'severity –')}</span>
+                  ${b.date ? `<span class="up-bug-date">${upEsc(b.date)}</span>` : ''}
+                  ${b.notes ? `<span class="up-bug-notes">${upEsc(b.notes)}</span>` : ''}
+                </div>
+                <div class="up-bugsec-acts">
+                  <button type="button" class="qa-icon-btn" data-tc-action="edit-bug" data-id="${upEsc(t.id)}" data-bug-id="${upEsc(b.id)}" title="Edit bug"><i class="bi bi-pencil"></i></button>
+                  <button type="button" class="qa-icon-btn danger" data-tc-action="delete-bug" data-id="${upEsc(t.id)}" data-bug-id="${upEsc(b.id)}" title="Hapus bug"><i class="bi bi-trash"></i></button>
+                </div>
+              </div>`).join('')}</div>` : '<div class="up-bugsec-empty">Belum ada bug pada test case ini.</div>'}
+          </div>
+        </td></tr>`;
       }
       return h;
     }).join('') : '<tr><td colspan="9" class="up-tc-empty">Tidak ada test case yang cocok dengan filter.</td></tr>';
@@ -3668,7 +3699,6 @@
       upSetVal('tc-actual', tc.actual);
       upSetVal('tc-status', TC_STATUSES.includes(tc.status) ? tc.status : 'Not Run');
       upSetVal('tc-severity', TC_SEVERITIES.includes(tc.severity) ? tc.severity : '');
-      upSetVal('tc-defect', tc.defect);
       upSetVal('tc-tester', tc.tester);
       upSetVal('tc-date', tc.date);
       upSetVal('tc-notes', tc.notes);
@@ -3687,7 +3717,6 @@
       upSetVal('tc-actual', '');
       upSetVal('tc-status', 'Not Run');
       upSetVal('tc-severity', '');
-      upSetVal('tc-defect', '');
       upSetVal('tc-tester', '');
       upSetVal('tc-date', '');
       upSetVal('tc-notes', '');
@@ -3733,7 +3762,6 @@
       actual: get('tc-actual'),
       status: upVal('tc-status'),
       severity: upVal('tc-severity'),
-      defect: get('tc-defect'),
       tester: get('tc-tester'),
       date: get('tc-date'),
       notes: get('tc-notes'),
@@ -3823,6 +3851,82 @@
     }
   }
 
+  /* ---------- Bug (relasi per test case) ---------- */
+  function openBugForm(tcId, bugId){
+    const tc = upTestCases.find(t => t.id === tcId);
+    if(!tc){
+      showToast('Test case tidak ditemukan.', 'error');
+      return;
+    }
+    const bug = bugId ? (tc.bugs || []).find(b => b.id === bugId) : null;
+    if(bugId && !bug){
+      showToast('Bug tidak ditemukan.', 'error');
+      return;
+    }
+    upBugTcId = tcId;
+    upBugEditingId = bugId || null;
+    document.getElementById('bug-form-title').textContent = bug ? 'Edit Bug' : 'Tambah Bug';
+    document.getElementById('bug-form-sub').textContent = bug
+      ? `${bug.id} — test case ${tcId} · ID tidak dapat diubah`
+      : `Test case ${tcId} · ID bug dibuat otomatis (BUG-NNN)`;
+    upSetVal('bug-title', bug ? bug.title : '');
+    upSetVal('bug-severity', bug && TC_SEVERITIES.includes(bug.severity) ? bug.severity : '');
+    upSetVal('bug-date', bug ? bug.date : upToday());
+    upSetVal('bug-notes', bug ? bug.notes : '');
+    document.getElementById('bug-form-overlay').classList.add('open');
+    setTimeout(() => upFocusField('bug-title'), 80);
+  }
+
+  function closeBugForm(){
+    const overlay = document.getElementById('bug-form-overlay');
+    if(overlay) overlay.classList.remove('open');
+    upBugTcId = null;
+    upBugEditingId = null;
+  }
+
+  async function saveBug(){
+    const tcId = upBugTcId;
+    const rec = {
+      title: upVal('bug-title').trim(),
+      severity: upVal('bug-severity'),
+      date: upVal('bug-date'),
+      notes: upVal('bug-notes').trim(),
+    };
+    if(!rec.title){
+      showToast('Judul bug wajib diisi.', 'error');
+      upFocusField('bug-title');
+      return;
+    }
+    const isEdit = !!upBugEditingId;
+    try {
+      const saved = isEdit
+        ? await api.put(`/api/uat/${activeUatId}/test-cases/${encodeURIComponent(tcId)}/bugs/${encodeURIComponent(upBugEditingId)}`, rec)
+        : await api.post(`/api/uat/${activeUatId}/test-cases/${encodeURIComponent(tcId)}/bugs`, rec);
+      closeBugForm();
+      await loadUatTestCases();
+      const bugId = saved && saved.bug ? saved.bug.id : '';
+      showToast(isEdit ? `Bug ${bugId} diperbarui.` : `Bug ${bugId} ditambahkan ke ${tcId}.`);
+    } catch(err){
+      showToast(uatErrorMessage(err, 'Gagal menyimpan bug'), 'error');
+    }
+  }
+
+  async function deleteBug(tcId, bugId){
+    const confirmed = await showConfirm(
+      `Yakin ingin menghapus bug <strong>${escapeHtml(bugId)}</strong>?`,
+      'Ya, Hapus',
+      'Batal'
+    );
+    if(!confirmed) return;
+    try {
+      await api.del(`/api/uat/${activeUatId}/test-cases/${encodeURIComponent(tcId)}/bugs/${encodeURIComponent(bugId)}`);
+      await loadUatTestCases();
+      showToast(`Bug ${bugId} dihapus.`);
+    } catch(err){
+      showToast(uatErrorMessage(err, 'Gagal menghapus bug'), 'error');
+    }
+  }
+
   function upDownload(name, text, type){
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([text], { type }));
@@ -3833,11 +3937,11 @@
 
   function upExportCsv(){
     const list = upFiltered();
-    const header = ['id', 'module', 'feature', 'scenario', 'type', 'priority', 'status', 'severity', 'defect', 'tester', 'date', 'actual'];
+    const header = ['id', 'module', 'feature', 'scenario', 'type', 'priority', 'status', 'severity', 'tester', 'date', 'actual', 'bugs'];
     const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
     upDownload(
       'uat-test-cases-' + activeUatId + '.csv',
-      [header.join(',')].concat(list.map(t => header.map(k => q(t[k])).join(','))).join('\n'),
+      [header.join(',')].concat(list.map(t => header.map(k => q(k === 'bugs' ? (t.bugs || []).length : t[k])).join(','))).join('\n'),
       'text/csv'
     );
     showToast(`${list.length} test case diekspor ke CSV.`);
@@ -3905,6 +4009,9 @@
         if(action === 'status') changeTcStatus(id, actionBtn.dataset.status);
         else if(action === 'edit') openTcForm(id);
         else if(action === 'delete') deleteTc(id);
+        else if(action === 'add-bug') openBugForm(id, null);
+        else if(action === 'edit-bug') openBugForm(id, actionBtn.dataset.bugId);
+        else if(action === 'delete-bug') deleteBug(id, actionBtn.dataset.bugId);
         return;
       }
       const tr = e.target.closest('tr.up-tc');
@@ -3929,6 +4036,20 @@
     const form = document.getElementById('tc-form');
     if(form) form.addEventListener('submit', (e) => { e.preventDefault(); saveTc(); });
 
+    // Form bug (relasi test case)
+    const bugCloseBtn = document.getElementById('bug-form-close');
+    if(bugCloseBtn) bugCloseBtn.addEventListener('click', closeBugForm);
+    const bugCancelBtn = document.getElementById('bug-cancel-btn');
+    if(bugCancelBtn) bugCancelBtn.addEventListener('click', closeBugForm);
+    const bugOverlay = document.getElementById('bug-form-overlay');
+    if(bugOverlay) bugOverlay.addEventListener('click', (e) => {
+      if(e.target === bugOverlay) closeBugForm();
+    });
+    const bugSaveBtn = document.getElementById('bug-save-btn');
+    if(bugSaveBtn) bugSaveBtn.addEventListener('click', saveBug);
+    const bugForm = document.getElementById('bug-form');
+    if(bugForm) bugForm.addEventListener('submit', (e) => { e.preventDefault(); saveBug(); });
+
     // Auto-ID saat mengetik module (sampai user menyentuh field ID)
     const moduleInput = document.getElementById('tc-module');
     if(moduleInput) moduleInput.addEventListener('input', () => {
@@ -3938,9 +4059,10 @@
     if(idInput) idInput.addEventListener('input', () => { if(!upEditingId) upIdTouched = true; });
 
     document.addEventListener('keydown', (e) => {
-      if(e.key === 'Escape' && document.getElementById('tc-form-overlay').classList.contains('open')){
-        closeTcForm();
-      }
+      if(e.key !== 'Escape') return;
+      // Form bug di atas form test case → tutup yang paling atas dulu
+      if(document.getElementById('bug-form-overlay').classList.contains('open')) closeBugForm();
+      else if(document.getElementById('tc-form-overlay').classList.contains('open')) closeTcForm();
     });
   }
 
