@@ -671,6 +671,7 @@ body{
   font-size:13px;
 }
 .breadcrumb-item.active:hover{ color:var(--ink); }
+.breadcrumb-item[data-view]{ cursor:pointer; }
 .breadcrumb-item i{ font-size:13px; }
 .breadcrumb-sep{
   display:inline-flex;
@@ -3771,23 +3772,6 @@ body{
 /* Tombol aksi "buka proses" di tabel UAT */
 .qa-icon-btn.process{ color:var(--gold); border-color:var(--gold-soft); background:var(--gold-soft); }
 .qa-icon-btn.process:hover{ color:#fff; border-color:var(--gold); background:var(--gold); }
-
-.up-back{
-  width:30px;
-  height:30px;
-  flex:none;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  border:1px solid var(--paper-line-strong);
-  border-radius:7px;
-  background:var(--surface);
-  color:var(--ink-soft);
-  cursor:pointer;
-  font-size:14px;
-  transition:all .15s;
-}
-.up-back:hover{ color:var(--gold); border-color:var(--gold); background:var(--gold-soft); }
 
 .uat-process-page{
   flex:1;

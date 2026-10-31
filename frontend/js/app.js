@@ -288,7 +288,7 @@
 
     if(currentView === 'qa'){
       els.breadcrumbCard.innerHTML = `
-        <span class="breadcrumb-item">
+        <span class="breadcrumb-item" data-view="dashboard">
           <i class="bi bi-house-door"></i>
           <span>Beranda</span>
         </span>
@@ -301,12 +301,12 @@
     if(currentView === 'uat-process'){
       const uat = uats.find(u => u.id === activeUatId);
       els.breadcrumbCard.innerHTML = `
-        <span class="breadcrumb-item">
+        <span class="breadcrumb-item" data-view="dashboard">
           <i class="bi bi-house-door"></i>
           <span>Beranda</span>
         </span>
         <span class="breadcrumb-sep"><i class="bi bi-chevron-right"></i></span>
-        <span class="breadcrumb-item">Quality Assurance</span>
+        <span class="breadcrumb-item" data-view="qa">Quality Assurance</span>
         <span class="breadcrumb-sep"><i class="bi bi-chevron-right"></i></span>
         <span class="breadcrumb-item active" aria-current="page">Proses UAT${uat ? ' — ' + escapeHtml(uat.title || '') : ''}</span>
       `;
@@ -773,6 +773,22 @@
         // Close mobile nav on click
         closeMobileNav();
       });
+    });
+
+    // Breadcrumb navigation (mis. kembali dari Proses UAT lewat breadcrumb)
+    els.breadcrumbCard.addEventListener('click', (e) => {
+      const item = e.target.closest('.breadcrumb-item');
+      if(!item) return;
+      if(item.classList.contains('active')) return;
+      const view = item.dataset.view;
+      if(!view || view === 'uat-process') return;
+      if(currentView === 'uat-process'){
+        activeUatId = null;
+        upTestCases = [];
+        upOpenRows.clear();
+        upFilter = { q:'', module:'', status:'', priority:'' };
+      }
+      setActiveView(view);
     });
 
     // Mobile nav toggle
@@ -3617,13 +3633,6 @@
     loadUatTestCases();
   }
 
-  function closeUatProcess(){
-    activeUatId = null;
-    upTestCases = [];
-    upOpenRows.clear();
-    setActiveView('qa');
-  }
-
   async function loadUatTestCases(){
     if(activeUatId === null) return;
     const tbody = document.getElementById('up-table-body');
@@ -3964,8 +3973,6 @@
   }
 
   function initUatProcess(){
-    const backBtn = document.getElementById('uat-process-back');
-    if(backBtn) backBtn.addEventListener('click', closeUatProcess);
     const addBtn = document.getElementById('up-add-btn');
     if(addBtn) addBtn.addEventListener('click', () => openTcForm(null));
     const csvBtn = document.getElementById('up-export-csv');
