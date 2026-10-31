@@ -26,6 +26,9 @@
     const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
     return `${y}-${m}-${day}`;
   }
+  function dateLabel(){
+    return fmt(today()).split('-').reverse().join('-');
+  }
   function parseDate(str){
     const parts = str.split('-').map(Number);
     if(parts.length!==3 || parts.some(isNaN)) return null;
@@ -65,12 +68,14 @@
   let view = "week"; // "week" | "month"
   let dayWidth = 40;
   let showFinished = localStorage.getItem('showFinished') !== 'false';
+  let modalSource = null; // 'notification' | 'sidebar' | 'new' | null
 
   const els = {
     title: document.getElementById('project-title'),
     range: document.getElementById('project-range'),
     legend: document.getElementById('legend'),
     overviewCards: document.getElementById('overview-cards'),
+    breadcrumbCard: document.getElementById('breadcrumb-card'),
     sidebarList: document.getElementById('sidebar-list'),
     ruler: document.getElementById('ruler'),
     rows: document.getElementById('rows'),
@@ -98,9 +103,14 @@
     todoSection: document.getElementById('todo-section'),
     bellBtn: document.getElementById('bell-btn'),
     bellDot: document.getElementById('bell-dot'),
+    holdBtn: document.getElementById('hold-btn'),
+    backBtn: document.getElementById('back-btn'),
     notifOverlay: document.getElementById('notif-overlay'),
-    notifBody: document.getElementById('notif-body'),
     notifSub: document.getElementById('notif-sub'),
+    notifHoldBody: document.getElementById('notif-hold-body'),
+    notifActiveBody: document.getElementById('notif-active-body'),
+    notifHoldCount: document.getElementById('notif-hold-count'),
+    notifActiveCount: document.getElementById('notif-active-count'),
     evidenceOverlay: document.getElementById('evidence-overlay'),
     evidenceBody: document.getElementById('evidence-body'),
     evidenceSub: document.getElementById('evidence-sub'),
@@ -116,6 +126,14 @@
     evidenceAddBtn: document.getElementById('evidence-add-btn'),
     evidenceLogSection: document.getElementById('evidence-log-section'),
     evidenceLogBody: document.getElementById('evidence-log-body'),
+    dailyTaskOverlay: document.getElementById('daily-task-overlay'),
+    dailyTaskTitle: document.getElementById('daily-task-title'),
+    dailyTaskCloseBtn: document.getElementById('daily-task-close-btn'),
+    dailyTaskContent: document.getElementById('daily-task-content'),
+    dailyTaskBody: document.getElementById('daily-task-body'),
+    dailyTaskChart: document.getElementById('daily-task-chart'),
+    dailyTaskLegend: document.getElementById('daily-task-legend'),
+    dailyTaskDragHandle: document.getElementById('daily-task-drag-handle'),
     imgPreviewOverlay: document.getElementById('img-preview-overlay'),
     imgPreviewImg: document.getElementById('img-preview-img'),
     reportOverlay: document.getElementById('report-overlay'),
@@ -132,6 +150,17 @@
     holSaveBtn: document.getElementById('hol-save-btn'),
     holCancelEditBtn: document.getElementById('hol-cancel-edit-btn'),
     holidayList: document.getElementById('holiday-list'),
+    dailyHistoryOverlay: document.getElementById('daily-history-overlay'),
+    dailyHistoryList: document.getElementById('daily-history-list'),
+    dailyHistoryCloseBtn: document.getElementById('daily-history-close-btn'),
+    navSidebar: document.getElementById('nav-sidebar'),
+    navMenu: document.getElementById('nav-menu'),
+    navToggle: document.getElementById('nav-toggle'),
+    navOverlay: document.getElementById('nav-sidebar-overlay'),
+    navItems: document.querySelectorAll('.nav-item'),
+    profileDropdown: document.getElementById('profile-dropdown'),
+    profileTrigger: document.getElementById('profile-trigger'),
+    profileMenu: document.getElementById('profile-menu'),
   };
 
   /* ---------------- API helper ---------------- */
@@ -158,6 +187,15 @@
     },
   };
 
+  async function saveTaskProgress(taskId, progress) {
+    try {
+      await api.put('/api/tasks/' + taskId, { progress });
+    } catch (e) {
+      console.error('Save task progress failed:', e);
+      showToast('Gagal menyimpan progress ke server', 'error');
+    }
+  }
+
   async function loadTasks(){
     try {
       const data = await api.get('/api/tasks');
@@ -172,7 +210,7 @@
       nextId = data.nextId;
       nextTodoId = data.nextTodoId;
       lastUpdated = data.metadata?.updatedAt || null;
-      if (data.metadata?.title) els.title.textContent = data.metadata.title;
+      if (data.metadata?.title && els.title) els.title.textContent = data.metadata.title;
       try {
         const holRes = await api.get('/api/holidays');
         holidays = (holRes.holidays || []).slice().sort((a,b) => a.start.localeCompare(b.start));
@@ -188,7 +226,7 @@
       alert('Gagal memuat data. Pastikan server API berjalan (node server.js).');
     }
     renderLegend();
-    renderAll(true);
+    renderViewContent(currentView);
     updateBellDot();
   }
 
@@ -223,11 +261,79 @@
   });
 
   /* ---------------- Overview Cards ---------------- */
+  function renderBreadcrumb(){
+    if(currentView === 'dashboard'){
+      els.breadcrumbCard.innerHTML = `
+        <span class="breadcrumb-item">
+          <i class="bi bi-house-door"></i>
+          <span>Beranda</span>
+        </span>
+        <span class="breadcrumb-sep"><i class="bi bi-chevron-right"></i></span>
+        <span class="breadcrumb-item active" aria-current="page">Dashboard</span>
+      `;
+      return;
+    }
+
+    if(currentView === 'mom'){
+      els.breadcrumbCard.innerHTML = `
+        <span class="breadcrumb-item">
+          <i class="bi bi-house-door"></i>
+          <span>Beranda</span>
+        </span>
+        <span class="breadcrumb-sep"><i class="bi bi-chevron-right"></i></span>
+        <span class="breadcrumb-item active" aria-current="page">Minutes of Meeting</span>
+      `;
+      return;
+    }
+
+    if(currentView === 'qa'){
+      els.breadcrumbCard.innerHTML = `
+        <span class="breadcrumb-item">
+          <i class="bi bi-house-door"></i>
+          <span>Beranda</span>
+        </span>
+        <span class="breadcrumb-sep"><i class="bi bi-chevron-right"></i></span>
+        <span class="breadcrumb-item active" aria-current="page">Quality Assurance</span>
+      `;
+      return;
+    }
+
+    if(currentView === 'uat-process'){
+      const uat = uats.find(u => u.id === activeUatId);
+      els.breadcrumbCard.innerHTML = `
+        <span class="breadcrumb-item">
+          <i class="bi bi-house-door"></i>
+          <span>Beranda</span>
+        </span>
+        <span class="breadcrumb-sep"><i class="bi bi-chevron-right"></i></span>
+        <span class="breadcrumb-item">Quality Assurance</span>
+        <span class="breadcrumb-sep"><i class="bi bi-chevron-right"></i></span>
+        <span class="breadcrumb-item active" aria-current="page">Proses UAT${uat ? ' — ' + escapeHtml(uat.title || '') : ''}</span>
+      `;
+      return;
+    }
+
+    const title = els.title?.textContent?.trim() || 'Timeframe';
+    els.breadcrumbCard.innerHTML = `
+      <span class="breadcrumb-item">
+        <i class="bi bi-house-door"></i>
+        <span>Beranda</span>
+      </span>
+      <span class="breadcrumb-sep"><i class="bi bi-chevron-right"></i></span>
+      <span class="breadcrumb-item">Proyek Management</span>
+      <span class="breadcrumb-sep"><i class="bi bi-chevron-right"></i></span>
+      <span class="breadcrumb-item active" aria-current="page">${escapeHtml(title)}</span>
+    `;
+  }
+
   function renderOverviewCards(){
     const totalTasks = tasks.length;
     const doneTasks = tasks.filter(t => t.progress === 100).length;
     const openTodos = tasks.reduce((sum, t) => sum + (t.todos||[]).filter(td => !td.done).length, 0);
     const overdueTasks = tasks.filter(t => t.progress < 100 && t.end && t.end < today()).length;
+    const heldTasks = tasks.filter(t => t.held === true).length;
+    const dailyTotal = dailyTasks.length;
+    const dailyDone = dailyTasks.filter(t => t.status === 'done').length;
 
     els.overviewCards.innerHTML = `
       <div class="overview-card">
@@ -254,7 +360,25 @@
           <div class="overview-sub">${overdueTasks > 0 ? 'Melewati batas waktu' : 'Tidak ada keterlambatan'}</div>
         </div>
       </div>
+      <div class="overview-card" id="card-task-hold">
+        <div class="overview-icon held"><i class="bi bi-pause-circle-fill"></i></div>
+        <div class="overview-body">
+          <div class="overview-num">${heldTasks}</div>
+          <div class="overview-label">Task Hold</div>
+          <div class="overview-sub">${heldTasks > 0 ? 'Sedang di-hold' : 'Tidak ada tugas di-hold'}</div>
+        </div>
+      </div>
+      <div class="overview-card" id="card-daily-task">
+        <div class="overview-icon daily"><i class="bi bi-calendar-day"></i></div>
+        <div class="overview-body">
+          <div class="overview-num">${dailyDone}/${dailyTotal}</div>
+          <div class="overview-label">Daily Task ${dateLabel()}</div>
+          <div class="overview-sub">${dailyDone} selesai dari ${dailyTotal} tugas</div>
+        </div>
+      </div>
     `;
+    const pulseActive = dailyTotal > 0 && dailyDone < dailyTotal;
+    document.getElementById('card-daily-task')?.classList.toggle('pulse-active', pulseActive);
   }
 
   /* ---------------- Legend ---------------- */
@@ -272,6 +396,9 @@
       `</label>` +
       `<button type="button" class="holiday-btn" id="holiday-manage-btn" title="Kelola Hari Libur">` +
         `Add Holiday` +
+      `</button>` +
+      `<button type="button" class="daily-history-btn" id="daily-history-btn" title="History Daily Task">` +
+        `History Daily` +
       `</button>`;
   }
 
@@ -387,7 +514,7 @@
 
     visibleTasks.forEach((t, idx) => {
       const bar = document.createElement('div');
-      bar.className = 'bar ' + (CATS[t.cat] ?? CATS.lainnya).cls;
+      bar.className = 'bar ' + (CATS[t.cat] ?? CATS.lainnya).cls + (t.held ? ' held' : '');
       bar.dataset.id = t.id;
       const left = dayDiff(range.start, t.start)*dayWidth;
       const width = (dayDiff(t.start,t.end)+1)*dayWidth - 4;
@@ -409,6 +536,13 @@
       pct.className='pct';
       pct.textContent = t.progress+'%';
       bar.appendChild(pct);
+
+      if (t.held) {
+        const holdBadge = document.createElement('span');
+        holdBadge.className = 'hold-badge';
+        holdBadge.innerHTML = '<i class="bi bi-pause-circle-fill"></i>';
+        bar.appendChild(holdBadge);
+      }
 
       const hLeft = document.createElement('div');
       hLeft.className='handle left';
@@ -494,12 +628,14 @@
       const row = document.createElement('div');
       const isDone = t.progress === 100;
       const isOverdue = !isDone && t.end && t.end < today();
-      row.className = 'sidebar-row' + (t.id===selectedId ? ' selected':'') + (isDone ? ' done':'') + (isOverdue ? ' overdue':'');
+      const isHeld = t.held === true;
+      row.className = 'sidebar-row' + (t.id===selectedId ? ' selected':'') + (isDone ? ' done':'') + (isOverdue ? ' overdue':'') + (isHeld ? ' held':'');
       row.innerHTML = `
         <div class="sidebar-row-top">
           <span class="name">${escapeHtml(t.name)}</span>
           ${isDone ? '<span class="done-flag">🏁</span>' : ''}
           ${isOverdue ? '<span class="overdue-flag"><i class="bi bi-bell-fill"></i></span>' : ''}
+          ${isHeld ? '<span class="held-flag"><i class="bi bi-pause-circle-fill"></i></span>' : ''}
         </div>
         <span class="meta"><span class="tag-dot ${(CATS[t.cat] ?? CATS.lainnya).cls}"></span>${(CATS[t.cat] ?? CATS.lainnya).label} · ${t.progress}% · ${countWeekdays(t.start,t.end)} Hari Pengerjaan</span>
       `;
@@ -525,6 +661,7 @@
 
   /* ---------------- Project range label ---------------- */
   function renderProjectRange(){
+    if(!els.range) return;
     if(tasks.length===0){ els.range.textContent='Belum ada tugas'; return; }
     let min=tasks[0].start, max=tasks[0].end;
     tasks.forEach(t=>{ if(t.start<min) min=t.start; if(t.end>max) max=t.end; });
@@ -589,6 +726,7 @@
     renderRows(range);
     renderSidebar();
     renderOverviewCards();
+    renderBreadcrumb();
     renderProjectRange();
     document.getElementById('backup-btn').disabled = tasks.length === 0;
     if(scrollToToday) scrollToTodayLine(range);
@@ -620,6 +758,191 @@
     renderAll(true);
   });
 
+  /* ---------------- Navigation ---------------- */
+  let currentView = 'dashboard';
+
+  function initNavigation(){
+    // Nav item clicks
+    els.navItems.forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        const view = item.dataset.view;
+        if(view && view !== currentView){
+          setActiveView(view);
+        }
+        // Close mobile nav on click
+        closeMobileNav();
+      });
+    });
+
+    // Mobile nav toggle
+    if(els.navToggle){
+      els.navToggle.addEventListener('click', toggleMobileNav);
+    }
+    if(els.navOverlay){
+      els.navOverlay.addEventListener('click', closeMobileNav);
+    }
+
+    // Show/hide nav toggle based on screen size
+    updateNavToggleVisibility();
+    window.addEventListener('resize', updateNavToggleVisibility);
+  }
+
+  /* ---------------- Profile Dropdown ---------------- */
+  function initProfileDropdown(){
+    if(!els.profileTrigger || !els.profileMenu || !els.profileDropdown) return;
+    
+    els.profileTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleProfileDropdown();
+    });
+    
+    // Close on click outside
+    document.addEventListener('click', (e) => {
+      if(els.profileDropdown && !els.profileDropdown.contains(e.target)){
+        closeProfileDropdown();
+      }
+    });
+    
+    // Close on ESC key
+    document.addEventListener('keydown', (e) => {
+      if(e.key === 'Escape'){
+        closeProfileDropdown();
+      }
+    });
+    
+    // Handle menu item clicks
+    if(els.profileMenu){
+      els.profileMenu.addEventListener('click', (e) => {
+        const item = e.target.closest('.profile-menu-item[data-action]');
+        if(!item) return;
+        
+        const action = item.dataset.action;
+        handleProfileAction(action);
+        closeProfileDropdown();
+      });
+    }
+  }
+
+  function toggleProfileDropdown(){
+    const isOpen = els.profileDropdown.classList.toggle('open');
+    els.profileTrigger.setAttribute('aria-expanded', isOpen);
+    if(isOpen){
+      els.profileMenu.hidden = false;
+    }else{
+      els.profileMenu.hidden = true;
+    }
+  }
+
+  function closeProfileDropdown(){
+    if(!els.profileDropdown) return;
+    els.profileDropdown.classList.remove('open');
+    els.profileTrigger.setAttribute('aria-expanded', 'false');
+    els.profileMenu.hidden = true;
+  }
+
+  function handleProfileAction(action){
+    switch(action){
+      case 'profile':
+        showToast('Profile feature coming soon', 'info');
+        break;
+      case 'settings':
+        showToast('Settings feature coming soon', 'info');
+        break;
+      case 'theme': {
+        const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        setTheme(next);
+        break;
+      }
+      case 'logout':
+        handleLogout();
+        break;
+    }
+  }
+
+  function handleLogout(){
+    showConfirm('Yakin ingin keluar?', 'Ya, Logout', 'Batal', 'confirm-yes').then(confirmed => {
+      if(confirmed){
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.reload();
+      }
+    });
+  }
+
+  function setActiveView(view){
+    currentView = view;
+    els.navItems.forEach(item => {
+      // Halaman proses UAT adalah sub-halaman dari Quality Assurance
+      const isActive = item.dataset.view === view || (view === 'uat-process' && item.dataset.view === 'qa');
+      item.classList.toggle('active', isActive);
+    });
+    
+    // Update header data attribute for CSS targeting (dashboard/uat cleanup)
+    const header = document.querySelector('.app-navbar');
+    if (header) {
+      header.setAttribute('data-view', view);
+    }
+    
+    renderViewContent(view);
+  }
+
+  function renderViewContent(view){
+    const mainContent = document.getElementById('app-main');
+    if(!mainContent) return;
+
+    // Toggle view visibility via CSS (see styles.css [data-active-view])
+    mainContent.setAttribute('data-active-view', view);
+
+    // Update breadcrumb path to match the active view
+    renderBreadcrumb();
+
+    // Remove any existing coming soon message
+    const existingSoon = document.getElementById('coming-soon-container');
+    if(existingSoon) existingSoon.remove();
+
+    if(view === 'projects'){
+      // Render the project management UI
+      renderAll(true);
+    }
+
+    if(view === 'mom'){
+      renderMomPage();
+    }
+
+    if(view === 'qa'){
+      renderQaPage();
+    }
+
+    if(view === 'uat-process'){
+      renderUatProcessPage();
+    }
+  }
+
+  function toggleMobileNav(){
+    els.navSidebar.classList.toggle('open');
+    els.navOverlay.classList.toggle('open');
+  }
+
+  function closeMobileNav(){
+    els.navSidebar.classList.remove('open');
+    els.navOverlay.classList.remove('open');
+  }
+
+  function updateNavToggleVisibility(){
+    const isMobile = window.innerWidth <= 480;
+    if(els.navToggle){
+      els.navToggle.style.display = isMobile ? 'inline-flex' : 'none';
+    }
+    if(!isMobile){
+      closeMobileNav();
+    }
+  }
+
+  // Initialize navigation
+  initNavigation();
+  initProfileDropdown();
+
   /* ---------------- Toggle finished tasks ---------------- */
   document.getElementById('legend').addEventListener('change', (e)=>{
     if(e.target.id === 'toggle-finished'){
@@ -630,6 +953,7 @@
   });
   document.getElementById('legend').addEventListener('click', (e)=>{
     if(e.target.closest('#holiday-manage-btn')) openHolidayModal();
+    if(e.target.closest('#daily-history-btn')) openDailyHistoryModal();
   });
 
   /* ---------------- Holiday management ---------------- */
@@ -762,6 +1086,69 @@
   document.getElementById('holiday-close-btn').addEventListener('click', closeHolidayModal);
   els.holidayOverlay.addEventListener('click', (e)=>{ if(e.target===els.holidayOverlay) closeHolidayModal(); });
 
+  /* ---------------- Daily history modal ---------------- */
+  const DAILY_STATUS_LABEL = { not_start:'Not Start', hold:'Hold', in_progress:'In Progress', done:'Done', stopped:'Stop' };
+
+  function openDailyHistoryModal(){
+    els.dailyHistoryOverlay.classList.add('open');
+    loadDailyHistory();
+  }
+  function closeDailyHistoryModal(){
+    els.dailyHistoryOverlay.classList.remove('open');
+  }
+
+  async function loadDailyHistory(){
+    els.dailyHistoryList.innerHTML = '<div class="daily-history-empty">Memuat history...</div>';
+    let history = [];
+    try {
+      const res = await api.get('/api/daily-tasks/history');
+      history = res.history || [];
+    } catch(err){
+      console.error('Failed to load daily history:', err);
+      els.dailyHistoryList.innerHTML = '<div class="daily-history-empty">Gagal memuat history daily task.</div>';
+      return;
+    }
+    renderDailyHistory(history);
+  }
+
+  function renderDailyHistory(history){
+    if(!history.length){
+      els.dailyHistoryList.innerHTML = '<div class="daily-history-empty">Belum ada history daily task.</div>';
+      return;
+    }
+
+    els.dailyHistoryList.innerHTML = history.map((snap, idx) => {
+      const rows = snap.dailyTasks || [];
+      const done = rows.filter(r => (r.status||'not_start') === 'done').length;
+      const items = rows.map(r => {
+        const st = r.status || 'not_start';
+        const label = DAILY_STATUS_LABEL[st] || st;
+        return `<div class="daily-history-item">` +
+          `<span class="daily-history-item-name">${escapeHtml(r.taskName || '')}</span>` +
+          `<span class="status-badge ${st}">${label}</span>` +
+        `</div>`;
+      }).join('') || '<div class="daily-history-empty">Tidak ada task pada tanggal ini.</div>';
+
+      return `<div class="daily-history-day" data-idx="${idx}">` +
+        `<div class="daily-history-day-head">` +
+          `<i class="bi bi-chevron-right daily-history-chevron"></i>` +
+          `<i class="bi bi-calendar-day daily-history-cal"></i>` +
+          `<span class="daily-history-date">${fmtDisplayDate(snap.date || '')}</span>` +
+          `<span class="daily-history-day-summary">${done}/${rows.length} Done</span>` +
+        `</div>` +
+        `<div class="daily-history-items">${items}</div>` +
+      `</div>`;
+    }).join('');
+  }
+
+  els.dailyHistoryList.addEventListener('click', (e)=>{
+    const head = e.target.closest('.daily-history-day-head');
+    if(!head) return;
+    head.parentElement.classList.toggle('expanded');
+  });
+  els.dailyHistoryCloseBtn.addEventListener('click', closeDailyHistoryModal);
+  els.dailyHistoryOverlay.addEventListener('click', (e)=>{ if(e.target===els.dailyHistoryOverlay) closeDailyHistoryModal(); });
+
   /* ---------------- Toast ---------------- */
   function showToast(msg, type='success'){
     const el = document.createElement('div');
@@ -773,7 +1160,8 @@
 
   /* ---------------- Backup ---------------- */
   document.getElementById('backup-btn').addEventListener('click', async ()=>{
-    await showConfirm('Yakin ingin melakukan backup data?', 'Ya, Backup', 'Batal', 'btn-primary');
+    const confirmed = await showConfirm('Yakin ingin melakukan backup data?', 'Ya, Backup', 'Batal', 'btn-primary');
+    if (!confirmed) return;
     const btn = document.getElementById('backup-btn');
     btn.textContent = 'MENYIMPAN...';
     btn.disabled = true;
@@ -856,7 +1244,8 @@
     const btn = e.target.closest('.restore-btn');
     if (!btn) return;
     const filename = btn.dataset.file;
-    await showConfirm('Yakin ingin me-restore data dari file <strong>' + filename + '</strong>?<br><br>Data tugas yang ada saat ini akan digantikan seluruhnya.', 'Ya, Restore', 'Batal', 'btn-primary');
+    const confirmed = await showConfirm('Yakin ingin me-restore data dari file <strong>' + filename + '</strong>?<br><br>Data tugas yang ada saat ini akan digantikan seluruhnya.', 'Ya, Restore', 'Batal', 'btn-primary');
+    if (!confirmed) return;
     btn.textContent = 'MERESTORE...';
     btn.disabled = true;
     try {
@@ -880,8 +1269,9 @@
   /* ---------------- Modal logic ---------------- */
   let editingId = null;
 
-  function openModal(task){
+  function openModal(task, source = null){
     editingId = task ? task.id : null;
+    modalSource = source;
     els.modalTitle.textContent = task ? 'Ubah Tugas' : 'Tugas Baru';
     els.modalSub.textContent = task ? 'Perbarui detail atau geser jadwal tugas ini.' : 'Isi detail tugas di bawah ini.';
     els.fName.value = task ? task.name : '';
@@ -898,9 +1288,27 @@
     if(task){
       els.todoDate.min = fmt(task.start);
       els.todoDate.max = fmt(task.end);
+      // Update hold button based on task.held status
+      if (task.held) {
+        els.holdBtn.textContent = 'Open Again';
+        els.holdBtn.classList.add('btn-success');
+        els.holdBtn.classList.remove('btn-ghost');
+      } else {
+        els.holdBtn.textContent = 'Hold';
+        els.holdBtn.classList.add('btn-ghost');
+        els.holdBtn.classList.remove('btn-success');
+      }
+      els.holdBtn.style.display = '';
     } else {
       els.todoDate.min = '';
       els.todoDate.max = '';
+      els.holdBtn.style.display = 'none';
+    }
+    // Show/hide back button based on source
+    if (modalSource === 'notification') {
+      els.backBtn.style.display = '';
+    } else {
+      els.backBtn.style.display = 'none';
     }
     renderTodos(task);
     updateProgressSlider(task);
@@ -924,6 +1332,7 @@
     cancelTodoEdit();
     editingId = null;
     selectedId = null;
+    modalSource = null;
     renderSidebar();
     closeEvidencePanel();
   }
@@ -946,27 +1355,50 @@
         <td><span class="todo-text${todo.done?' done':''}">${escapeHtml(todo.text)}</span></td>
         <td class="todo-due" style="font-size:11px;font-family:'IBM Plex Mono',monospace;">${todo.due ? fmt(todo.due) : '—'}</td>
         <td class="todo-status"><input type="checkbox" class="todo-cb" data-todo-id="${todo.id}"${todo.done?' checked':''}></td>
-        <td class="todo-del"><button class="todo-del-btn" data-todo-id="${todo.id}">&times;</button></td>
+        <td class="todo-act">
+          <button class="todo-dup-btn" data-todo-id="${todo.id}" title="Duplicate"><i class="bi bi-files"></i></button>
+          <button class="todo-del-btn" data-todo-id="${todo.id}">&times;</button>
+        </td>
       `;
-      tr.querySelector('.todo-cb').addEventListener('change', function(){
+      tr.querySelector('.todo-cb').addEventListener('change', async function(){
         todo.done = this.checked;
-        api.put('/api/tasks/'+task.id+'/todos/'+todo.id, { done: todo.done }).catch(e => console.error('Save todo cb failed:', e));
+        await api.put('/api/tasks/'+task.id+'/todos/'+todo.id, { done: todo.done }).catch(e => console.error('Save todo cb failed:', e));
         updateProgressFromTodos(task);
+        await saveTaskProgress(task.id, task.progress);
         renderTodos(task);
         updateBellDot();
         renderAll(false);
         if(editingId) loadTaskLog(editingId);
       });
-      tr.querySelector('.todo-del-btn').addEventListener('click', function(){
-        api.del('/api/tasks/'+task.id+'/todos/'+todo.id).catch(e => console.error('Delete todo failed:', e));
+
+      tr.querySelector('.todo-del-btn').addEventListener('click', async function(){
+        await api.del('/api/tasks/'+task.id+'/todos/'+todo.id).catch(e => console.error('Delete todo failed:', e));
         task.todos = task.todos.filter(t=>t.id!==todo.id);
         updateProgressFromTodos(task);
+        await saveTaskProgress(task.id, task.progress);
         renderTodos(task);
         updateProgressSlider(task);
         updateBellDot();
         renderAll(false);
         if(editingId) loadTaskLog(editingId);
       });
+
+      tr.querySelector('.todo-dup-btn').addEventListener('click', async function(){
+        const newTodo = await api.post('/api/tasks/'+task.id+'/todos', {
+          text: todo.text,
+          due: todo.due ? fmt(todo.due) : null
+        }).catch(e => { showToast('Gagal duplikasi: '+e.message, 'error'); throw e; });
+        const created = newTodo.todo;
+        task.todos.push({ ...created, due: created.due ? parseDate(created.due) : null, done: false });
+        updateProgressFromTodos(task);
+        await saveTaskProgress(task.id, task.progress);
+        renderTodos(task);
+        updateBellDot();
+        renderAll(false);
+        if(editingId) loadTaskLog(editingId);
+        showToast('Sub Task diduplikasi');
+      });
+
       tr.querySelector('.todo-text').addEventListener('click', function(){
         editingTodoId = todo.id;
         els.todoInput.value = todo.text;
@@ -1009,11 +1441,10 @@
 
   /* ---------------- Notification Panel ---------------- */
   function openNotifPanel(){
-    const T = today();
     const allTodos = [];
     tasks.forEach(task => {
       (task.todos||[]).forEach(todo => {
-        allTodos.push({ ...todo, taskId: task.id, taskName: task.name });
+        allTodos.push({ ...todo, taskId: task.id, taskName: task.name, taskHeld: task.held });
       });
     });
 
@@ -1026,21 +1457,50 @@
 
     const ordered = sorted.filter(t => !t.done);
 
+    // Split into hold and non-hold
+    const holdTodos = ordered.filter(t => t.taskHeld === true);
+    const activeTodos = ordered.filter(t => t.taskHeld !== true);
+
+    // Update counts
+    els.notifHoldCount.textContent = holdTodos.length;
+    els.notifActiveCount.textContent = activeTodos.length;
+
+    // Clear both bodies
+    els.notifHoldBody.innerHTML = '';
+    els.notifActiveBody.innerHTML = '';
+
     if(ordered.length === 0){
-      els.notifBody.innerHTML = '<tr><td colspan="6" class="notif-empty">Semua aktivitas telah selesai.</td></tr>';
       els.notifSub.textContent = 'Tidak ada aktivitas yang perlu diproses.';
+      // Add empty messages to both sections
+      els.notifHoldBody.innerHTML = '<tr><td colspan="6" class="notif-empty">Tidak ada tugas di-hold.</td></tr>';
+      els.notifActiveBody.innerHTML = '<tr><td colspan="6" class="notif-empty">Tidak ada tugas aktif.</td></tr>';
       return;
     }
 
     els.notifSub.textContent = 'Daftar aktivitas yang perlu diproses.';
-    els.notifBody.innerHTML = '';
-    ordered.forEach((todo, i) => {
+
+    // Render hold todos
+    renderNotifTodos(holdTodos, els.notifHoldBody, 'Tidak ada tugas di-hold.', false);
+
+    // Render active todos
+    renderNotifTodos(activeTodos, els.notifActiveBody, 'Tidak ada tugas aktif.', true);
+
+    // Open the panel
+    els.notifOverlay.classList.add('open');
+  }
+
+  function renderNotifTodos(todos, tbody, emptyMessage, showAdd){
+    if(todos.length === 0){
+      tbody.innerHTML = '<tr><td colspan="6" class="notif-empty">' + emptyMessage + '</td></tr>';
+      return;
+    }
+    todos.forEach((todo, i) => {
       let sisaHariText, sisaClass;
       if(!todo.due){
         sisaHariText = '—';
         sisaClass = '';
       } else {
-        const diff = dayDiff(T, todo.due);
+        const diff = dayDiff(today(), todo.due);
         if(diff < 0){
           sisaHariText = 'Overdue';
           sisaClass = 'overdue';
@@ -1053,9 +1513,19 @@
         }
       }
 
+      const inDaily = dailyTasks.some(dt => dt.taskId === todo.taskId && dt.taskName === todo.text);
+
       const tr = document.createElement('tr');
+      if(inDaily && showAdd) tr.classList.add('notif-row-in-daily');
+      const numCell = showAdd
+        ? `<td class="todo-num">` +
+          (inDaily
+            ? `<span class="daily-badge" title="Sudah di Daily Task"><i class="bi bi-check-circle-fill"></i></span>`
+            : `<button class="todo-add-btn" title="Tambahkan ke Daily Task"><i class="bi bi-plus-lg"></i></button>`)
+          + `</td>`
+        : `<td class="todo-num">${i+1}</td>`;
       tr.innerHTML = `
-        <td class="todo-num">${i+1}</td>
+        ${numCell}
         <td><span class="todo-text${todo.done?' done':''}">${escapeHtml(todo.text)}</span></td>
         <td class="todo-due" style="font-size:11px;font-family:'IBM Plex Mono',monospace;">${todo.due ? fmt(todo.due) : '—'}</td>
         <td class="todo-due" style="font-size:11px;font-family:'IBM Plex Mono',monospace;${sisaClass ? 'color:var(--status-risk);font-weight:600;' : ''}">${sisaHariText}</td>
@@ -1070,6 +1540,7 @@
           const t = task.todos.find(td => td.id === todo.id);
           if(t) t.done = todo.done;
           updateProgressFromTodos(task);
+          await saveTaskProgress(task.id, task.progress);
           await api.put('/api/tasks/'+todo.taskId+'/todos/'+todo.id, { done: todo.done }).catch(e => console.error('Save notif todo failed:', e));
         }
         openNotifPanel();
@@ -1080,14 +1551,36 @@
       tr.querySelector('.todo-text').addEventListener('click', function(){
         els.notifOverlay.classList.remove('open');
         const task = tasks.find(t => t.id === todo.taskId);
-        if(task) openModal(task);
+        if(task) openModal(task, 'notification');
       });
 
       tr.querySelector('.todo-copy-btn').addEventListener('click', function(){
         navigator.clipboard.writeText(todo.text).then(() => showToast('Teks berhasil tercopy')).catch(() => showToast('Gagal copy teks', 'error'));
       });
 
-      els.notifBody.appendChild(tr);
+      const addBtn = tr.querySelector('.todo-add-btn');
+      if(addBtn){
+        addBtn.addEventListener('click', async function(e){
+          e.stopPropagation();
+          const dup = dailyTasks.some(dt => dt.taskId === todo.taskId && dt.taskName === todo.text);
+          if(dup){ showToast('Sudah ada di Daily Task', 'error'); return; }
+          try {
+            await api.post('/api/daily-tasks', {
+              taskId: todo.taskId,
+              taskName: todo.text,
+              status: 'not_start'
+            });
+            await loadDailyTasks();
+            openNotifPanel();
+            showToast('Ditambahkan ke Daily Task');
+          } catch(err){
+            console.error('Failed to add daily task:', err);
+            showToast('Gagal menambahkan', 'error');
+          }
+        });
+      }
+
+      tbody.appendChild(tr);
     });
   }
 
@@ -1140,6 +1633,365 @@
     els.evidenceTextInput.value = '';
     els.evidenceFileInput.value = '';
     els.evidenceImageKetInput.value = '';
+  }
+
+  /* ---------------- Daily Task Panel ---------------- */
+  let dailyTasks = [];
+  let dailyTaskChart = null;
+
+  function updateDateLabels(){
+    if(els.dailyTaskTitle) els.dailyTaskTitle.textContent = 'DAILY TASK ' + dateLabel();
+    renderOverviewCards();
+  }
+
+  function openDailyTaskPanel(){
+    els.dailyTaskOverlay.classList.add('open');
+    updateDateLabels();
+    loadDailyTasks();
+    setupDailyTaskResize();
+  }
+
+  function closeDailyTaskPanel(){
+    els.dailyTaskOverlay.classList.remove('open');
+  }
+
+  function setupDailyTaskResize(){
+    const modal = els.dailyTaskOverlay.querySelector('.bottom-modal');
+    const handle = els.dailyTaskDragHandle;
+    if(!modal || !handle) return;
+
+    let startY = 0;
+    let startHeight = 0;
+    const MIN_HEIGHT = 200;
+    const MAX_HEIGHT = window.innerHeight * 0.9;
+
+    function loadSavedHeight(){
+      const saved = localStorage.getItem('dailyTaskHeight');
+      if(saved){
+        const h = parseInt(saved, 10);
+        if(h >= MIN_HEIGHT && h <= MAX_HEIGHT){
+          modal.style.height = h + 'px';
+        }
+      }
+    }
+
+    function onMouseDown(e){
+      const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+      startY = clientY;
+      startHeight = modal.offsetHeight;
+      modal.classList.add('resizing');
+      handle.classList.add('dragging');
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+      document.addEventListener('touchmove', onMouseMove, { passive: false });
+      document.addEventListener('touchend', onMouseUp);
+      e.preventDefault();
+    }
+
+    function onMouseMove(e){
+      const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+      const deltaY = startY - clientY;
+      let newHeight = startHeight + deltaY;
+      newHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, newHeight));
+      modal.style.height = newHeight + 'px';
+    }
+
+    function onMouseUp(){
+      modal.classList.remove('resizing');
+      handle.classList.remove('dragging');
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.removeEventListener('touchmove', onMouseMove);
+      document.removeEventListener('touchend', onMouseUp);
+      localStorage.setItem('dailyTaskHeight', modal.offsetHeight.toString());
+    }
+
+    handle.addEventListener('mousedown', onMouseDown);
+    handle.addEventListener('touchstart', onMouseDown, { passive: false });
+
+    loadSavedHeight();
+  }
+
+  async function loadDailyTasks(){
+    try {
+      const res = await api.get('/api/daily-tasks');
+      dailyTasks = res.dailyTasks || [];
+    } catch(e) {
+      console.error('Failed to load daily tasks:', e);
+      dailyTasks = [];
+    }
+    renderDailyTasks();
+    renderDailyTaskChart();
+    renderOverviewCards();
+  }
+
+  async function syncTodoWithDailyStatus(dt, newStatus){
+    const wantDone = newStatus === 'done';
+    const task = tasks.find(t => t.id === dt.taskId);
+    const todo = task && (task.todos||[]).find(td => td.text === dt.taskName);
+    if(!task || !todo){
+      showToast('Todo "'+ (dt.taskName || '') +'" tidak ditemukan di task', 'info');
+      return;
+    }
+    if(!!todo.done === wantDone) return;
+    todo.done = wantDone;
+    try {
+      await api.put('/api/tasks/'+task.id+'/todos/'+todo.id, { done: todo.done });
+    } catch(e){
+      console.error('Sync todo from daily status failed:', e);
+      showToast('Gagal memperbarui todo: '+e.message, 'error');
+      todo.done = !wantDone;
+      return;
+    }
+    updateProgressFromTodos(task);
+    await saveTaskProgress(task.id, task.progress);
+    updateBellDot();
+    if(els.notifOverlay.classList.contains('open')) openNotifPanel();
+    if(editingId === task.id){
+      renderTodos(task);
+      loadTaskLog(editingId);
+    }
+    renderAll(false);
+  }
+
+  function renderDailyTasks(){
+    els.dailyTaskBody.innerHTML = '';
+
+    if(dailyTasks.length === 0){
+      els.dailyTaskBody.innerHTML = '<tr><td colspan="4" class="notif-empty">Belum ada tugas harian.</td></tr>';
+      return;
+    }
+
+    dailyTasks.forEach((dt, i) => {
+      const tr = document.createElement('tr');
+      const statusClass = dt.status || 'not_start';
+      const statusLabel = DAILY_STATUS_LABEL[statusClass] || statusClass;
+
+      // Determine button states
+      const isDone = statusClass === 'done';
+      const isStopped = statusClass === 'stopped';
+      const isInProgress = statusClass === 'in_progress';
+
+      const takeoutBtn = `
+          <button class="takeout-btn" data-id="${dt.id}" title="Take Out — keluarkan dari Daily Task">
+            <i class="bi bi-box-arrow-left"></i>
+          </button>
+      `;
+
+      // Explicit action buttons per status
+      const bStart = `<button class="status-action-btn start" data-id="${dt.id}" data-status="in_progress" title="Start"><i class="bi bi-play-circle-fill"></i></button>`;
+      const bHold = `<button class="status-action-btn hold" data-id="${dt.id}" data-status="hold" title="Hold"><i class="bi bi-pause-circle-fill"></i></button>`;
+      const bDone = `<button class="status-action-btn done" data-id="${dt.id}" data-status="done" title="Done"><i class="bi bi-check-circle-fill"></i></button>`;
+      const bStop = `<button class="status-action-btn stop" data-id="${dt.id}" data-status="stopped" title="Stop"><i class="bi bi-stop-circle-fill"></i></button>`;
+      const bReopenHold = `<button class="status-action-btn hold" data-id="${dt.id}" data-status="hold" title="Reopen as Hold"><i class="bi bi-pause-circle-fill"></i></button>`;
+      const bReopenProg = `<button class="status-action-btn in_progress" data-id="${dt.id}" data-status="in_progress" title="Reopen as In Progress"><i class="bi bi-play-circle-fill"></i></button>`;
+
+      let buttons = '';
+      if (isDone) {
+        buttons = bReopenHold + bReopenProg;
+      } else {
+        buttons = isInProgress ? bHold : bStart;
+        buttons += bDone;
+        if (!isStopped) buttons += bStop;
+      }
+
+      const statusActions = `
+        <div class="status-actions">
+          ${buttons}
+          ${takeoutBtn}
+        </div>
+      `;
+
+      tr.innerHTML = `
+        <td class="todo-num">${i+1}</td>
+        <td>${escapeHtml(dt.taskName)}</td>
+        <td class="todo-status">
+          <span class="status-badge ${statusClass}">${statusLabel}</span>
+        </td>
+        <td class="todo-act">
+          ${statusActions}
+        </td>
+      `;
+
+      // Handle take out: remove from daily task (and revert todo if it was done)
+      tr.querySelector('.takeout-btn').addEventListener('click', async function(){
+        const id = parseInt(this.dataset.id, 10);
+        const dt = dailyTasks.find(d => d.id === id);
+        if(!dt) return;
+
+        // If the item was marked done, revert the related todo to not-done
+        if((dt.status || 'not_start') === 'done'){
+          const task = tasks.find(t => t.id === dt.taskId);
+          const todo = task && (task.todos || []).find(td => td.text === dt.taskName);
+          if(task && todo){
+            todo.done = false;
+            try {
+              await api.put('/api/tasks/'+task.id+'/todos/'+todo.id, { done: false });
+              updateProgressFromTodos(task);
+              await saveTaskProgress(task.id, task.progress);
+            } catch(e) {
+              console.error('Revert todo on take out failed:', e);
+              showToast('Gagal mengembalikan status todo', 'error');
+              return;
+            }
+          }
+        }
+
+        try {
+          await api.del('/api/daily-tasks/'+id);
+          await loadDailyTasks();
+          updateBellDot();
+          renderAll(false);
+          if (els.notifOverlay.classList.contains('open')) openNotifPanel();
+          if (editingId) {
+            const t = tasks.find(x => x.id === editingId);
+            if (t) renderTodos(t);
+          }
+          showToast('Tugas dikeluarkan dari Daily Task');
+        } catch(e) {
+          console.error('Failed to take out daily task:', e);
+          showToast('Gagal mengeluarkan tugas', 'error');
+        }
+      });
+
+      // Add click handlers for all status buttons
+      tr.querySelectorAll('.status-action-btn').forEach(btn => {
+        btn.addEventListener('click', async function(){
+          const id = parseInt(this.dataset.id, 10);
+          const newStatus = this.dataset.status;
+          const dt = dailyTasks.find(d => d.id === id);
+          try {
+            await api.put('/api/daily-tasks/'+id, { status: newStatus });
+            if(dt) await syncTodoWithDailyStatus(dt, newStatus);
+            loadDailyTasks();
+            if (els.notifOverlay.classList.contains('open')) openNotifPanel();
+          } catch(e) {
+            console.error('Failed to update daily task status:', e);
+          }
+        });
+      });
+
+      els.dailyTaskBody.appendChild(tr);
+    });
+  }
+
+  function renderDailyTaskChart(){
+    const ctx = els.dailyTaskChart?.getContext('2d');
+    if(!ctx) return;
+
+    // Count statuses
+    const counts = { not_start: 0, hold: 0, in_progress: 0, done: 0, stopped: 0 };
+    dailyTasks.forEach(dt => {
+      const s = dt.status || 'not_start';
+      if(counts[s] !== undefined) counts[s]++;
+    });
+
+    const total = counts.not_start + counts.hold + counts.in_progress + counts.done + counts.stopped;
+
+    if(total === 0){
+      // Show empty state
+      els.dailyTaskLegend.innerHTML = '';
+      if(dailyTaskChart) { dailyTaskChart.destroy(); dailyTaskChart = null; }
+      ctx.clearRect(0, 0, els.dailyTaskChart.width, els.dailyTaskChart.height);
+      ctx.font = '14px Inter, sans-serif';
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ink-faint').trim() || '#8B9CB3';
+      ctx.textAlign = 'center';
+      const emptyMsg = 'Belum ada data tugas';
+      ctx.fillText(emptyMsg, els.dailyTaskChart.width/2, els.dailyTaskChart.height/2);
+      return;
+    }
+
+    // Destroy existing chart
+    if(dailyTaskChart) dailyTaskChart.destroy();
+
+    const colors = {
+      not_start: getComputedStyle(document.documentElement).getPropertyValue('--ink-faint').trim() || '#8B9CB3',
+      hold: getComputedStyle(document.documentElement).getPropertyValue('--purple').trim() || '#7C3AED',
+      in_progress: getComputedStyle(document.documentElement).getPropertyValue('--status-progress').trim() || '#2F6BA3',
+      done: getComputedStyle(document.documentElement).getPropertyValue('--status-done').trim() || '#3F8F63',
+      stopped: getComputedStyle(document.documentElement).getPropertyValue('--status-risk').trim() || '#B5482F',
+    };
+
+    const done = counts.done;
+    const notDone = total - done;
+
+    const centerTextPlugin = {
+      id: 'centerText',
+      afterDraw(chart) {
+        const { ctx, chartArea: { top, bottom, left, right } } = chart;
+        const centerX = (left + right) / 2;
+        const centerY = (top + bottom) / 2;
+
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        ctx.font = '12px Inter, sans-serif';
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ink-faint').trim() || '#8B9CB3';
+        ctx.fillText('Total', centerX, centerY - 12);
+
+        ctx.font = 'bold 22px Inter, sans-serif';
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim() || '#1A1F2E';
+        ctx.fillText(done + '/' + notDone, centerX, centerY + 14);
+
+        ctx.restore();
+      }
+    };
+
+    dailyTaskChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Not Start', 'Hold', 'In Progress', 'Done', 'Stop'],
+        datasets: [{
+          data: [counts.not_start, counts.hold, counts.in_progress, counts.done, counts.stopped],
+          backgroundColor: [colors.not_start, colors.hold, colors.in_progress, colors.done, colors.stopped],
+          borderWidth: 0,
+          borderRadius: 4,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        cutout: '65%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const value = context.raw;
+                const percent = total > 0 ? Math.round((value / total) * 100) : 0;
+                return context.label + ': ' + value + ' (' + percent + '%)';
+              }
+            }
+          }
+        }
+      },
+      plugins: [centerTextPlugin]
+    });
+
+    // Render custom legend
+    renderDailyTaskLegend(counts, total, colors);
+  }
+
+  function renderDailyTaskLegend(counts, total, colors){
+    const labels = [
+      { key: 'not_start', label: 'Not Start' },
+      { key: 'hold', label: 'Hold' },
+      { key: 'in_progress', label: 'In Progress' },
+      { key: 'done', label: 'Done' },
+      { key: 'stopped', label: 'Stop' }
+    ];
+    els.dailyTaskLegend.innerHTML = labels.map(l => {
+      const count = counts[l.key] || 0;
+      const percent = total > 0 ? Math.round((count / total) * 100) : 0;
+      return `
+        <div class="chart-legend-item">
+          <span class="chart-legend-color" style="background:${colors[l.key]}"></span>
+          <span class="chart-legend-label">${l.label}</span>
+          <span class="chart-legend-value">${count} (${percent}%)</span>
+        </div>
+      `;
+    }).join('');
   }
 
   function renderEvidences(){
@@ -1310,7 +2162,7 @@
     if(editingTodoId){
       const todo = t.todos.find(x=>x.id===editingTodoId);
       if(todo){ todo.text = text; todo.due = dueStr ? parseDate(dueStr) : null; }
-      api.put('/api/tasks/'+t.id+'/todos/'+editingTodoId, { text, due: dueStr }).catch(e => console.error('Save todo failed:', e));
+      await api.put('/api/tasks/'+t.id+'/todos/'+editingTodoId, { text, due: dueStr }).catch(e => console.error('Save todo failed:', e));
       cancelTodoEdit();
     } else {
       try {
@@ -1323,6 +2175,7 @@
     els.todoInput.focus();
     renderTodos(t);
     updateProgressFromTodos(t);
+    await saveTaskProgress(t.id, t.progress);
     updateProgressSlider(t);
     updateBellDot();
     renderAll(false);
@@ -1338,6 +2191,10 @@
 
   document.getElementById('cancel-btn').addEventListener('click', closeModal);
   document.getElementById('close-btn').addEventListener('click', closeModal);
+  document.getElementById('back-btn').addEventListener('click', ()=>{
+    closeModal();
+    openNotifPanel();
+  });
   els.overlay.addEventListener('click', (e)=>{ if(e.target===els.overlay) closeModal(); });
   els.confirmOverlay.addEventListener('click', (e)=>{ if(e.target===els.confirmOverlay) closeConfirm(); });
 
@@ -1358,7 +2215,13 @@
       if(!t) return;
       t.name = name; t.start = start; t.end = end;
       t.cat = cat; t.assignee = assignee; t.progress = progress;
-      api.put('/api/tasks/'+editingId, { name, start:fmt(start), end:fmt(end), cat, assignee, progress }).catch(e => console.error('Save task failed:', e));
+      try {
+        await api.put('/api/tasks/'+editingId, { name, start:fmt(start), end:fmt(end), cat, assignee, progress });
+      } catch(e){ 
+        console.error('Save task failed:', e); 
+        showToast('Gagal menyimpan tugas: ' + e.message, 'error');
+        return;
+      }
     } else {
       try {
         const result = await api.post('/api/tasks', { name, start:fmt(start), end:fmt(end), cat, assignee, progress });
@@ -1378,7 +2241,8 @@
   document.getElementById('delete-btn').addEventListener('click', async ()=>{
     if(!editingId) return;
     const name = tasks.find(t=>t.id===editingId)?.name||'';
-    await showConfirm('Yakin ingin menghapus tugas <strong>'+escapeHtml(name)+'</strong>?', 'Ya, Hapus', 'Batal', 'confirm-yes');
+    const confirmed = await showConfirm('Yakin ingin menghapus tugas <strong>'+escapeHtml(name)+'</strong>?', 'Ya, Hapus', 'Batal', 'confirm-yes');
+    if (!confirmed) return;
     api.del('/api/tasks/'+editingId).catch(e => console.error('Delete task failed:', e));
     tasks = tasks.filter(t=>t.id!==editingId);
     closeModal(true);
@@ -1391,10 +2255,42 @@
     if(editingId) openEvidencePanel(editingId);
   });
 
+  els.holdBtn.addEventListener('click', async ()=>{
+    if(!editingId) return;
+    const task = tasks.find(t => t.id === editingId);
+    if(!task) return;
+    
+    try {
+      const result = await api.put('/api/tasks/'+editingId+'/hold');
+      task.held = result.held;
+      task.heldAt = result.heldAt;
+      
+      // Update button text and style
+      if (result.held) {
+        els.holdBtn.textContent = 'Open Again';
+        els.holdBtn.classList.add('btn-success');
+        els.holdBtn.classList.remove('btn-ghost');
+        showToast('Tugas di-hold (dihentikan sementara)');
+      } else {
+        els.holdBtn.textContent = 'Hold';
+        els.holdBtn.classList.add('btn-ghost');
+        els.holdBtn.classList.remove('btn-success');
+        showToast('Tugas dibuka kembali (dilanjutkan)');
+      }
+      
+      // Reload task log to show the new entry
+      loadTaskLog(editingId);
+      renderSidebar();
+      renderAll(false);
+    } catch (e) {
+      console.error('Failed to toggle hold:', e);
+      showToast('Gagal mengubah status hold', 'error');
+    }
+  });
+
   /* ---------------- Notification Panel Events ---------------- */
   els.bellBtn.addEventListener('click', ()=>{
     openNotifPanel();
-    els.notifOverlay.classList.add('open');
   });
 
   els.notifOverlay.addEventListener('click', (e)=>{
@@ -1412,12 +2308,21 @@
 
   document.getElementById('evidence-close-btn').addEventListener('click', closeEvidencePanel);
 
+  /* ---------------- Daily Task Panel Events ---------------- */
+  els.dailyTaskOverlay.addEventListener('click', (e)=>{
+    if(e.target === els.dailyTaskOverlay) closeDailyTaskPanel();
+  });
+
+  els.dailyTaskCloseBtn.addEventListener('click', closeDailyTaskPanel);
+
   document.addEventListener('keydown', (e)=>{
     if(e.key==='Escape' && els.confirmOverlay.classList.contains('open')){ closeConfirm(); return; }
     if(e.key==='Escape' && els.overlay.classList.contains('open')) closeModal();
     if(e.key==='Escape' && els.notifOverlay.classList.contains('open')) els.notifOverlay.classList.remove('open');
     if(e.key==='Escape' && els.evidenceOverlay.classList.contains('open')) closeEvidencePanel();
+    if(e.key==='Escape' && els.dailyTaskOverlay.classList.contains('open')) closeDailyTaskPanel();
     if(e.key==='Escape' && els.imgPreviewOverlay.classList.contains('open')) closeImagePreview();
+    if(e.key==='Escape' && els.navSidebar.classList.contains('open')) closeMobileNav();
   });
 
   /* ---------------- Inline Title Edit ---------------- */
@@ -1445,6 +2350,7 @@
       span.textContent = val;
       input.replaceWith(span);
       els.title = span;
+      renderBreadcrumb();
       api.put('/api/metadata', { title: val }).catch(e => console.error('Save title failed:', e));
     }
 
@@ -1454,6 +2360,7 @@
       span.textContent = _savedTitle;
       input.replaceWith(span);
       els.title = span;
+      renderBreadcrumb();
     }
 
     input.addEventListener('keydown', function(e){
@@ -1463,7 +2370,7 @@
     input.addEventListener('blur', commit);
   }
 
-  document.querySelector('.title-row').addEventListener('click', function(e){
+  document.querySelector('.title-row')?.addEventListener('click', function(e){
     if(e.target.id === 'project-title' || e.target.id === 'title-edit-icon'){
       enableTitleEdit();
     }
@@ -1485,8 +2392,11 @@
   function setTheme(theme){
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
-    const btn = document.getElementById('theme-toggle');
-    if(btn) btn.innerHTML = theme === 'dark' ? '<i class="bi bi-sun-fill"></i>' : '<i class="bi bi-moon-fill"></i>';
+    const dark = theme === 'dark';
+    const icon = document.getElementById('theme-icon');
+    const label = document.getElementById('theme-label');
+    if(icon) icon.className = dark ? 'bi bi-sun' : 'bi bi-moon';
+    if(label) label.textContent = dark ? 'Mode Terang' : 'Mode Gelap';
   }
 
   function initTheme(){
@@ -1497,11 +2407,6 @@
   }
 
   setFavicon();
-
-  document.getElementById('theme-toggle').addEventListener('click', function(){
-    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    setTheme(next);
-  });
 
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e){
     if(!localStorage.getItem('theme')) setTheme(e.matches ? 'dark' : 'light');
@@ -1699,7 +2604,1940 @@
     });
   });
 
+  /* ---------------- Minutes of Meeting ---------------- */
+  const MOM_TYPES = {
+    internal: 'Internal',
+    project: 'Project',
+    client: 'Client',
+    formal: 'Formal',
+    lainnya: 'Lainnya',
+  };
+  const MOM_ATTENDANCE = {
+    present: 'Hadir',
+    excused: 'Izin',
+    absent: 'Tidak Hadir',
+  };
+  const MOM_ACTION_STATUS = {
+    open: 'Open',
+    in_progress: 'In Progress',
+    done: 'Done',
+  };
+  const MOM_MONTHS_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+
+  let momMeetings = [];
+  let momEditingId = null;
+  let momPreviewId = null;
+  let momFilter = { search: '', status: '', month: '' };
+  let momDraft = null;
+  let momSearchTimer = null;
+
+  function momEsc(value){
+    return escapeHtml(String(value === undefined || value === null ? '' : value));
+  }
+
+  function momNl2br(value){
+    return momEsc(value).replace(/\n/g, '<br>');
+  }
+
+  function momVal(id){
+    const el = document.getElementById(id);
+    return el ? el.value : '';
+  }
+
+  function momSetVal(id, value){
+    const el = document.getElementById(id);
+    if(el) el.value = value === undefined || value === null ? '' : value;
+  }
+
+  function momFormatDate(value){
+    if(!value) return '—';
+    const parts = String(value).slice(0, 10).split('-');
+    if(parts.length !== 3) return value;
+    const month = MOM_MONTHS_ID[Number(parts[1]) - 1] || parts[1];
+    return `${Number(parts[2])} ${month} ${parts[0]}`;
+  }
+
+  function momTimeRange(meeting){
+    const start = meeting.startTime || '';
+    const end = meeting.endTime || '';
+    if(!start && !end) return '—';
+    return start + (end ? ' – ' + end : '');
+  }
+
+  function momOptions(map, selected){
+    return Object.keys(map).map(key =>
+      `<option value="${key}"${key === selected ? ' selected' : ''}>${map[key]}</option>`
+    ).join('');
+  }
+
+  function momEmptyDraft(){
+    return {
+      momNumber: '',
+      title: '',
+      meetingType: 'internal',
+      date: fmt(today()),
+      startTime: '',
+      endTime: '',
+      location: '',
+      chair: '',
+      notetaker: '',
+      status: 'draft',
+      attendees: [{ name: '', role: '', organization: '', attendance: 'present' }],
+      agenda: [{ topic: '', presenter: '', duration: '' }],
+      discussions: [{ agendaTopic: '', notes: '' }],
+      decisions: [{ text: '' }],
+      actionItems: [{ description: '', pic: '', dueDate: '', status: 'open' }],
+      nextSteps: '',
+      nextMeetingDate: '',
+      nextMeetingTime: '',
+      nextMeetingLocation: '',
+      preparedBy: { name: '', role: '', date: fmt(today()), signature: '' },
+      approvedBy: { name: '', role: '', date: fmt(today()), signature: '' },
+    };
+  }
+
+  function momNormalizeDraft(meeting){
+    const draft = meeting ? JSON.parse(JSON.stringify(meeting)) : momEmptyDraft();
+    draft.attendees = Array.isArray(draft.attendees) ? draft.attendees : [];
+    draft.agenda = Array.isArray(draft.agenda) ? draft.agenda : [];
+    draft.discussions = Array.isArray(draft.discussions) ? draft.discussions : [];
+    draft.decisions = Array.isArray(draft.decisions) ? draft.decisions : [];
+    draft.actionItems = Array.isArray(draft.actionItems) ? draft.actionItems : [];
+    draft.preparedBy = draft.preparedBy || { name: '', role: '', date: fmt(today()), signature: '' };
+    draft.approvedBy = draft.approvedBy || { name: '', role: '', date: fmt(today()), signature: '' };
+    if(!draft.preparedBy.date) draft.preparedBy.date = fmt(today());
+    if(!draft.approvedBy.date) draft.approvedBy.date = fmt(today());
+    draft.meetingType = draft.meetingType || 'internal';
+    draft.status = draft.status === 'final' ? 'final' : 'draft';
+    return draft;
+  }
+
+  function momUpdateAttendeeCount(){
+    const countEl = document.getElementById('mom-attendee-count');
+    if(!countEl || !momDraft) return;
+    countEl.textContent = (momDraft.attendees || []).filter(a => String(a.name || '').trim()).length;
+  }
+
+  function momRenderAttendees(){
+    const body = document.getElementById('mom-attendee-body');
+    if(!body || !momDraft) return;
+    if(!momDraft.attendees.length){
+      body.innerHTML = '<tr><td colspan="6" class="mom-input-empty">Belum ada peserta. Klik "Tambah Peserta".</td></tr>';
+      momUpdateAttendeeCount();
+      return;
+    }
+    body.innerHTML = momDraft.attendees.map((a, i) => `
+      <tr data-index="${i}">
+        <td class="mom-row-num">${i + 1}</td>
+        <td><input type="text" data-mom-array="attendees" data-field="name" value="${momEsc(a.name)}" placeholder="Nama peserta"></td>
+        <td><input type="text" data-mom-array="attendees" data-field="role" value="${momEsc(a.role)}" placeholder="Jabatan / Divisi"></td>
+        <td><input type="text" data-mom-array="attendees" data-field="organization" value="${momEsc(a.organization)}" placeholder="Instansi"></td>
+        <td><select data-mom-array="attendees" data-field="attendance">${momOptions(MOM_ATTENDANCE, a.attendance || 'present')}</select></td>
+        <td><button type="button" class="mom-row-del" data-mom-remove="attendees" data-index="${i}" title="Hapus peserta"><i class="bi bi-x-lg"></i></button></td>
+      </tr>
+    `).join('');
+    momUpdateAttendeeCount();
+  }
+
+  function momRenderAgenda(){
+    const body = document.getElementById('mom-agenda-body');
+    if(!body || !momDraft) return;
+    if(!momDraft.agenda.length){
+      body.innerHTML = '<tr><td colspan="5" class="mom-input-empty">Belum ada agenda. Klik "Tambah Agenda".</td></tr>';
+      return;
+    }
+    body.innerHTML = momDraft.agenda.map((a, i) => `
+      <tr data-index="${i}">
+        <td class="mom-row-num">${i + 1}</td>
+        <td><input type="text" data-mom-array="agenda" data-field="topic" value="${momEsc(a.topic)}" placeholder="Topik agenda"></td>
+        <td><input type="text" data-mom-array="agenda" data-field="presenter" value="${momEsc(a.presenter)}" placeholder="Presenter / PIC"></td>
+        <td><input type="text" data-mom-array="agenda" data-field="duration" value="${momEsc(a.duration)}" placeholder="cth. 15"></td>
+        <td><button type="button" class="mom-row-del" data-mom-remove="agenda" data-index="${i}" title="Hapus agenda"><i class="bi bi-x-lg"></i></button></td>
+      </tr>
+    `).join('');
+  }
+
+  function momRenderDiscussions(){
+    const body = document.getElementById('mom-discussion-body');
+    if(!body || !momDraft) return;
+    if(!momDraft.discussions.length){
+      body.innerHTML = '<tr><td colspan="4" class="mom-input-empty">Belum ada poin pembahasan. Klik "Tambah Pembahasan".</td></tr>';
+      return;
+    }
+    body.innerHTML = momDraft.discussions.map((d, i) => `
+      <tr data-index="${i}">
+        <td class="mom-row-num">${i + 1}</td>
+        <td><input type="text" data-mom-array="discussions" data-field="agendaTopic" value="${momEsc(d.agendaTopic)}" placeholder="Agenda terkait"></td>
+        <td><textarea data-mom-array="discussions" data-field="notes" rows="2" placeholder="Tulis poin pembahasan...">${momEsc(d.notes)}</textarea></td>
+        <td><button type="button" class="mom-row-del" data-mom-remove="discussions" data-index="${i}" title="Hapus pembahasan"><i class="bi bi-x-lg"></i></button></td>
+      </tr>
+    `).join('');
+  }
+
+  function momRenderDecisions(){
+    const body = document.getElementById('mom-decision-body');
+    if(!body || !momDraft) return;
+    if(!momDraft.decisions.length){
+      body.innerHTML = '<tr><td colspan="3" class="mom-input-empty">Belum ada keputusan. Klik "Tambah Keputusan".</td></tr>';
+      return;
+    }
+    body.innerHTML = momDraft.decisions.map((d, i) => `
+      <tr data-index="${i}">
+        <td class="mom-row-num">${i + 1}</td>
+        <td><input type="text" data-mom-array="decisions" data-field="text" value="${momEsc(d.text)}" placeholder="Tulis keputusan / kesepakatan..."></td>
+        <td><button type="button" class="mom-row-del" data-mom-remove="decisions" data-index="${i}" title="Hapus keputusan"><i class="bi bi-x-lg"></i></button></td>
+      </tr>
+    `).join('');
+  }
+
+  function momRenderActions(){
+    const body = document.getElementById('mom-action-body');
+    if(!body || !momDraft) return;
+    if(!momDraft.actionItems.length){
+      body.innerHTML = '<tr><td colspan="6" class="mom-input-empty">Belum ada action item. Klik "Tambah Action Item".</td></tr>';
+      return;
+    }
+    body.innerHTML = momDraft.actionItems.map((a, i) => `
+      <tr data-index="${i}">
+        <td class="mom-row-num">${i + 1}</td>
+        <td><input type="text" data-mom-array="actionItems" data-field="description" value="${momEsc(a.description)}" placeholder="Action item"></td>
+        <td><input type="text" data-mom-array="actionItems" data-field="pic" value="${momEsc(a.pic)}" placeholder="PIC"></td>
+        <td><input type="date" data-mom-array="actionItems" data-field="dueDate" value="${momEsc(a.dueDate)}"></td>
+        <td><select data-mom-array="actionItems" data-field="status">${momOptions(MOM_ACTION_STATUS, a.status || 'open')}</select></td>
+        <td><button type="button" class="mom-row-del" data-mom-remove="actionItems" data-index="${i}" title="Hapus action item"><i class="bi bi-x-lg"></i></button></td>
+      </tr>
+    `).join('');
+  }
+
+  function momRenderAllRows(){
+    momRenderAttendees();
+    momRenderAgenda();
+    momRenderDiscussions();
+    momRenderDecisions();
+    momRenderActions();
+  }
+
+  function momHandleArrayInput(e){
+    const el = e.target.closest('[data-mom-array]');
+    if(!el || !momDraft) return;
+    const arr = momDraft[el.dataset.momArray];
+    const tr = el.closest('tr[data-index]');
+    if(!Array.isArray(arr) || !tr) return;
+    const idx = Number(tr.dataset.index);
+    if(!arr[idx]) return;
+    arr[idx][el.dataset.field] = el.value;
+    if(el.dataset.momArray === 'attendees') momUpdateAttendeeCount();
+  }
+
+  function momHandleArrayRemove(e){
+    const btn = e.target.closest('[data-mom-remove]');
+    if(!btn || !momDraft) return;
+    const arr = momDraft[btn.dataset.momRemove];
+    const tr = btn.closest('tr[data-index]');
+    if(!Array.isArray(arr) || !tr) return;
+    arr.splice(Number(tr.dataset.index), 1);
+    momRenderAllRows();
+  }
+
+  function momSetupSignaturePad(canvasId, existingSignature){
+    const original = document.getElementById(canvasId);
+    if(!original) return;
+    const canvas = original.cloneNode(false);
+    original.parentNode.replaceChild(canvas, original);
+
+    const rect = canvas.getBoundingClientRect();
+    const width = Math.max(rect.width, 260);
+    const height = Math.max(rect.height, 120);
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#1B3350';
+
+    canvas.dataset.dirty = '0';
+    canvas.dataset.existing = existingSignature || '';
+
+    if(existingSignature){
+      const img = new Image();
+      img.onload = () => {
+        const ratio = Math.min(width / img.width, height / img.height);
+        const w = img.width * ratio;
+        const h = img.height * ratio;
+        ctx.drawImage(img, (width - w) / 2, (height - h) / 2, w, h);
+      };
+      img.src = existingSignature;
+    }
+
+    let drawing = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    function point(e){
+      const r = canvas.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      drawing = true;
+      canvas.dataset.dirty = '1';
+      const p = point(e);
+      lastX = p.x;
+      lastY = p.y;
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      try { canvas.setPointerCapture(e.pointerId); } catch(_) {}
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if(!drawing) return;
+      e.preventDefault();
+      const p = point(e);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      lastX = p.x;
+      lastY = p.y;
+    });
+
+    const stop = () => { drawing = false; };
+    canvas.addEventListener('pointerup', stop);
+    canvas.addEventListener('pointercancel', stop);
+    canvas.addEventListener('pointerleave', stop);
+  }
+
+  function momReadSignature(canvasId, fallback){
+    const canvas = document.getElementById(canvasId);
+    if(!canvas) return fallback || '';
+    if(canvas.dataset.dirty === '1') {
+      try { return canvas.toDataURL('image/png'); } catch(_) { return fallback || ''; }
+    }
+    return canvas.dataset.existing || fallback || '';
+  }
+
+  function momClearSignature(canvasId){
+    const canvas = document.getElementById(canvasId);
+    if(!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    canvas.dataset.dirty = '1';
+    canvas.dataset.existing = '';
+  }
+
+  function openMomForm(meeting){
+    momEditingId = meeting ? meeting.id : null;
+    momDraft = momNormalizeDraft(meeting);
+
+    document.getElementById('mom-form-title').textContent = meeting ? 'Edit MoM' : 'MoM Baru';
+    document.getElementById('mom-form-sub').textContent = meeting
+      ? 'Perbarui informasi rapat, keputusan, action item, dan pengesahan.'
+      : 'Lengkapi informasi rapat, peserta, agenda, keputusan, dan tindak lanjut.';
+
+    momSetVal('mom-number', momDraft.momNumber || '');
+    momSetVal('mom-title', momDraft.title);
+    momSetVal('mom-type', momDraft.meetingType);
+    momSetVal('mom-status', momDraft.status);
+    momSetVal('mom-date', momDraft.date);
+    momSetVal('mom-location', momDraft.location);
+    momSetVal('mom-start', momDraft.startTime);
+    momSetVal('mom-end', momDraft.endTime);
+    momSetVal('mom-chair', momDraft.chair);
+    momSetVal('mom-notetaker', momDraft.notetaker);
+
+    momSetVal('mom-next-steps', momDraft.nextSteps);
+    momSetVal('mom-next-date', momDraft.nextMeetingDate);
+    momSetVal('mom-next-time', momDraft.nextMeetingTime);
+    momSetVal('mom-next-location', momDraft.nextMeetingLocation);
+
+    momSetVal('mom-prepared-name', momDraft.preparedBy.name);
+    momSetVal('mom-prepared-role', momDraft.preparedBy.role);
+    momSetVal('mom-prepared-date', momDraft.preparedBy.date);
+    momSetVal('mom-approved-name', momDraft.approvedBy.name);
+    momSetVal('mom-approved-role', momDraft.approvedBy.role);
+    momSetVal('mom-approved-date', momDraft.approvedBy.date);
+
+    document.getElementById('mom-delete-btn').style.visibility = meeting ? 'visible' : 'hidden';
+    momRenderAllRows();
+
+    const overlay = document.getElementById('mom-form-overlay');
+    overlay.classList.add('open');
+
+    requestAnimationFrame(() => {
+      if(!momDraft) return;
+      momSetupSignaturePad('mom-prepared-canvas', momDraft.preparedBy.signature);
+      momSetupSignaturePad('mom-approved-canvas', momDraft.approvedBy.signature);
+    });
+  }
+
+  function closeMomForm(){
+    const overlay = document.getElementById('mom-form-overlay');
+    if(overlay) overlay.classList.remove('open');
+    momEditingId = null;
+    momDraft = null;
+  }
+
+  function momCollectPayload(status){
+    const draft = momDraft || momEmptyDraft();
+    draft.title = momVal('mom-title').trim();
+    draft.momNumber = momVal('mom-number').trim();
+    draft.meetingType = momVal('mom-type') || 'internal';
+    draft.status = status || momVal('mom-status') || 'draft';
+    draft.date = momVal('mom-date');
+    draft.startTime = momVal('mom-start');
+    draft.endTime = momVal('mom-end');
+    draft.location = momVal('mom-location').trim();
+    draft.chair = momVal('mom-chair').trim();
+    draft.notetaker = momVal('mom-notetaker').trim();
+
+    draft.nextSteps = momVal('mom-next-steps').trim();
+    draft.nextMeetingDate = momVal('mom-next-date');
+    draft.nextMeetingTime = momVal('mom-next-time');
+    draft.nextMeetingLocation = momVal('mom-next-location').trim();
+
+    draft.preparedBy = {
+      name: momVal('mom-prepared-name').trim(),
+      role: momVal('mom-prepared-role').trim(),
+      date: momVal('mom-prepared-date'),
+      signature: momReadSignature('mom-prepared-canvas', draft.preparedBy && draft.preparedBy.signature),
+    };
+    draft.approvedBy = {
+      name: momVal('mom-approved-name').trim(),
+      role: momVal('mom-approved-role').trim(),
+      date: momVal('mom-approved-date'),
+      signature: momReadSignature('mom-approved-canvas', draft.approvedBy && draft.approvedBy.signature),
+    };
+
+    draft.attendees = (draft.attendees || []).filter(a =>
+      String(a.name || '').trim() || String(a.role || '').trim() || String(a.organization || '').trim()
+    );
+    draft.agenda = (draft.agenda || []).filter(a =>
+      String(a.topic || '').trim() || String(a.presenter || '').trim() || String(a.duration || '').trim()
+    );
+    draft.discussions = (draft.discussions || []).filter(d =>
+      String(d.agendaTopic || '').trim() || String(d.notes || '').trim()
+    );
+    draft.decisions = (draft.decisions || []).filter(d => String(d.text || '').trim());
+    draft.actionItems = (draft.actionItems || []).filter(a =>
+      String(a.description || '').trim() || String(a.pic || '').trim() || String(a.dueDate || '').trim()
+    );
+
+    return JSON.parse(JSON.stringify(draft));
+  }
+
+  async function saveMom(status){
+    if(!momDraft) return;
+    const payload = momCollectPayload(status);
+    if(!payload.title){
+      showToast('Judul rapat wajib diisi.', 'error');
+      document.getElementById('mom-title').focus();
+      return;
+    }
+    if(!payload.date){
+      showToast('Tanggal rapat wajib diisi.', 'error');
+      document.getElementById('mom-date').focus();
+      return;
+    }
+
+    const btn = document.getElementById(status === 'final' ? 'mom-save-final-btn' : 'mom-save-draft-btn');
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.textContent = 'Menyimpan...';
+    try {
+      if(momEditingId){
+        await api.put('/api/mom/' + momEditingId, payload);
+      } else {
+        await api.post('/api/mom', payload);
+      }
+      const savedStatus = payload.status;
+      closeMomForm();
+      await loadMomMeetings();
+      showToast(savedStatus === 'final' ? 'MoM berhasil disimpan sebagai Final.' : 'MoM berhasil disimpan sebagai Draft.');
+    } catch(err){
+      showToast('Gagal menyimpan MoM: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
+  }
+
+  async function loadMomMeetings(){
+    try {
+      const data = await api.get('/api/mom');
+      momMeetings = Array.isArray(data.meetings) ? data.meetings : [];
+    } catch(err){
+      console.error('Gagal memuat Minutes of Meeting:', err);
+      momMeetings = [];
+    }
+    renderMomPage();
+  }
+
+  function momFilteredMeetings(){
+    const q = momFilter.search.toLowerCase();
+    return momMeetings.filter(m => {
+      if(momFilter.status && m.status !== momFilter.status) return false;
+      if(momFilter.month && String(m.date || '').slice(0, 7) !== momFilter.month) return false;
+      if(!q) return true;
+      const haystack = [
+        m.title,
+        m.momNumber,
+        m.chair,
+        m.notetaker,
+        m.location,
+        ...(m.attendees || []).map(a => a.name),
+      ].join(' ').toLowerCase();
+      return haystack.includes(q);
+    }).sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || (b.id || 0) - (a.id || 0));
+  }
+
+  function momActionCounts(){
+    let open = 0;
+    let overdue = 0;
+    const todayKey = fmt(today());
+    momMeetings.forEach(m => {
+      (m.actionItems || []).forEach(a => {
+        if(a.status === 'done') return;
+        open += 1;
+        const due = a.dueDate ? String(a.dueDate).slice(0, 10) : '';
+        if(due && due < todayKey) overdue += 1;
+      });
+    });
+    return { open, overdue };
+  }
+
+  /* ---------------- Quality Assurance (UAT) ---------------- */
+  const QA_STATUS_CARDS = [
+    { key:'not_started', label:'Not Started', icon:'bi-circle',                cls:'not-started' },
+    { key:'finish',      label:'Finish',      icon:'bi-check-circle-fill',      cls:'finish' },
+    { key:'in_progress', label:'In Progress', icon:'bi-arrow-repeat',           cls:'in-progress' },
+    { key:'hold',        label:'Hold',        icon:'bi-pause-circle-fill',      cls:'hold' },
+    { key:'reopen',      label:'Re-Open',     icon:'bi-arrow-counterclockwise', cls:'reopen' },
+  ];
+
+  const UAT_STATUS_LABEL = { not_started:'Not Started', finish:'Finish', in_progress:'In Progress', hold:'Hold', reopen:'Re-Open' };
+
+  let uats = [];
+  let uatEditingId = null;
+
+  function qaStatusCounts(){
+    const counts = { not_started:0, finish:0, in_progress:0, hold:0, reopen:0 };
+    uats.forEach(u => {
+      if(Object.prototype.hasOwnProperty.call(counts, u.status)) counts[u.status]++;
+    });
+    return counts;
+  }
+
+  async function loadUats(){
+    try {
+      const data = await api.get('/api/uat');
+      uats = Array.isArray(data.uats) ? data.uats : [];
+    } catch(err){
+      console.error('Gagal memuat data UAT:', err);
+      uats = [];
+    }
+    renderQaPage();
+  }
+
+  function renderQaPage(){
+    const statsEl = document.getElementById('qa-stats');
+    if(statsEl){
+      const counts = qaStatusCounts();
+      statsEl.innerHTML = QA_STATUS_CARDS.map(card => `
+        <div class="qa-stat">
+          <div class="qa-stat-icon ${card.cls}"><i class="bi ${card.icon}"></i></div>
+          <div>
+            <div class="qa-stat-num">${counts[card.key] ?? 0}</div>
+            <div class="qa-stat-label">${card.label}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    const tbody = document.getElementById('uat-table-body');
+    if(!tbody) return;
+
+    tbody.innerHTML = uats.map((u, i) => {
+      const status = UAT_STATUS_LABEL[u.status] ? u.status : 'not_started';
+      const statusLabel = UAT_STATUS_LABEL[status];
+      return `
+        <tr data-uat-id="${u.id}">
+          <td class="qa-col-num">${i + 1}</td>
+          <td class="qa-title-cell">${escapeHtml(u.title || '')}</td>
+          <td>${escapeHtml(u.developer || '—')}</td>
+          <td>${escapeHtml(u.pic || '—')}</td>
+          <td class="qa-date-cell">${escapeHtml(momFormatDate(u.dueDate))}</td>
+          <td class="qa-status-cell">
+            <span class="uat-status-badge ${status}">${statusLabel}</span>
+          </td>
+          <td class="qa-col-act">
+            <div class="qa-actions">
+              <button type="button" class="qa-icon-btn process" data-uat-action="process" data-id="${u.id}" title="Buka Proses UAT"><i class="bi bi-clipboard-data"></i></button>
+              <button type="button" class="qa-icon-btn" data-uat-action="edit" data-id="${u.id}" title="Edit"><i class="bi bi-pencil"></i></button>
+              <button type="button" class="qa-icon-btn danger" data-uat-action="delete" data-id="${u.id}" title="Hapus"><i class="bi bi-trash"></i></button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    const tableWrap = document.querySelector('.qa-table-wrap');
+    if(tableWrap) tableWrap.style.display = uats.length ? 'block' : 'none';
+    const emptyEl = document.getElementById('uat-empty');
+    // '' = lepas inline style agar kembali ke display:flex dari stylesheet
+    if(emptyEl) emptyEl.style.display = uats.length ? 'none' : '';
+    const countLabel = document.getElementById('uat-count-label');
+    if(countLabel) countLabel.textContent = `${uats.length} UAT tercatat`;
+  }
+
+  function uatVal(id){
+    const el = document.getElementById(id);
+    return el ? el.value : '';
+  }
+
+  function uatSetVal(id, value){
+    const el = document.getElementById(id);
+    if(el) el.value = value === undefined || value === null ? '' : value;
+  }
+
+  function uatErrorMessage(err, fallback){
+    let msg = err && err.message ? err.message : fallback;
+    try { msg = JSON.parse(msg).error || msg; } catch(_){}
+    return msg;
+  }
+
+  function openUatForm(uat){
+    uatEditingId = uat ? uat.id : null;
+    document.getElementById('uat-form-title').textContent = uat ? 'Edit UAT' : 'Tambah UAT';
+    document.getElementById('uat-form-sub').textContent = uat
+      ? 'Perbarui detail item User Acceptance Test.'
+      : 'Lengkapi detail item User Acceptance Test.';
+    uatSetVal('uat-title', uat ? uat.title : '');
+    uatSetVal('uat-developer', uat ? uat.developer : '');
+    uatSetVal('uat-pic', uat ? uat.pic : '');
+    uatSetVal('uat-due-date', uat ? uat.dueDate : '');
+    document.getElementById('uat-form-overlay').classList.add('open');
+    const titleEl = document.getElementById('uat-title');
+    if(titleEl) titleEl.focus();
+  }
+
+  function closeUatForm(){
+    const overlay = document.getElementById('uat-form-overlay');
+    if(overlay) overlay.classList.remove('open');
+    uatEditingId = null;
+  }
+
+  function uatCollectPayload(){
+    return {
+      title: uatVal('uat-title').trim(),
+      developer: uatVal('uat-developer').trim(),
+      pic: uatVal('uat-pic').trim(),
+      dueDate: uatVal('uat-due-date'),
+    };
+  }
+
+  async function saveUat(){
+    const payload = uatCollectPayload();
+    if(!payload.title){
+      showToast('Title UAT wajib diisi.', 'error');
+      document.getElementById('uat-title').focus();
+      return;
+    }
+    if(!payload.developer){
+      showToast('Developer wajib diisi.', 'error');
+      document.getElementById('uat-developer').focus();
+      return;
+    }
+    if(!payload.pic){
+      showToast('PIC UAT wajib diisi.', 'error');
+      document.getElementById('uat-pic').focus();
+      return;
+    }
+    if(!payload.dueDate){
+      showToast('Due Date wajib diisi.', 'error');
+      document.getElementById('uat-due-date').focus();
+      return;
+    }
+
+    const btn = document.getElementById('uat-save-btn');
+    const original = btn.innerHTML;
+    const isEdit = !!uatEditingId;
+    btn.disabled = true;
+    btn.textContent = 'Menyimpan...';
+    try {
+      if(uatEditingId){
+        await api.put('/api/uat/' + uatEditingId, payload);
+      } else {
+        await api.post('/api/uat', payload);
+      }
+      closeUatForm();
+      await loadUats();
+      showToast(isEdit ? 'UAT berhasil diperbarui.' : 'UAT berhasil ditambahkan.');
+    } catch(err){
+      showToast('Gagal menyimpan UAT: ' + uatErrorMessage(err, 'terjadi kesalahan'), 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
+  }
+
+  async function deleteUat(id){
+    const uat = uats.find(u => u.id === id);
+    if(!uat) return;
+    const confirmed = await showConfirm(
+      `Yakin ingin menghapus UAT <strong>${escapeHtml(uat.title || 'ini')}</strong>?`,
+      'Ya, Hapus',
+      'Batal'
+    );
+    if(!confirmed) return;
+    try {
+      await api.del('/api/uat/' + id);
+      if(uatEditingId === id) closeUatForm();
+      await loadUats();
+      showToast('UAT berhasil dihapus.');
+    } catch(err){
+      showToast(uatErrorMessage(err, 'Gagal menghapus UAT'), 'error');
+    }
+  }
+
+  function initUat(){
+    const addBtn = document.getElementById('uat-add-btn');
+    if(addBtn) addBtn.addEventListener('click', () => openUatForm(null));
+
+    document.getElementById('uat-form-close').addEventListener('click', closeUatForm);
+    document.getElementById('uat-cancel-btn').addEventListener('click', closeUatForm);
+    document.getElementById('uat-form-overlay').addEventListener('click', (e) => {
+      if(e.target === document.getElementById('uat-form-overlay')) closeUatForm();
+    });
+    document.getElementById('uat-save-btn').addEventListener('click', saveUat);
+    document.getElementById('uat-form').addEventListener('submit', (e) => e.preventDefault());
+
+    const tbody = document.getElementById('uat-table-body');
+    tbody.addEventListener('click', (e) => {
+      const actionBtn = e.target.closest('[data-uat-action]');
+      if(!actionBtn) return;
+      const id = Number(actionBtn.dataset.id);
+      if(actionBtn.dataset.uatAction === 'edit'){
+        const uat = uats.find(u => u.id === id);
+        if(uat) openUatForm(uat);
+      } else if(actionBtn.dataset.uatAction === 'delete'){
+        deleteUat(id);
+      } else if(actionBtn.dataset.uatAction === 'process'){
+        openUatProcess(id);
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if(e.key === 'Escape' && document.getElementById('uat-form-overlay').classList.contains('open')){
+        closeUatForm();
+      }
+    });
+  }
+
+  /* ---------------- Proses UAT (test case dashboard) ---------------- */
+  const TC_STATUSES = ['Pass', 'Fail', 'Blocked', 'In Progress', 'Not Run', 'N/A'];
+  const TC_PRIORITIES = ['Critical', 'High', 'Medium', 'Low'];
+  const TC_TYPES = ['Functional', 'Negative', 'Boundary / Functional'];
+  const TC_SEVERITIES = ['', 'Critical', 'Major', 'Minor', 'Trivial'];
+  const TC_STATUS_CLASS = { 'Pass': 's-Pass', 'Fail': 's-Fail', 'Blocked': 's-Blocked', 'In Progress': 's-InProgress', 'Not Run': 's-NotRun', 'N/A': 's-NA' };
+  const TC_STATUS_ICON = {
+    'Pass': 'bi-check-circle-fill',
+    'Fail': 'bi-x-circle-fill',
+    'Blocked': 'bi-slash-circle-fill',
+    'In Progress': 'bi-arrow-repeat',
+    'Not Run': 'bi-circle',
+    'N/A': 'bi-dash-circle'
+  };
+  const TC_STATUS_COLOR = {
+    'Pass': 'var(--up-pass)',
+    'Fail': 'var(--up-fail)',
+    'Blocked': 'var(--up-blocked)',
+    'In Progress': 'var(--up-progress)',
+    'Not Run': 'var(--up-notrun)',
+    'N/A': 'var(--up-na)'
+  };
+  const BUG_SEVERITY_CLASS = { 'Critical': 'sev-critical', 'Major': 'sev-major', 'Minor': 'sev-minor', 'Trivial': 'sev-trivial' };
+  const upBugSeverityClass = (sev) => BUG_SEVERITY_CLASS[sev] || 'sev-none';
+
+  let activeUatId = null;
+  let upTestCases = [];
+  let upEditingId = null;
+  let upIdTouched = false;
+  let upOpenRows = new Set();
+  let upFilter = { q: '', module: '', status: '', priority: '' };
+  let upBugTcId = null;
+  let upBugEditingId = null;
+
+  const upEsc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const upPct = (n, d) => d ? Math.round(n / d * 100) : 0;
+
+  function upCounts(list, keyFn){
+    const m = {};
+    list.forEach(t => {
+      const k = keyFn(t);
+      m[k] = m[k] || { total: 0, Pass: 0, Fail: 0, Blocked: 0, 'In Progress': 0, 'Not Run': 0, 'N/A': 0 };
+      m[k].total++;
+      if(m[k][t.status] !== undefined) m[k][t.status]++;
+    });
+    return m;
+  }
+
+  function upBarHtml(c, total){
+    return TC_STATUSES
+      .map(s => c[s] ? `<span title="${s}: ${c[s]}" style="width:${c[s] / total * 100}%;background:${TC_STATUS_COLOR[s]}"></span>` : '')
+      .join('');
+  }
+
+  function renderUatProcessPage(){
+    const list = upTestCases;
+    const total = list.length;
+    const c = upCounts(list, () => 'all').all || { total: 0, Pass: 0, Fail: 0, Blocked: 0, 'In Progress': 0, 'Not Run': 0, 'N/A': 0 };
+    // In Progress belum dihitung selesai dieksekusi → Pass Rate = Pass / (Pass+Fail+Blocked)
+    const executed = c.Pass + c.Fail + c.Blocked;
+    const bugRecords = [];
+    list.forEach(t => (t.bugs || []).forEach(b => bugRecords.push({ tc: t, bug: b })));
+
+    // KPI cards
+    const kpiEl = document.getElementById('up-kpis');
+    if(kpiEl){
+      const items = [
+        ['Total Test Case', total, '', null],
+        ['Pass', c.Pass, upPct(c.Pass, total) + '%', 'Pass'],
+        ['Fail', c.Fail, upPct(c.Fail, total) + '%', 'Fail'],
+        ['Blocked', c.Blocked, upPct(c.Blocked, total) + '%', 'Blocked'],
+        ['In Progress', c['In Progress'], upPct(c['In Progress'], total) + '%', 'In Progress'],
+        ['Not Run', c['Not Run'], upPct(c['Not Run'], total) + '%', 'Not Run'],
+        ['N/A', c['N/A'], upPct(c['N/A'], total) + '%', 'N/A'],
+        ['Bug / Defect', bugRecords.length, 'dari seluruh test case', null],
+        ['Pass Rate', upPct(c.Pass, executed) + '%', executed + ' test dieksekusi', null],
+      ];
+      kpiEl.innerHTML = items.map(([label, val, pctText, status]) => `
+        <div class="up-kpi">
+          <div class="up-kpi-label">${status ? `<i class="bi ${TC_STATUS_ICON[status]}" style="color:${TC_STATUS_COLOR[status]}"></i>` : label === 'Bug / Defect' ? '<i class="bi bi-bug-fill" style="color:var(--gold)"></i>' : ''}${label}</div>
+          <div class="up-kpi-val">${val}</div>
+          <div class="up-kpi-pct">${pctText || '&nbsp;'}</div>
+        </div>`).join('');
+    }
+
+    // Progress bar + legend
+    const barEl = document.getElementById('up-main-bar');
+    if(barEl) barEl.innerHTML = total ? upBarHtml(c, total) : `<span style="width:100%;background:${TC_STATUS_COLOR['Not Run']}"></span>`;
+    const progressText = document.getElementById('up-progress-text');
+    if(progressText) progressText.textContent = `· ${upPct(executed, total)}% selesai dieksekusi (${executed}/${total})`;
+    const legendEl = document.getElementById('up-legend');
+    if(legendEl) legendEl.innerHTML = TC_STATUSES.map(s => `<span><i style="background:${TC_STATUS_COLOR[s]}"></i>${s} ${c[s]}</span>`).join('');
+
+    // Donut (conic-gradient, tanpa library chart)
+    let acc = 0;
+    const stops = TC_STATUSES.filter(s => c[s]).map(s => {
+      const a = acc;
+      acc += c[s] / total * 100;
+      return `${TC_STATUS_COLOR[s]} ${a}% ${acc}%`;
+    });
+    const donutEl = document.getElementById('up-donut');
+    if(donutEl) donutEl.style.background = stops.length ? `conic-gradient(${stops.join(',')})` : 'var(--up-notrun)';
+    const donutLabel = document.getElementById('up-donut-label');
+    if(donutLabel) donutLabel.innerHTML = `<span>${upPct(c.Pass, total)}%<small>Pass</small></span>`;
+    const donutLegend = document.getElementById('up-donut-legend');
+    if(donutLegend) donutLegend.innerHTML = TC_STATUSES.map(s => `<span><i style="background:${TC_STATUS_COLOR[s]}"></i>${s}: <b>${c[s]}</b></span>`).join('');
+
+    // Bugs panel (dari record bug relasi, bukan turunan status)
+    const bugsEl = document.getElementById('up-bugs');
+    if(bugsEl){
+      bugsEl.innerHTML = bugRecords.length ? bugRecords.map(({ tc, bug }) => `
+        <div class="up-bug">
+          <div>
+            <b>${upEsc(bug.title)}</b> · ${upEsc(tc.id)}
+            <div class="up-bug-sub">${upEsc(bug.notes || '—')}</div>
+          </div>
+          <div class="up-bug-right">
+            <span class="up-bug-badge ${upBugSeverityClass(bug.severity)}">${upEsc(bug.severity || 'severity –')}</span>
+            <div class="up-bug-sub">${upEsc(bug.id)}${bug.date ? ' · ' + upEsc(bug.date) : ''}</div>
+          </div>
+        </div>`).join('') : '<div class="up-empty-note">Belum ada bug tercatat 🎉</div>';
+    }
+
+    // Breakdowns
+    upBreakdown('up-by-module', upCounts(list, t => t.module));
+    upBreakdown('up-by-priority', upCounts(list, t => t.priority), TC_PRIORITIES);
+
+    // Filters + tabel
+    upRefreshFilters();
+    upRenderTable();
+
+    const countLabel = document.getElementById('up-count-label');
+    if(countLabel) countLabel.textContent = `${total} test case tercatat`;
+  }
+
+  function upBreakdown(elId, map, order){
+    const el = document.getElementById(elId);
+    if(!el) return;
+    const keys = order ? order.filter(k => map[k]) : Object.keys(map);
+    el.innerHTML = keys.length ? keys.map(k => {
+      const c = map[k];
+      return `<div class="up-row">
+        <div class="up-row-top"><span>${upEsc(k)}</span><span>${c.Pass} pass · ${c.Fail} fail · ${c.Blocked} blocked · ${c['Not Run']} not run / ${c.total}</span></div>
+        <div class="up-bar up-bar-sm">${upBarHtml(c, c.total)}</div>
+      </div>`;
+    }).join('') : '<div class="up-empty-note">Belum ada data test case.</div>';
+  }
+
+  function upModuleNames(){
+    return [...new Set(upTestCases.map(t => t.module).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  }
+
+  function upRefreshFilters(){
+    const moduleSel = document.getElementById('up-filter-module');
+    if(moduleSel){
+      moduleSel.innerHTML = '<option value="">Semua module</option>' + upModuleNames().map(m => `<option value="${upEsc(m)}">${upEsc(m)}</option>`).join('');
+      moduleSel.value = upFilter.module;
+      if(moduleSel.value !== upFilter.module) upFilter.module = ''; // pilihan sudah tidak ada di data
+    }
+    const statusSel = document.getElementById('up-filter-status');
+    if(statusSel){
+      if(statusSel.options.length <= 1){
+        statusSel.innerHTML = '<option value="">Semua status</option>' + TC_STATUSES.map(s => `<option value="${s}">${s}</option>`).join('');
+      }
+      statusSel.value = upFilter.status;
+    }
+    const prioritySel = document.getElementById('up-filter-priority');
+    if(prioritySel){
+      if(prioritySel.options.length <= 1){
+        prioritySel.innerHTML = '<option value="">Semua prioritas</option>' + TC_PRIORITIES.map(s => `<option value="${s}">${s}</option>`).join('');
+      }
+      prioritySel.value = upFilter.priority;
+    }
+    const dl = document.getElementById('up-module-list');
+    if(dl) dl.innerHTML = upModuleNames().map(m => `<option value="${upEsc(m)}"></option>`).join('');
+  }
+
+  function upFiltered(){
+    const q = upFilter.q.toLowerCase();
+    return upTestCases.filter(t =>
+      (!upFilter.module || t.module === upFilter.module) &&
+      (!upFilter.status || t.status === upFilter.status) &&
+      (!upFilter.priority || t.priority === upFilter.priority) &&
+      (!q || [t.id, t.feature, t.scenario, t.module, t.notes, t.tester].join(' ').toLowerCase().includes(q))
+    );
+  }
+
+  function upRenderTable(){
+    const tbody = document.getElementById('up-table-body');
+    if(!tbody) return;
+    const hasAny = upTestCases.length > 0;
+    const wrap = document.getElementById('up-table-wrap');
+    const emptyEl = document.getElementById('up-empty');
+    if(emptyEl) emptyEl.style.display = hasAny ? 'none' : '';
+    if(wrap) wrap.style.display = hasAny ? 'block' : 'none';
+    if(!hasAny){ tbody.innerHTML = ''; return; }
+
+    const filtered = upFiltered();
+    tbody.innerHTML = filtered.length ? filtered.map((t, i) => {
+      let h = `<tr class="up-tc" data-tc-id="${upEsc(t.id)}">
+        <td class="qa-col-num">${i + 1}</td>
+        <td class="up-tc-id">${upEsc(t.id)}</td>
+        <td>${upEsc(t.module)}</td>
+        <td>${upEsc(t.feature)}</td>
+        <td>${upEsc(t.scenario)}</td>
+        <td>${upEsc(t.type)}</td>
+        <td class="up-p-${(t.priority || '').toLowerCase()}">${upEsc(t.priority)}</td>
+        <td><span class="up-tc-badge ${TC_STATUS_CLASS[t.status] || ''}">${upEsc(t.status)}</span></td>
+        <td class="up-col-act">
+          <div class="up-actions">
+            <div class="up-quick">
+              ${TC_STATUSES.map(s => `<button type="button" class="up-status-btn ${TC_STATUS_CLASS[s]}${s === t.status ? ' active' : ''}" data-tc-action="status" data-status="${s}" data-id="${upEsc(t.id)}" title="Ubah status ke ${s}"><i class="bi ${TC_STATUS_ICON[s]}"></i></button>`).join('')}
+            </div>
+            <button type="button" class="qa-icon-btn" data-tc-action="edit" data-id="${upEsc(t.id)}" title="Edit"><i class="bi bi-pencil"></i></button>
+            <button type="button" class="qa-icon-btn danger" data-tc-action="delete" data-id="${upEsc(t.id)}" title="Hapus"><i class="bi bi-trash"></i></button>
+          </div>
+        </td>
+      </tr>`;
+      if(upOpenRows.has(t.id)){
+        const tcBugs = t.bugs || [];
+        h += `<tr class="up-detail"><td colspan="9">
+          <div class="up-dgrid">
+            <div><h4>Requirement</h4><p>${upEsc(t.req) || '–'}</p></div>
+            <div><h4>Precondition</h4><p>${upEsc(t.pre) || '–'}</p></div>
+            <div><h4>Test Data</h4><p>${upEsc(t.data) || '–'}</p></div>
+            <div><h4>Langkah</h4><ol>${(t.steps || []).map(x => `<li>${upEsc(String(x).replace(/^\s*\d+[.)]\s*/, ''))}</li>`).join('')}</ol></div>
+            <div><h4>Expected Result</h4><p>${upEsc(t.expected) || '–'}</p></div>
+            <div><h4>Actual Result</h4><p>${upEsc(t.actual) || '–'}</p></div>
+            <div><h4>Tester / Tanggal</h4><p>${upEsc(t.tester) || '–'}${t.date ? ' · ' + upEsc(t.date) : ''}</p></div>
+            <div><h4>Catatan</h4><p>${upEsc(t.notes) || '–'}</p></div>
+          </div>
+          <div class="up-bugsec">
+            <div class="up-bugsec-head">
+              <h4>Bug / Defect <span class="up-bugsec-count">${tcBugs.length}</span></h4>
+              <button type="button" class="btn btn-primary up-bugsec-add" data-tc-action="add-bug" data-id="${upEsc(t.id)}"><i class="bi bi-bug"></i> TAMBAH BUG</button>
+            </div>
+            ${tcBugs.length ? `<div class="up-bugsec-list">${tcBugs.map(b => `
+              <div class="up-bugsec-item">
+                <div class="up-bugsec-info">
+                  <span class="up-bug-id">${upEsc(b.id)}</span>
+                  <span class="up-bug-title">${upEsc(b.title)}</span>
+                  <span class="up-bug-badge ${upBugSeverityClass(b.severity)}">${upEsc(b.severity || 'severity –')}</span>
+                  ${b.date ? `<span class="up-bug-date">${upEsc(b.date)}</span>` : ''}
+                  ${b.notes ? `<span class="up-bug-notes">${upEsc(b.notes)}</span>` : ''}
+                </div>
+                <div class="up-bugsec-acts">
+                  <button type="button" class="qa-icon-btn" data-tc-action="edit-bug" data-id="${upEsc(t.id)}" data-bug-id="${upEsc(b.id)}" title="Edit bug"><i class="bi bi-pencil"></i></button>
+                  <button type="button" class="qa-icon-btn danger" data-tc-action="delete-bug" data-id="${upEsc(t.id)}" data-bug-id="${upEsc(b.id)}" title="Hapus bug"><i class="bi bi-trash"></i></button>
+                </div>
+              </div>`).join('')}</div>` : '<div class="up-bugsec-empty">Belum ada bug pada test case ini.</div>'}
+          </div>
+        </td></tr>`;
+      }
+      return h;
+    }).join('') : '<tr><td colspan="9" class="up-tc-empty">Tidak ada test case yang cocok dengan filter.</td></tr>';
+  }
+
+  function openUatProcess(id){
+    const uat = uats.find(u => u.id === id);
+    if(!uat){
+      showToast('Item UAT tidak ditemukan.', 'error');
+      return;
+    }
+    activeUatId = id;
+    upTestCases = [];
+    upOpenRows.clear();
+    upFilter = { q: '', module: '', status: '', priority: '' };
+    const qInput = document.getElementById('up-search');
+    if(qInput) qInput.value = '';
+
+    const status = UAT_STATUS_LABEL[uat.status] ? uat.status : 'not_started';
+    const titleEl = document.getElementById('uat-process-title');
+    if(titleEl) titleEl.textContent = uat.title || '—';
+    const subEl = document.getElementById('uat-process-sub');
+    if(subEl){
+      subEl.innerHTML = `Developer: <b>${escapeHtml(uat.developer || '—')}</b> · PIC UAT: <b>${escapeHtml(uat.pic || '—')}</b> · Due Date: <b>${escapeHtml(momFormatDate(uat.dueDate) || '—')}</b> · <span class="uat-status-badge ${status}">${UAT_STATUS_LABEL[status]}</span>`;
+    }
+    setActiveView('uat-process');
+    loadUatTestCases();
+  }
+
+  function closeUatProcess(){
+    activeUatId = null;
+    upTestCases = [];
+    upOpenRows.clear();
+    setActiveView('qa');
+  }
+
+  async function loadUatTestCases(){
+    if(activeUatId === null) return;
+    const tbody = document.getElementById('up-table-body');
+    if(tbody) tbody.innerHTML = '<tr><td colspan="9" class="up-tc-empty">Memuat data…</td></tr>';
+    const wrap = document.getElementById('up-table-wrap');
+    if(wrap) wrap.style.display = 'block';
+    const emptyEl = document.getElementById('up-empty');
+    if(emptyEl) emptyEl.style.display = 'none';
+    try {
+      const data = await api.get('/api/uat/' + activeUatId + '/test-cases');
+      upTestCases = Array.isArray(data.testCases) ? data.testCases : [];
+      renderUatProcessPage();
+    } catch(err){
+      console.error('Gagal memuat test case:', err);
+      if(tbody) tbody.innerHTML = `<tr><td colspan="9" class="up-tc-empty">Gagal memuat test case. Muat ulang halaman atau coba lagi.</td></tr>`;
+      showToast('Gagal memuat test case.', 'error');
+    }
+  }
+
+  function upVal(id){
+    const el = document.getElementById(id);
+    return el ? el.value : '';
+  }
+
+  function upSetVal(id, value){
+    const el = document.getElementById(id);
+    if(el) el.value = value === undefined || value === null ? '' : value;
+  }
+
+  function upToday(){
+    const d = new Date(), p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  }
+
+  function upNextId(module){
+    const word = String(module || '').trim().split(/[\s/_-]+/).filter(Boolean)[0] || 'NEW';
+    const prefix = word.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4) || 'NEW';
+    const ids = new Set(upTestCases.map(t => t.id));
+    let n = 1;
+    while(ids.has(`TC-${prefix}-${String(n).padStart(3, '0')}`)) n++;
+    return `TC-${prefix}-${String(n).padStart(3, '0')}`;
+  }
+
+  function openTcForm(tcId){
+    const tc = tcId ? upTestCases.find(t => t.id === tcId) : null;
+    if(tcId && !tc){
+      showToast('Test case tidak ditemukan.', 'error');
+      return;
+    }
+    upEditingId = tcId || null;
+    upIdTouched = !!tc;
+    document.getElementById('tc-form-title').textContent = tc ? 'Edit Test Case' : 'Tambah Test Case';
+    document.getElementById('tc-form-sub').textContent = tc
+      ? `Perbarui detail ${tc.id}.`
+      : 'Lengkapi field bertanda *. ID disarankan otomatis.';
+
+    if(tc){
+      upSetVal('tc-id', tc.id);
+      upSetVal('tc-module', tc.module);
+      upSetVal('tc-feature', tc.feature);
+      upSetVal('tc-scenario', tc.scenario);
+      upSetVal('tc-type', TC_TYPES.includes(tc.type) ? tc.type : TC_TYPES[0]);
+      upSetVal('tc-priority', TC_PRIORITIES.includes(tc.priority) ? tc.priority : 'Medium');
+      upSetVal('tc-req', tc.req);
+      upSetVal('tc-pre', tc.pre);
+      upSetVal('tc-data', tc.data);
+      upSetVal('tc-steps', (tc.steps || [])
+        .map(s => String(s).replace(/^\s*\d+[.)]\s*/, '').trim())
+        .filter(Boolean)
+        .map((s, i) => `${i + 1}. ${s}`)
+        .join('\n'));
+      upSetVal('tc-expected', tc.expected);
+      upSetVal('tc-actual', tc.actual);
+      upSetVal('tc-status', TC_STATUSES.includes(tc.status) ? tc.status : 'Not Run');
+      upSetVal('tc-severity', TC_SEVERITIES.includes(tc.severity) ? tc.severity : '');
+      upSetVal('tc-tester', tc.tester);
+      upSetVal('tc-date', tc.date);
+      upSetVal('tc-notes', tc.notes);
+    } else {
+      upSetVal('tc-id', '');
+      upSetVal('tc-module', '');
+      upSetVal('tc-feature', '');
+      upSetVal('tc-scenario', '');
+      upSetVal('tc-type', TC_TYPES[0]);
+      upSetVal('tc-priority', 'Medium');
+      upSetVal('tc-req', '');
+      upSetVal('tc-pre', '');
+      upSetVal('tc-data', '');
+      upSetVal('tc-steps', '');
+      upSetVal('tc-expected', '');
+      upSetVal('tc-actual', '');
+      upSetVal('tc-status', 'Not Run');
+      upSetVal('tc-severity', '');
+      upSetVal('tc-tester', '');
+      upSetVal('tc-date', '');
+      upSetVal('tc-notes', '');
+      upSetVal('tc-id', upNextId(''));
+    }
+    const idEl = document.getElementById('tc-id');
+    if(idEl){
+      idEl.readOnly = !!tc;
+      idEl.title = tc ? 'ID test case tidak dapat diubah saat mengedit' : 'ID disarankan otomatis (TC-MOD-NNN)';
+    }
+    document.getElementById('tc-form-overlay').classList.add('open');
+    setTimeout(() => {
+      const focusEl = document.getElementById(tc ? 'tc-feature' : 'tc-module');
+      if(focusEl) focusEl.focus();
+    }, 80);
+  }
+
+  function closeTcForm(){
+    const overlay = document.getElementById('tc-form-overlay');
+    if(overlay) overlay.classList.remove('open');
+    upEditingId = null;
+  }
+
+  function readTcForm(){
+    const get = id => upVal(id).trim();
+    const steps = get('tc-steps')
+      .split(/\r?\n/)
+      .map(s => s.replace(/^\s*\d+[.)]\s*/, '').trim())
+      .filter(Boolean)
+      .map((s, i) => `${i + 1}. ${s}`);
+    return {
+      id: get('tc-id'),
+      module: get('tc-module'),
+      feature: get('tc-feature'),
+      req: get('tc-req'),
+      scenario: get('tc-scenario'),
+      type: upVal('tc-type'),
+      priority: upVal('tc-priority'),
+      pre: get('tc-pre'),
+      data: get('tc-data'),
+      steps,
+      expected: get('tc-expected'),
+      actual: get('tc-actual'),
+      status: upVal('tc-status'),
+      severity: upVal('tc-severity'),
+      tester: get('tc-tester'),
+      date: get('tc-date'),
+      notes: get('tc-notes'),
+    };
+  }
+
+  function upFocusField(id){
+    const el = document.getElementById(id);
+    if(el) el.focus();
+  }
+
+  function upFocusRow(tcId){
+    const btn = [...document.querySelectorAll('#up-table-body [data-tc-action="edit"]')].find(b => b.dataset.id === tcId);
+    if(btn) btn.focus();
+  }
+
+  function validateTc(rec){
+    if(!rec.id){ showToast('ID test case wajib diisi.', 'error'); upFocusField('tc-id'); return false; }
+    if(!rec.module){ showToast('Module wajib diisi.', 'error'); upFocusField('tc-module'); return false; }
+    if(!rec.feature){ showToast('Fitur wajib diisi.', 'error'); upFocusField('tc-feature'); return false; }
+    if(!rec.scenario){ showToast('Skenario wajib diisi.', 'error'); upFocusField('tc-scenario'); return false; }
+    if(!rec.expected){ showToast('Expected result wajib diisi.', 'error'); upFocusField('tc-expected'); return false; }
+    if(!rec.steps.length){ showToast('Minimal satu langkah.', 'error'); upFocusField('tc-steps'); return false; }
+    if(rec.id !== upEditingId && upTestCases.some(t => t.id === rec.id)){
+      showToast('ID sudah digunakan test case lain.', 'error');
+      upFocusField('tc-id');
+      return false;
+    }
+    return true;
+  }
+
+  async function saveTc(){
+    const rec = readTcForm();
+    if(!validateTc(rec)) return;
+    if(rec.status !== 'Not Run' && !rec.date) rec.date = upToday();
+    const isEdit = !!upEditingId;
+    try {
+      const saved = isEdit
+        ? await api.put('/api/uat/' + activeUatId + '/test-cases/' + encodeURIComponent(upEditingId), rec)
+        : await api.post('/api/uat/' + activeUatId + '/test-cases', rec);
+      closeTcForm();
+      if(!isEdit){
+        // Seperti versi asli: reset filter agar test case baru langsung terlihat
+        upFilter = { q: '', module: '', status: '', priority: '' };
+        upSetVal('up-search', '');
+        upSetVal('up-filter-module', '');
+        upSetVal('up-filter-status', '');
+        upSetVal('up-filter-priority', '');
+      }
+      await loadUatTestCases();
+      const id = (saved && saved.testCase && saved.testCase.id) || rec.id;
+      showToast(isEdit ? `Perubahan untuk ${id} tersimpan.` : `Test case ${id} tersimpan.`);
+      upFocusRow(id);
+    } catch(err){
+      showToast(uatErrorMessage(err, 'Gagal menyimpan test case'), 'error');
+    }
+  }
+
+  async function changeTcStatus(tcId, status){
+    const tc = upTestCases.find(t => t.id === tcId);
+    if(!tc || tc.status === status) return;
+    const body = { status };
+    if(status !== 'Not Run' && !tc.date) body.date = upToday(); // aturan auto-date versi asli
+    try {
+      await api.put('/api/uat/' + activeUatId + '/test-cases/' + encodeURIComponent(tcId), body);
+      await loadUatTestCases();
+      showToast(`${tcId} → ${status}`);
+    } catch(err){
+      showToast(uatErrorMessage(err, 'Gagal mengubah status test case'), 'error');
+    }
+  }
+
+  async function deleteTc(tcId){
+    const confirmed = await showConfirm(
+      `Yakin ingin menghapus test case <strong>${escapeHtml(tcId)}</strong>?`,
+      'Ya, Hapus',
+      'Batal'
+    );
+    if(!confirmed) return;
+    try {
+      await api.del('/api/uat/' + activeUatId + '/test-cases/' + encodeURIComponent(tcId));
+      upOpenRows.delete(tcId);
+      await loadUatTestCases();
+      showToast(`Test case ${tcId} dihapus.`);
+    } catch(err){
+      showToast(uatErrorMessage(err, 'Gagal menghapus test case'), 'error');
+    }
+  }
+
+  /* ---------- Bug (relasi per test case) ---------- */
+  function openBugForm(tcId, bugId){
+    const tc = upTestCases.find(t => t.id === tcId);
+    if(!tc){
+      showToast('Test case tidak ditemukan.', 'error');
+      return;
+    }
+    const bug = bugId ? (tc.bugs || []).find(b => b.id === bugId) : null;
+    if(bugId && !bug){
+      showToast('Bug tidak ditemukan.', 'error');
+      return;
+    }
+    upBugTcId = tcId;
+    upBugEditingId = bugId || null;
+    document.getElementById('bug-form-title').textContent = bug ? 'Edit Bug' : 'Tambah Bug';
+    document.getElementById('bug-form-sub').textContent = bug
+      ? `${bug.id} — test case ${tcId} · ID tidak dapat diubah`
+      : `Test case ${tcId} · ID bug dibuat otomatis (BUG-NNN)`;
+    upSetVal('bug-title', bug ? bug.title : '');
+    upSetVal('bug-severity', bug && TC_SEVERITIES.includes(bug.severity) ? bug.severity : '');
+    upSetVal('bug-date', bug ? bug.date : upToday());
+    upSetVal('bug-notes', bug ? bug.notes : '');
+    document.getElementById('bug-form-overlay').classList.add('open');
+    setTimeout(() => upFocusField('bug-title'), 80);
+  }
+
+  function closeBugForm(){
+    const overlay = document.getElementById('bug-form-overlay');
+    if(overlay) overlay.classList.remove('open');
+    upBugTcId = null;
+    upBugEditingId = null;
+  }
+
+  async function saveBug(){
+    const tcId = upBugTcId;
+    const rec = {
+      title: upVal('bug-title').trim(),
+      severity: upVal('bug-severity'),
+      date: upVal('bug-date'),
+      notes: upVal('bug-notes').trim(),
+    };
+    if(!rec.title){
+      showToast('Judul bug wajib diisi.', 'error');
+      upFocusField('bug-title');
+      return;
+    }
+    const isEdit = !!upBugEditingId;
+    try {
+      const saved = isEdit
+        ? await api.put(`/api/uat/${activeUatId}/test-cases/${encodeURIComponent(tcId)}/bugs/${encodeURIComponent(upBugEditingId)}`, rec)
+        : await api.post(`/api/uat/${activeUatId}/test-cases/${encodeURIComponent(tcId)}/bugs`, rec);
+      closeBugForm();
+      await loadUatTestCases();
+      const bugId = saved && saved.bug ? saved.bug.id : '';
+      showToast(isEdit ? `Bug ${bugId} diperbarui.` : `Bug ${bugId} ditambahkan ke ${tcId}.`);
+    } catch(err){
+      showToast(uatErrorMessage(err, 'Gagal menyimpan bug'), 'error');
+    }
+  }
+
+  async function deleteBug(tcId, bugId){
+    const confirmed = await showConfirm(
+      `Yakin ingin menghapus bug <strong>${escapeHtml(bugId)}</strong>?`,
+      'Ya, Hapus',
+      'Batal'
+    );
+    if(!confirmed) return;
+    try {
+      await api.del(`/api/uat/${activeUatId}/test-cases/${encodeURIComponent(tcId)}/bugs/${encodeURIComponent(bugId)}`);
+      await loadUatTestCases();
+      showToast(`Bug ${bugId} dihapus.`);
+    } catch(err){
+      showToast(uatErrorMessage(err, 'Gagal menghapus bug'), 'error');
+    }
+  }
+
+  function upDownload(name, text, type){
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type }));
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function upExportCsv(){
+    const list = upFiltered();
+    const header = ['id', 'module', 'feature', 'scenario', 'type', 'priority', 'status', 'severity', 'tester', 'date', 'actual', 'bugs'];
+    const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+    upDownload(
+      'uat-test-cases-' + activeUatId + '.csv',
+      [header.join(',')].concat(list.map(t => header.map(k => q(k === 'bugs' ? (t.bugs || []).length : t[k])).join(','))).join('\n'),
+      'text/csv'
+    );
+    showToast(`${list.length} test case diekspor ke CSV.`);
+  }
+
+  function upExportJson(){
+    const uat = uats.find(u => u.id === activeUatId);
+    const payload = {
+      uatTitle: uat ? uat.title : '',
+      updatedAt: new Date().toISOString(),
+      count: upTestCases.length,
+      testCases: upTestCases,
+    };
+    upDownload(
+      'uat-test-cases-' + activeUatId + '.json',
+      JSON.stringify(payload, null, 2) + '\n',
+      'application/json'
+    );
+    showToast('Test case diekspor ke JSON.');
+  }
+
+  function initUatProcess(){
+    const backBtn = document.getElementById('uat-process-back');
+    if(backBtn) backBtn.addEventListener('click', closeUatProcess);
+    const addBtn = document.getElementById('up-add-btn');
+    if(addBtn) addBtn.addEventListener('click', () => openTcForm(null));
+    const csvBtn = document.getElementById('up-export-csv');
+    if(csvBtn) csvBtn.addEventListener('click', upExportCsv);
+    const jsonBtn = document.getElementById('up-export-json');
+    if(jsonBtn) jsonBtn.addEventListener('click', upExportJson);
+
+    // Filter & pencarian (debounce seperti MoM)
+    let searchTimer;
+    const searchInput = document.getElementById('up-search');
+    if(searchInput) searchInput.addEventListener('input', (e) => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        upFilter.q = e.target.value.trim();
+        upRenderTable();
+      }, 250);
+    });
+    const moduleSel = document.getElementById('up-filter-module');
+    if(moduleSel) moduleSel.addEventListener('change', (e) => { upFilter.module = e.target.value; upRenderTable(); });
+    const statusSel = document.getElementById('up-filter-status');
+    if(statusSel) statusSel.addEventListener('change', (e) => { upFilter.status = e.target.value; upRenderTable(); });
+    const prioritySel = document.getElementById('up-filter-priority');
+    if(prioritySel) prioritySel.addEventListener('change', (e) => { upFilter.priority = e.target.value; upRenderTable(); });
+    const resetBtn = document.getElementById('up-filter-reset');
+    if(resetBtn) resetBtn.addEventListener('click', () => {
+      upFilter = { q: '', module: '', status: '', priority: '' };
+      upSetVal('up-search', '');
+      upSetVal('up-filter-module', '');
+      upSetVal('up-filter-status', '');
+      upSetVal('up-filter-priority', '');
+      upRenderTable();
+    });
+
+    // Delegasi klik tabel (row expand + quick status + edit + hapus)
+    const tbody = document.getElementById('up-table-body');
+    if(tbody) tbody.addEventListener('click', (e) => {
+      const actionBtn = e.target.closest('[data-tc-action]');
+      if(actionBtn){
+        const id = actionBtn.dataset.id;
+        const action = actionBtn.dataset.tcAction;
+        if(action === 'status') changeTcStatus(id, actionBtn.dataset.status);
+        else if(action === 'edit') openTcForm(id);
+        else if(action === 'delete') deleteTc(id);
+        else if(action === 'add-bug') openBugForm(id, null);
+        else if(action === 'edit-bug') openBugForm(id, actionBtn.dataset.bugId);
+        else if(action === 'delete-bug') deleteBug(id, actionBtn.dataset.bugId);
+        return;
+      }
+      const tr = e.target.closest('tr.up-tc');
+      if(!tr) return;
+      const id = tr.dataset.tcId;
+      if(upOpenRows.has(id)) upOpenRows.delete(id);
+      else upOpenRows.add(id);
+      upRenderTable();
+    });
+
+    // Form test case
+    const closeBtn = document.getElementById('tc-form-close');
+    if(closeBtn) closeBtn.addEventListener('click', closeTcForm);
+    const cancelBtn = document.getElementById('tc-cancel-btn');
+    if(cancelBtn) cancelBtn.addEventListener('click', closeTcForm);
+    const overlay = document.getElementById('tc-form-overlay');
+    if(overlay) overlay.addEventListener('click', (e) => {
+      if(e.target === overlay) closeTcForm();
+    });
+    const saveBtn = document.getElementById('tc-save-btn');
+    if(saveBtn) saveBtn.addEventListener('click', saveTc);
+    const form = document.getElementById('tc-form');
+    if(form) form.addEventListener('submit', (e) => { e.preventDefault(); saveTc(); });
+
+    // Form bug (relasi test case)
+    const bugCloseBtn = document.getElementById('bug-form-close');
+    if(bugCloseBtn) bugCloseBtn.addEventListener('click', closeBugForm);
+    const bugCancelBtn = document.getElementById('bug-cancel-btn');
+    if(bugCancelBtn) bugCancelBtn.addEventListener('click', closeBugForm);
+    const bugOverlay = document.getElementById('bug-form-overlay');
+    if(bugOverlay) bugOverlay.addEventListener('click', (e) => {
+      if(e.target === bugOverlay) closeBugForm();
+    });
+    const bugSaveBtn = document.getElementById('bug-save-btn');
+    if(bugSaveBtn) bugSaveBtn.addEventListener('click', saveBug);
+    const bugForm = document.getElementById('bug-form');
+    if(bugForm) bugForm.addEventListener('submit', (e) => { e.preventDefault(); saveBug(); });
+
+    // Auto-ID saat mengetik module (sampai user menyentuh field ID)
+    const moduleInput = document.getElementById('tc-module');
+    if(moduleInput) moduleInput.addEventListener('input', () => {
+      if(!upEditingId && !upIdTouched) upSetVal('tc-id', upNextId(upVal('tc-module')));
+    });
+    const idInput = document.getElementById('tc-id');
+    if(idInput) idInput.addEventListener('input', () => { if(!upEditingId) upIdTouched = true; });
+
+    document.addEventListener('keydown', (e) => {
+      if(e.key !== 'Escape') return;
+      // Form bug di atas form test case → tutup yang paling atas dulu
+      if(document.getElementById('bug-form-overlay').classList.contains('open')) closeBugForm();
+      else if(document.getElementById('tc-form-overlay').classList.contains('open')) closeTcForm();
+    });
+  }
+
+  function renderMomPage(){
+    const tbody = document.getElementById('mom-table-body');
+    if(!tbody) return;
+
+    const currentMonth = fmt(today()).slice(0, 7);
+    const monthCount = momMeetings.filter(m => String(m.date || '').slice(0, 7) === currentMonth).length;
+    const counts = momActionCounts();
+    const statsEl = document.getElementById('mom-stats');
+    if(statsEl){
+      statsEl.innerHTML = `
+        <div class="mom-stat">
+          <div class="mom-stat-icon total"><i class="bi bi-journal-check"></i></div>
+          <div><div class="mom-stat-num">${momMeetings.length}</div><div class="mom-stat-label">Total MoM</div></div>
+        </div>
+        <div class="mom-stat">
+          <div class="mom-stat-icon month"><i class="bi bi-calendar3"></i></div>
+          <div><div class="mom-stat-num">${monthCount}</div><div class="mom-stat-label">Rapat Bulan Ini</div></div>
+        </div>
+        <div class="mom-stat">
+          <div class="mom-stat-icon open"><i class="bi bi-list-task"></i></div>
+          <div><div class="mom-stat-num">${counts.open}</div><div class="mom-stat-label">Action Item Open</div></div>
+        </div>
+        <div class="mom-stat">
+          <div class="mom-stat-icon overdue"><i class="bi bi-exclamation-triangle"></i></div>
+          <div><div class="mom-stat-num">${counts.overdue}</div><div class="mom-stat-label">Action Item Overdue</div></div>
+        </div>
+      `;
+    }
+
+    const monthSelect = document.getElementById('mom-filter-month');
+    if(monthSelect){
+      const months = Array.from(new Set(
+        momMeetings.map(m => String(m.date || '').slice(0, 7)).filter(Boolean)
+      )).sort().reverse();
+      if(momFilter.month && !months.includes(momFilter.month)) momFilter.month = '';
+      monthSelect.innerHTML = '<option value="">Semua Bulan</option>' + months.map(ym => {
+        const parts = ym.split('-');
+        const label = `${MOM_MONTHS_ID[Number(parts[1]) - 1] || parts[1]} ${parts[0]}`;
+        return `<option value="${ym}"${ym === momFilter.month ? ' selected' : ''}>${label}</option>`;
+      }).join('');
+    }
+    const filtered = momFilteredMeetings();
+    const countLabel = document.getElementById('mom-count-label');
+    if(countLabel){
+      countLabel.textContent = filtered.length === momMeetings.length
+        ? `${momMeetings.length} MoM tercatat`
+        : `Menampilkan ${filtered.length} dari ${momMeetings.length} MoM`;
+    }
+
+    tbody.innerHTML = filtered.map((m, i) => {
+      const status = m.status === 'final' ? 'final' : 'draft';
+      const openActions = (m.actionItems || []).filter(a => a.status !== 'done').length;
+      const participantCount = (m.attendees || []).filter(a => String(a.name || '').trim()).length;
+      const typeLabel = MOM_TYPES[m.meetingType] || MOM_TYPES.lainnya;
+      return `
+        <tr data-mom-id="${m.id}">
+          <td class="mom-col-num">${i + 1}</td>
+          <td><span class="mom-number">${momEsc(m.momNumber || '—')}</span></td>
+          <td>
+            <div class="mom-title-cell">${momEsc(m.title || '(Tanpa judul)')}</div>
+            <div class="mom-sub-cell">${momEsc(typeLabel)}</div>
+          </td>
+          <td>${momEsc(momFormatDate(m.date))}</td>
+          <td class="mom-time-cell">${momEsc(momTimeRange(m))}</td>
+          <td>${momEsc(m.location || '—')}</td>
+          <td class="mom-people-cell">
+            <span><b>${momEsc(m.chair || '—')}</b></span>
+            <span>${momEsc(m.notetaker || '—')}</span>
+          </td>
+          <td class="mom-col-center">${participantCount}</td>
+          <td class="mom-col-center">${openActions}</td>
+          <td class="mom-col-center"><span class="mom-badge ${status}">${status === 'final' ? 'Final' : 'Draft'}</span></td>
+          <td class="mom-col-act">
+            <div class="mom-actions">
+              <button type="button" class="mom-icon-btn" data-mom-action="preview" data-id="${m.id}" title="Preview"><i class="bi bi-eye"></i></button>
+              <button type="button" class="mom-icon-btn" data-mom-action="edit" data-id="${m.id}" title="Edit"><i class="bi bi-pencil"></i></button>
+              <button type="button" class="mom-icon-btn danger" data-mom-action="delete" data-id="${m.id}" title="Hapus"><i class="bi bi-trash"></i></button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    const emptyEl = document.getElementById('mom-empty');
+    if(emptyEl) emptyEl.style.display = filtered.length === 0 ? 'block' : 'none';
+  }
+
+  function momSignatureBlock(label, sig){
+    const signature = sig && sig.signature
+      ? `<img src="${momEsc(sig.signature)}" alt="Tanda tangan">`
+      : '';
+    return `
+      <div class="mom-doc-sign">
+        <div class="mom-doc-sign-label">${label},</div>
+        <div class="mom-doc-sign-space">${signature}</div>
+        <div class="mom-doc-sign-line"></div>
+        <div class="mom-doc-sign-name">${momEsc(sig && sig.name ? sig.name : '................................')}</div>
+        <div class="mom-doc-sign-role">${momEsc(sig && sig.role ? sig.role : 'Jabatan')}</div>
+        <div class="mom-doc-sign-date">${sig && sig.date ? 'Tanggal: ' + momEsc(momFormatDate(sig.date)) : '&nbsp;'}</div>
+      </div>
+    `;
+  }
+
+  function momBuildDoc(m){
+    const infoRows = [
+      ['Nomor MoM', m.momNumber || '—'],
+      ['Jenis Rapat', MOM_TYPES[m.meetingType] || MOM_TYPES.lainnya],
+      ['Hari / Tanggal', momFormatDate(m.date)],
+      ['Waktu', momTimeRange(m)],
+      ['Lokasi / Link', m.location || '—'],
+      ['Pimpinan Rapat', m.chair || '—'],
+      ['Notulis', m.notetaker || '—'],
+      ['Status', m.status === 'final' ? 'Final' : 'Draft'],
+    ];
+
+    const attendees = (m.attendees || []).filter(a => String(a.name || '').trim());
+    const agenda = (m.agenda || []).filter(a => String(a.topic || '').trim());
+    const discussions = (m.discussions || []).filter(d => String(d.notes || '').trim() || String(d.agendaTopic || '').trim());
+    const decisions = (m.decisions || []).filter(d => String(d.text || '').trim());
+    const actions = (m.actionItems || []).filter(a => String(a.description || '').trim());
+
+    let html = `
+      <div class="mom-doc-head">
+        <div class="mom-doc-kicker">Minutes of Meeting</div>
+        <h1>${momEsc(m.title || '(Tanpa judul)')}</h1>
+        <div class="mom-doc-number">${momEsc(m.momNumber || '')}</div>
+      </div>
+      <table class="mom-doc-table mom-doc-info">
+        <tbody>
+          ${infoRows.map(([label, value]) => `<tr><th>${momEsc(label)}</th><td>${momEsc(value)}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    `;
+
+    html += '<div class="mom-doc-section"><h2>Peserta Meeting</h2>';
+    if(attendees.length){
+      html += `
+        <table class="mom-doc-table">
+          <thead><tr><th style="width:34px;">No.</th><th>Nama</th><th>Jabatan / Divisi</th><th>Instansi</th><th>Kehadiran</th></tr></thead>
+          <tbody>
+            ${attendees.map((a, i) => `
+              <tr>
+                <td>${i + 1}</td>
+                <td>${momEsc(a.name)}</td>
+                <td>${momEsc(a.role || '—')}</td>
+                <td>${momEsc(a.organization || '—')}</td>
+                <td>${momEsc(MOM_ATTENDANCE[a.attendance] || MOM_ATTENDANCE.present)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    } else {
+      html += '<p class="mom-doc-muted">Tidak ada data peserta.</p>';
+    }
+    html += '</div>';
+
+    if(agenda.length){
+      html += `
+        <div class="mom-doc-section">
+          <h2>Agenda Meeting</h2>
+          <table class="mom-doc-table">
+            <thead><tr><th style="width:34px;">No.</th><th>Agenda</th><th>Presenter / PIC</th><th>Durasi</th></tr></thead>
+            <tbody>
+              ${agenda.map((a, i) => `
+                <tr>
+                  <td>${i + 1}</td>
+                  <td>${momEsc(a.topic)}</td>
+                  <td>${momEsc(a.presenter || '—')}</td>
+                  <td>${momEsc(a.duration ? a.duration + ' menit' : '—')}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    if(discussions.length){
+      html += `
+        <div class="mom-doc-section">
+          <h2>Poin-poin Pembahasan</h2>
+          <ol class="mom-doc-list">
+            ${discussions.map(d => `
+              <li>
+                ${d.agendaTopic ? `<strong>${momEsc(d.agendaTopic)}</strong><br>` : ''}
+                <div class="mom-doc-p">${momNl2br(d.notes)}</div>
+              </li>
+            `).join('')}
+          </ol>
+        </div>
+      `;
+    }
+
+    if(decisions.length){
+      html += `
+        <div class="mom-doc-section">
+          <h2>Keputusan / Kesepakatan</h2>
+          <ol class="mom-doc-list">
+            ${decisions.map(d => `<li>${momNl2br(d.text)}</li>`).join('')}
+          </ol>
+        </div>
+      `;
+    }
+
+    if(actions.length){
+      html += `
+        <div class="mom-doc-section">
+          <h2>Action Item / Tindak Lanjut</h2>
+          <table class="mom-doc-table">
+            <thead><tr><th style="width:34px;">No.</th><th>Action Item</th><th>PIC</th><th>Due Date</th><th>Status</th></tr></thead>
+            <tbody>
+              ${actions.map((a, i) => `
+                <tr>
+                  <td>${i + 1}</td>
+                  <td>${momNl2br(a.description)}</td>
+                  <td>${momEsc(a.pic || '—')}</td>
+                  <td>${a.dueDate ? momEsc(momFormatDate(a.dueDate)) : '—'}</td>
+                  <td>${momEsc(MOM_ACTION_STATUS[a.status] || MOM_ACTION_STATUS.open)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    if(m.nextSteps || m.nextMeetingDate || m.nextMeetingTime || m.nextMeetingLocation){
+      html += `
+        <div class="mom-doc-section">
+          <h2>What's Next / Rencana Selanjutnya</h2>
+          ${m.nextSteps ? `<p class="mom-doc-p">${momNl2br(m.nextSteps)}</p>` : ''}
+          <div class="mom-doc-meta">
+            ${m.nextMeetingDate ? `<span><b>Rapat berikutnya:</b> ${momEsc(momFormatDate(m.nextMeetingDate))}</span>` : ''}
+            ${m.nextMeetingTime ? `<span><b>Waktu:</b> ${momEsc(m.nextMeetingTime)}</span>` : ''}
+            ${m.nextMeetingLocation ? `<span><b>Lokasi:</b> ${momEsc(m.nextMeetingLocation)}</span>` : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    html += `
+      <div class="mom-doc-signatures">
+        ${momSignatureBlock('Dibuat oleh', m.preparedBy)}
+        ${momSignatureBlock('Disetujui oleh', m.approvedBy)}
+      </div>
+    `;
+
+    return html;
+  }
+
+  function openMomPreview(id){
+    const meeting = momMeetings.find(m => m.id === id);
+    if(!meeting) return;
+    momPreviewId = id;
+    const sub = document.getElementById('mom-preview-sub');
+    if(sub) sub.textContent = `${meeting.momNumber || 'MoM'} · ${momFormatDate(meeting.date)} · ${meeting.status === 'final' ? 'Final' : 'Draft'}`;
+    const doc = document.getElementById('mom-printable');
+    if(doc) doc.innerHTML = momBuildDoc(meeting);
+    document.getElementById('mom-preview-overlay').classList.add('open');
+  }
+
+  function closeMomPreview(){
+    const overlay = document.getElementById('mom-preview-overlay');
+    if(overlay) overlay.classList.remove('open');
+  }
+
+  function openMomEdit(id){
+    const meeting = momMeetings.find(m => m.id === id);
+    if(!meeting) return;
+    closeMomPreview();
+    openMomForm(meeting);
+  }
+
+  async function deleteMom(id){
+    const meeting = momMeetings.find(m => m.id === id);
+    if(!meeting) return;
+    const confirmed = await showConfirm(
+      `Yakin ingin menghapus MoM <strong>${momEsc(meeting.title || 'ini')}</strong>?`,
+      'Ya, Hapus',
+      'Batal'
+    );
+    if(!confirmed) return;
+    try {
+      await api.del('/api/mom/' + id);
+      if(momPreviewId === id) closeMomPreview();
+      if(momEditingId === id) closeMomForm();
+      await loadMomMeetings();
+      showToast('MoM berhasil dihapus.');
+    } catch(err){
+      showToast('Gagal menghapus MoM: ' + err.message, 'error');
+    }
+  }
+
+  async function exportMomPdf(){
+    const el = document.getElementById('mom-printable');
+    if(!el) return;
+    if(typeof html2pdf === 'undefined'){
+      showToast('Library PDF belum dimuat. Silakan coba lagi.', 'error');
+      return;
+    }
+    const meeting = momMeetings.find(m => m.id === momPreviewId);
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    if(currentTheme === 'dark') document.documentElement.setAttribute('data-theme', 'light');
+    el.classList.add('mom-print-light');
+
+    const fileName = ((meeting && meeting.momNumber) || 'MoM').replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') + '.pdf';
+    const opt = {
+      margin: [10, 10, 10, 10],
+      filename: fileName || 'MoM.pdf',
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    };
+
+    try {
+      await html2pdf().set(opt).from(el).save();
+    } catch(err){
+      showToast('Gagal export PDF: ' + err.message, 'error');
+    } finally {
+      el.classList.remove('mom-print-light');
+      if(currentTheme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  }
+
+  function openMomTemplate(){
+    document.getElementById('mom-template-overlay').classList.add('open');
+  }
+
+  function closeMomTemplate(){
+    document.getElementById('mom-template-overlay').classList.remove('open');
+  }
+
+  function initMom(){
+    const addBtns = [document.getElementById('mom-add-btn'), document.getElementById('mom-add-btn-2')];
+    addBtns.forEach(btn => {
+      if(btn) btn.addEventListener('click', () => openMomForm(null));
+    });
+
+    document.getElementById('mom-template-btn').addEventListener('click', openMomTemplate);
+    document.getElementById('mom-template-close').addEventListener('click', closeMomTemplate);
+    document.getElementById('mom-template-ok').addEventListener('click', closeMomTemplate);
+    document.getElementById('mom-template-overlay').addEventListener('click', (e) => {
+      if(e.target === document.getElementById('mom-template-overlay')) closeMomTemplate();
+    });
+
+    const searchInput = document.getElementById('mom-search');
+    searchInput.addEventListener('input', () => {
+      clearTimeout(momSearchTimer);
+      momSearchTimer = setTimeout(() => {
+        momFilter.search = searchInput.value.trim();
+        renderMomPage();
+      }, 150);
+    });
+
+    document.getElementById('mom-filter-status').addEventListener('change', (e) => {
+      momFilter.status = e.target.value;
+      renderMomPage();
+    });
+    document.getElementById('mom-filter-month').addEventListener('change', (e) => {
+      momFilter.month = e.target.value;
+      renderMomPage();
+    });
+    document.getElementById('mom-filter-reset').addEventListener('click', () => {
+      momFilter = { search: '', status: '', month: '' };
+      searchInput.value = '';
+      document.getElementById('mom-filter-status').value = '';
+      document.getElementById('mom-filter-month').value = '';
+      renderMomPage();
+    });
+
+    document.getElementById('mom-table-body').addEventListener('click', (e) => {
+      const actionBtn = e.target.closest('[data-mom-action]');
+      if(actionBtn){
+        e.stopPropagation();
+        const id = Number(actionBtn.dataset.id);
+        const action = actionBtn.dataset.momAction;
+        if(action === 'preview') openMomPreview(id);
+        if(action === 'edit') openMomEdit(id);
+        if(action === 'delete') deleteMom(id);
+        return;
+      }
+      const row = e.target.closest('tr[data-mom-id]');
+      if(row) openMomPreview(Number(row.dataset.momId));
+    });
+
+    document.getElementById('mom-form-close').addEventListener('click', closeMomForm);
+    document.getElementById('mom-cancel-btn').addEventListener('click', closeMomForm);
+    document.getElementById('mom-form-overlay').addEventListener('click', (e) => {
+      if(e.target === document.getElementById('mom-form-overlay')) closeMomForm();
+    });
+
+    document.getElementById('mom-save-draft-btn').addEventListener('click', () => saveMom('draft'));
+    document.getElementById('mom-save-final-btn').addEventListener('click', () => saveMom('final'));
+    document.getElementById('mom-delete-btn').addEventListener('click', () => {
+      if(momEditingId) deleteMom(momEditingId);
+    });
+
+    document.getElementById('mom-form').addEventListener('input', momHandleArrayInput);
+    document.getElementById('mom-form').addEventListener('change', momHandleArrayInput);
+    document.getElementById('mom-form').addEventListener('click', momHandleArrayRemove);
+    document.getElementById('mom-form').addEventListener('submit', (e) => e.preventDefault());
+
+    document.getElementById('mom-add-attendee').addEventListener('click', () => {
+      momDraft.attendees.push({ name: '', role: '', organization: '', attendance: 'present' });
+      momRenderAttendees();
+    });
+    document.getElementById('mom-add-agenda').addEventListener('click', () => {
+      momDraft.agenda.push({ topic: '', presenter: '', duration: '' });
+      momRenderAgenda();
+    });
+    document.getElementById('mom-add-discussion').addEventListener('click', () => {
+      momDraft.discussions.push({ agendaTopic: '', notes: '' });
+      momRenderDiscussions();
+    });
+    document.getElementById('mom-add-decision').addEventListener('click', () => {
+      momDraft.decisions.push({ text: '' });
+      momRenderDecisions();
+    });
+    document.getElementById('mom-add-action').addEventListener('click', () => {
+      momDraft.actionItems.push({ description: '', pic: '', dueDate: '', status: 'open' });
+      momRenderActions();
+    });
+
+    document.querySelectorAll('[data-sign-clear]').forEach(btn => {
+      btn.addEventListener('click', () => momClearSignature(btn.dataset.signClear));
+    });
+
+    document.getElementById('mom-preview-close').addEventListener('click', closeMomPreview);
+    document.getElementById('mom-preview-overlay').addEventListener('click', (e) => {
+      if(e.target === document.getElementById('mom-preview-overlay')) closeMomPreview();
+    });
+    document.getElementById('mom-preview-edit').addEventListener('click', () => {
+      if(momPreviewId) openMomEdit(momPreviewId);
+    });
+    document.getElementById('mom-export-pdf').addEventListener('click', exportMomPdf);
+
+    document.addEventListener('keydown', (e) => {
+      if(e.key === 'Escape'){
+        if(document.getElementById('mom-form-overlay').classList.contains('open')) closeMomForm();
+        else if(document.getElementById('mom-preview-overlay').classList.contains('open')) closeMomPreview();
+        else if(document.getElementById('mom-template-overlay').classList.contains('open')) closeMomTemplate();
+      }
+    });
+  }
+
+  initMom();
+  initUat();
+  initUatProcess();
+
   /* ---------------- Init ---------------- */
-  loadTasks();
+  (async () => {
+    await Promise.all([loadTasks(), loadDailyTasks(), loadMomMeetings(), loadUats()]);
+  })();
+
+  // Update date labels when the day rolls over (checked every 30s)
+  let lastDateKey = fmt(today());
+  setInterval(() => {
+    const key = fmt(today());
+    if(key !== lastDateKey){
+      lastDateKey = key;
+      updateDateLabels();
+      loadDailyTasks();
+    }
+  }, 30000);
+
+  // Daily Task card click handler (delegated)
+  els.overviewCards.addEventListener('click', (e) => {
+    const card = e.target.closest('#card-daily-task');
+    if (card) {
+      openDailyTaskPanel();
+    }
+  });
 
 })();
