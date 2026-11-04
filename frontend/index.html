@@ -21,7 +21,7 @@
       <span class="nav-subtitle">System Analyst & Associate PM</span>
     </div>
     <nav class="nav-menu" id="nav-menu">
-      <a href="#" class="nav-item active" data-view="dashboard">
+      <a href="#" class="nav-item" data-view="dashboard">
         <i class="bi bi-pie-chart-fill"></i>
         <span>Dashboard</span>
       </a>
@@ -42,7 +42,7 @@
 
   <div class="nav-sidebar-overlay" id="nav-sidebar-overlay"></div>
 
-  <main class="app-main" id="app-main" data-active-view="dashboard">
+  <main class="app-main" id="app-main">
     <header class="app-navbar" id="app-navbar">
       <button class="btn btn-ghost nav-toggle" id="nav-toggle" aria-label="Toggle navigation" style="display:none;">
         <i class="bi bi-list"></i>
@@ -567,6 +567,10 @@
       <div class="field">
         <label for="bug-notes">Catatan</label>
         <textarea id="bug-notes" rows="3" placeholder="Deskripsi detail, langkah reproduksi, dampak (opsional)"></textarea>
+      </div>
+      <div class="field">
+        <label for="bug-image-input">Gambar Evidence</label>
+        <input type="file" id="bug-image-input" accept="image/*">
       </div>
     </form>
 

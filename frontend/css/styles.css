@@ -1654,6 +1654,29 @@ body{
 .evidence-add-row input[type=file]::file-selector-button:hover{
   background:var(--paper);
 }
+#bug-form input[type=file]{
+  width:100%;
+  padding:6px 10px;
+  font-size:12px;
+  font-family:'Inter', sans-serif;
+  color:var(--ink);
+  background:var(--paper);
+  border:1px solid var(--paper-line-strong);
+  border-radius:7px;
+  cursor:pointer;
+}
+#bug-form input[type=file]::file-selector-button{
+  padding:4px 12px;
+  border-radius:5px;
+  border:1px solid var(--paper-line-strong);
+  background:var(--surface);
+  color:var(--ink);
+  font-family:'Inter', sans-serif;
+  font-size:11px;
+  cursor:pointer;
+  margin-right:8px;
+}
+#bug-form input[type=file]::file-selector-button:hover{ background:var(--paper); }
 .evidence-add .btn{ font-size:12px; padding:7px 12px; white-space:nowrap; align-self:flex-end; }
 .evidence-text-input{
   width:100%;
@@ -3630,6 +3653,10 @@ body{
 [data-theme="dark"] .uat-status-badge.in_progress{ background:rgba(66,165,245,.16); color:var(--status-progress); }
 [data-theme="dark"] .uat-status-badge.hold{ background:rgba(124,58,237,.2); color:var(--purple); }
 [data-theme="dark"] .uat-status-badge.reopen{ background:rgba(201,154,59,.16); color:var(--gold); }
+.uat-status-badge.passed{ background:rgba(63,143,99,.13); color:var(--status-done); }
+[data-theme="dark"] .uat-status-badge.passed{ background:rgba(76,175,80,.16); color:var(--status-done); }
+.uat-status-badge.not_passed{ background:rgba(181,72,47,.13); color:var(--status-risk); }
+[data-theme="dark"] .uat-status-badge.not_passed{ background:rgba(239,83,80,.16); color:var(--cut-line); }
 
 /* Footer form UAT */
 .uat-form-footer{

@@ -888,6 +888,7 @@
 
   function setActiveView(view){
     currentView = view;
+    try{ localStorage.setItem('currentView', view); }catch(_){}
     els.navItems.forEach(item => {
       // Halaman proses UAT adalah sub-halaman dari Quality Assurance
       const isActive = item.dataset.view === view || (view === 'uat-process' && item.dataset.view === 'qa');
@@ -3176,8 +3177,8 @@
     if(!tbody) return;
 
     tbody.innerHTML = uats.map((u, i) => {
-      const status = UAT_STATUS_LABEL[u.status] ? u.status : 'not_started';
-      const statusLabel = UAT_STATUS_LABEL[status];
+      const status = getUatRunStatusFor(u);
+      const statusLabel = status === 'passed' ? 'Passed' : 'Not Passed';
       return `
         <tr data-uat-id="${u.id}">
           <td class="qa-col-num">${i + 1}</td>
@@ -3609,7 +3610,28 @@
     }).join('') : '<tr><td colspan="9" class="up-tc-empty">Tidak ada test case yang cocok dengan filter.</td></tr>';
   }
 
-  function openUatProcess(id){
+  function getUatRunStatusFor(uat){
+    const tcs = Array.isArray(uat && uat.testCases) ? uat.testCases : [];
+    const allPassed = tcs.length > 0 && tcs.every(tc => tc.status === 'Pass');
+    return allPassed ? 'passed' : 'not_passed';
+  }
+
+  function getUatRunStatus(){
+    const tcs = Array.isArray(upTestCases) ? upTestCases : [];
+    const allPassed = tcs.length > 0 && tcs.every(tc => tc.status === 'Pass');
+    return allPassed ? 'passed' : 'not_passed';
+  }
+
+  function renderUatProcessHeader(){
+    const subEl = document.getElementById('uat-process-sub');
+    if(!subEl) return;
+    const uat = uats.find(u => u.id === activeUatId);
+    if(!uat) return;
+    const status = getUatRunStatus();
+    subEl.innerHTML = `Developer: <b>${escapeHtml(uat.developer || '—')}</b> · PIC UAT: <b>${escapeHtml(uat.pic || '—')}</b> · Due Date: <b>${escapeHtml(momFormatDate(uat.dueDate) || '—')}</b> · <span class="uat-status-badge ${status}">${status === 'passed' ? 'Passed' : 'Not Passed'}</span>`;
+  }
+
+  async function openUatProcess(id){
     const uat = uats.find(u => u.id === id);
     if(!uat){
       showToast('Item UAT tidak ditemukan.', 'error');
@@ -3622,15 +3644,12 @@
     const qInput = document.getElementById('up-search');
     if(qInput) qInput.value = '';
 
-    const status = UAT_STATUS_LABEL[uat.status] ? uat.status : 'not_started';
     const titleEl = document.getElementById('uat-process-title');
     if(titleEl) titleEl.textContent = uat.title || '—';
-    const subEl = document.getElementById('uat-process-sub');
-    if(subEl){
-      subEl.innerHTML = `Developer: <b>${escapeHtml(uat.developer || '—')}</b> · PIC UAT: <b>${escapeHtml(uat.pic || '—')}</b> · Due Date: <b>${escapeHtml(momFormatDate(uat.dueDate) || '—')}</b> · <span class="uat-status-badge ${status}">${UAT_STATUS_LABEL[status]}</span>`;
-    }
+    renderUatProcessHeader();
     setActiveView('uat-process');
-    loadUatTestCases();
+    await loadUatTestCases();
+    renderUatProcessHeader();
   }
 
   async function loadUatTestCases(){
@@ -3645,6 +3664,7 @@
       const data = await api.get('/api/uat/' + activeUatId + '/test-cases');
       upTestCases = Array.isArray(data.testCases) ? data.testCases : [];
       renderUatProcessPage();
+      renderUatProcessHeader();
     } catch(err){
       console.error('Gagal memuat test case:', err);
       if(tbody) tbody.innerHTML = `<tr><td colspan="9" class="up-tc-empty">Gagal memuat test case. Muat ulang halaman atau coba lagi.</td></tr>`;
@@ -3901,6 +3921,16 @@
       date: upVal('bug-date'),
       notes: upVal('bug-notes').trim(),
     };
+    const bugImageInput = document.getElementById('bug-image-input');
+    if(bugImageInput && bugImageInput.files && bugImageInput.files[0]){
+      const file = bugImageInput.files[0];
+      rec.image = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+      });
+    }
     if(!rec.title){
       showToast('Judul bug wajib diisi.', 'error');
       upFocusField('bug-title');
@@ -4525,6 +4555,9 @@
 
   /* ---------------- Init ---------------- */
   (async () => {
+    const savedView = localStorage.getItem('currentView');
+    const validViews = ['dashboard', 'projects', 'mom', 'qa', 'uat-process'];
+    setActiveView(savedView && validViews.includes(savedView) ? savedView : 'dashboard');
     await Promise.all([loadTasks(), loadDailyTasks(), loadMomMeetings(), loadUats()]);
   })();
 
