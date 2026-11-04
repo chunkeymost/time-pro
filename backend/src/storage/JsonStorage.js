@@ -768,12 +768,14 @@ class JsonStorage {
     const base = existing || {};
     const pick = (key) => momString(data[key] !== undefined ? data[key] : base[key]).trim();
     const severity = momString(data.severity !== undefined ? data.severity : base.severity).trim();
+    const image = momString(data.image !== undefined ? data.image : base.image).trim();
     return {
       id: pick('id'),
       title: pick('title'),
       severity: ['Critical', 'Major', 'Minor', 'Trivial'].includes(severity) ? severity : '',
       date: pick('date').slice(0, 10),
       notes: pick('notes'),
+      image,
     };
   }
 
