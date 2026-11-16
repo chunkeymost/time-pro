@@ -48,6 +48,10 @@
         <i class="bi bi-list"></i>
       </button>
 
+      <button class="btn btn-ghost nav-sidebar-toggle" id="nav-sidebar-toggle" aria-label="Sembunyikan sidebar" aria-expanded="true" style="display:none;">
+        <i class="bi bi-chevron-left" id="nav-sidebar-toggle-icon"></i>
+      </button>
+
       <div class="app-navbar-slot" id="app-navbar-slot"><!-- slot konten navbar --></div>
 
       <div class="app-navbar-actions">
@@ -397,6 +401,13 @@
         <label for="uat-due-date">Due Date *</label>
         <input type="date" id="uat-due-date">
       </div>
+      <div class="field">
+        <label for="uat-status">Status</label>
+        <select id="uat-status">
+          <option value="passed">Passed</option>
+          <option value="not_passed">Not Passed</option>
+        </select>
+      </div>
     </form>
 
     <div class="uat-form-footer">
@@ -634,6 +645,11 @@
         <input type="range" id="f-progress" min="0" max="100" value="0">
         <span class="range-val" id="f-progress-val">0%</span>
       </div>
+    </div>
+
+    <div class="field">
+      <label for="f-notes">Catatan / Notes</label>
+      <textarea id="f-notes" rows="3" placeholder="Catatan tambahan (opsional)"></textarea>
     </div>
 
     <div class="todo-section" id="todo-section">

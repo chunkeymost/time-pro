@@ -68,6 +68,7 @@
   let view = "week"; // "week" | "month"
   let dayWidth = 40;
   let showFinished = localStorage.getItem('showFinished') !== 'false';
+  let navSidebarHidden = localStorage.getItem('navSidebarHidden') === 'true';
   let modalSource = null; // 'notification' | 'sidebar' | 'new' | null
 
   const els = {
@@ -91,6 +92,7 @@
     fAssignee: document.getElementById('f-assignee'),
     fProgress: document.getElementById('f-progress'),
     fProgressVal: document.getElementById('f-progress-val'),
+    fNotes: document.getElementById('f-notes'),
     todoInput: document.getElementById('todo-input'),
     todoDate: document.getElementById('todo-date'),
     todoAddBtn: document.getElementById('todo-add-btn'),
@@ -156,6 +158,8 @@
     navSidebar: document.getElementById('nav-sidebar'),
     navMenu: document.getElementById('nav-menu'),
     navToggle: document.getElementById('nav-toggle'),
+    navSidebarToggle: document.getElementById('nav-sidebar-toggle'),
+    navSidebarToggleIcon: document.getElementById('nav-sidebar-toggle-icon'),
     navOverlay: document.getElementById('nav-sidebar-overlay'),
     navItems: document.querySelectorAll('.nav-item'),
     profileDropdown: document.getElementById('profile-dropdown'),
@@ -713,7 +717,7 @@
       const tr = document.createElement('tr');
       tr.innerHTML =
         '<td class="todo-num">' + (i + 1) + '</td>' +
-        '<td class="log-action-text">' + escapeHtml(log.action) + '</td>' +
+        '<td class="log-action-text">' + escapeHtml(log.action) + (log.notes ? '<div class="log-notes">' + escapeHtml(log.notes) + '</div>' : '') + '</td>' +
         '<td class="log-date-text"><span class="log-date-row">' + datePart + '</span><span class="log-time-row">' + timePart + '</span></td>';
       els.taskLogBody.appendChild(tr);
     });
@@ -762,6 +766,9 @@
   let currentView = 'dashboard';
 
   function initNavigation(){
+    // Apply saved sidebar visibility state
+    applyNavSidebarState();
+
     // Nav item clicks
     els.navItems.forEach(item => {
       item.addEventListener('click', (e) => {
@@ -794,6 +801,14 @@
     // Mobile nav toggle
     if(els.navToggle){
       els.navToggle.addEventListener('click', toggleMobileNav);
+    }
+
+    // Sidebar hide/show toggle
+    if(els.navSidebarToggle){
+      els.navSidebarToggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        toggleNavSidebar();
+      });
     }
     if(els.navOverlay){
       els.navOverlay.addEventListener('click', closeMobileNav);
@@ -936,6 +951,32 @@
     }
   }
 
+  function toggleNavSidebar(){
+    navSidebarHidden = !navSidebarHidden;
+    try{ localStorage.setItem('navSidebarHidden', navSidebarHidden ? 'true' : 'false'); }catch(_){}
+    applyNavSidebarState();
+  }
+
+  function applyNavSidebarState(){
+    const isDesktopViewport = window.innerWidth > 480;
+    const isHidden = navSidebarHidden && isDesktopViewport;
+
+    if(els.navSidebar){
+      els.navSidebar.classList.toggle('hidden', isHidden);
+    }
+
+    const toggleBtn = els.navSidebarToggle;
+    if(toggleBtn){
+      toggleBtn.setAttribute('aria-expanded', String(!isHidden));
+      toggleBtn.setAttribute('aria-label', isHidden ? 'Tampilkan sidebar' : 'Sembunyikan sidebar');
+      const icon = els.navSidebarToggleIcon;
+      if(icon){
+        icon.classList.toggle('bi-chevron-left', !isHidden);
+        icon.classList.toggle('bi-chevron-right', isHidden);
+      }
+    }
+  }
+
   function toggleMobileNav(){
     els.navSidebar.classList.toggle('open');
     els.navOverlay.classList.toggle('open');
@@ -951,9 +992,14 @@
     if(els.navToggle){
       els.navToggle.style.display = isMobile ? 'inline-flex' : 'none';
     }
+    if(els.navSidebarToggle){
+      els.navSidebarToggle.style.display = isMobile ? 'none' : 'inline-flex';
+    }
     if(!isMobile){
       closeMobileNav();
     }
+    // Re-sync sidebar visibility state on viewport changes (desktop <-> mobile)
+    applyNavSidebarState();
   }
 
   // Initialize navigation
@@ -1298,6 +1344,7 @@
     els.fAssignee.value = task ? task.assignee : '';
     els.fProgress.value = task ? task.progress : 0;
     els.fProgressVal.textContent = (task ? task.progress : 0)+'%';
+    els.fNotes.value = task ? (task.notes || '') : '';
     els.deleteBtn.style.visibility = task ? 'visible' : 'hidden';
     selectedId = task ? task.id : null;
     renderSidebar();
@@ -2226,14 +2273,15 @@
     const cat = els.fCat.value;
     const assignee = els.fAssignee.value.trim();
     const progress = Number(els.fProgress.value);
+    const notes = els.fNotes.value.trim();
 
     if(editingId){
       const t = tasks.find(x=>x.id===editingId);
       if(!t) return;
       t.name = name; t.start = start; t.end = end;
-      t.cat = cat; t.assignee = assignee; t.progress = progress;
+      t.cat = cat; t.assignee = assignee; t.progress = progress; t.notes = notes;
       try {
-        await api.put('/api/tasks/'+editingId, { name, start:fmt(start), end:fmt(end), cat, assignee, progress });
+        await api.put('/api/tasks/'+editingId, { name, start:fmt(start), end:fmt(end), cat, assignee, progress, notes });
       } catch(e){ 
         console.error('Save task failed:', e); 
         showToast('Gagal menyimpan tugas: ' + e.message, 'error');
@@ -2241,7 +2289,7 @@
       }
     } else {
       try {
-        const result = await api.post('/api/tasks', { name, start:fmt(start), end:fmt(end), cat, assignee, progress });
+        const result = await api.post('/api/tasks', { name, start:fmt(start), end:fmt(end), cat, assignee, progress, notes });
         tasks.push({
           ...result.task,
           start: parseDate(result.task.start),
@@ -2278,9 +2326,10 @@
     if(!task) return;
     
     try {
-      const result = await api.put('/api/tasks/'+editingId+'/hold');
+      const result = await api.put('/api/tasks/'+editingId+'/hold', { notes: els.fNotes.value.trim() });
       task.held = result.held;
       task.heldAt = result.heldAt;
+      task.notes = result.notes;
       
       // Update button text and style
       if (result.held) {
@@ -2395,7 +2444,9 @@
 
   /* ---------------- Theme ---------------- */
   function setFavicon(){
-    const svg = `<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22><path fill=%22%23FFFFFF%22 d=%22M2.5 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2zm5 2h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1m-5 1a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1zm9-1h1a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1%22/></svg>`;
+    const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const fill = dark ? '%232DD4BF' : '%230F766E';
+    const svg = `<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22><path fill=%22${fill}%22 d=%22M2.5 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2zm5 2h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1m-5 1a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1zm9-1h1a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1%22/></svg>`;
     let link = document.querySelector('link[rel="icon"][type="image/svg+xml"]');
     if(!link){
       link = document.createElement('link');
@@ -2409,6 +2460,7 @@
   function setTheme(theme){
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
+    setFavicon();
     const dark = theme === 'dark';
     const icon = document.getElementById('theme-icon');
     const label = document.getElementById('theme-label');
@@ -3235,6 +3287,7 @@
     uatSetVal('uat-developer', uat ? uat.developer : '');
     uatSetVal('uat-pic', uat ? uat.pic : '');
     uatSetVal('uat-due-date', uat ? uat.dueDate : '');
+    uatSetVal('uat-status', getUatRunStatusFor(uat));
     document.getElementById('uat-form-overlay').classList.add('open');
     const titleEl = document.getElementById('uat-title');
     if(titleEl) titleEl.focus();
@@ -3252,6 +3305,7 @@
       developer: uatVal('uat-developer').trim(),
       pic: uatVal('uat-pic').trim(),
       dueDate: uatVal('uat-due-date'),
+      status: uatVal('uat-status'),
     };
   }
 
