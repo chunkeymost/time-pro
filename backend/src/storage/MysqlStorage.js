@@ -34,7 +34,7 @@ class MysqlStorage {
     const conn = await this._getConnection();
     try {
       const [tasks] = await conn.execute(
-        'SELECT id, name, start_date, end_date, category_id, assignee, progress, created_at, updated_at FROM tasks WHERE deleted_at IS NULL ORDER BY id'
+        'SELECT id, name, start_date, end_date, category_id, assignee, progress, notes, created_at, updated_at FROM tasks WHERE deleted_at IS NULL ORDER BY id'
       );
       const [todos] = await conn.execute(
         'SELECT id, task_id, text, done, due_date FROM todos WHERE deleted_at IS NULL ORDER BY id'
@@ -91,6 +91,7 @@ class MysqlStorage {
           category_id: t.category_id,
           assignee: t.assignee,
           progress: t.progress,
+          notes: t.notes || '',
           todos: todoMap[t.id] || [],
           evidences: evidenceMap[t.id] || [],
           createdAt: t.created_at ? t.created_at.toISOString() : null,
@@ -111,7 +112,7 @@ class MysqlStorage {
     const conn = await this._getConnection();
     try {
       const [tasks] = await conn.execute(
-        'SELECT id, name, start_date, end_date, category_id, assignee, progress, created_at, updated_at FROM tasks WHERE id = ? AND deleted_at IS NULL',
+        'SELECT id, name, start_date, end_date, category_id, assignee, progress, notes, created_at, updated_at FROM tasks WHERE id = ? AND deleted_at IS NULL',
         [id]
       );
       if (tasks.length === 0) return null;
@@ -139,6 +140,7 @@ class MysqlStorage {
         category_id: t.category_id,
         assignee: t.assignee,
         progress: t.progress,
+        notes: t.notes || '',
         todos: todos.map(td => ({
           id: td.id,
           text: td.text,
@@ -165,8 +167,8 @@ class MysqlStorage {
     try {
       const categoryId = taskData.category_id || await this._resolveCategory(taskData.cat, conn);
       const [result] = await conn.execute(
-        `INSERT INTO tasks (name, start_date, end_date, category_id, assignee, progress)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO tasks (name, start_date, end_date, category_id, assignee, progress, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
           taskData.name || '',
           taskData.start,
@@ -174,6 +176,7 @@ class MysqlStorage {
           categoryId,
           taskData.assignee || '',
           typeof taskData.progress === 'number' ? taskData.progress : 0,
+          taskData.notes || '',
         ]
       );
       return this.getById(result.insertId);
@@ -198,6 +201,7 @@ class MysqlStorage {
       if (taskData.category_id !== undefined) { sets.push('category_id = ?'); params.push(taskData.category_id); }
       if (taskData.assignee !== undefined) { sets.push('assignee = ?'); params.push(taskData.assignee); }
       if (taskData.progress !== undefined) { sets.push('progress = ?'); params.push(taskData.progress); }
+      if (taskData.notes !== undefined) { sets.push('notes = ?'); params.push(taskData.notes || ''); }
 
       if (sets.length === 0) return this.getById(id);
 
@@ -354,12 +358,12 @@ class MysqlStorage {
     }
   }
 
-  async addTaskLog(taskId, action) {
+  async addTaskLog(taskId, action, notes) {
     const conn = await this._getConnection();
     try {
       await conn.execute(
-        'INSERT INTO task_changelog (task_id, action) VALUES (?, ?)',
-        [taskId, action]
+        'INSERT INTO task_changelog (task_id, action, notes) VALUES (?, ?, ?)',
+        [taskId, action, notes !== undefined ? (notes || null) : null]
       );
     } finally {
       await conn.end();
@@ -370,12 +374,13 @@ class MysqlStorage {
     const conn = await this._getConnection();
     try {
       const [rows] = await conn.execute(
-        'SELECT task_id AS taskId, action, action_at AS actionAt FROM task_changelog WHERE task_id = ? ORDER BY action_at DESC',
+        'SELECT task_id AS taskId, action, notes, action_at AS actionAt FROM task_changelog WHERE task_id = ? ORDER BY action_at DESC',
         [taskId]
       );
       return rows.map(r => ({
         taskId: r.taskId,
         action: r.action,
+        notes: r.notes ? r.notes : null,
         actionAt: r.actionAt ? r.actionAt.toISOString() : null,
       }));
     } finally {

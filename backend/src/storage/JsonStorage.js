@@ -172,6 +172,7 @@ class JsonStorage {
       cat: taskData.cat || 'pengembangan',
       assignee: taskData.assignee || '',
       progress: typeof taskData.progress === 'number' ? taskData.progress : 0,
+      notes: momString(taskData.notes),
       todos: [],
       evidences: [],
       held: false,
@@ -195,6 +196,7 @@ class JsonStorage {
     if (taskData.cat !== undefined) task.cat = taskData.cat;
     if (taskData.assignee !== undefined) task.assignee = taskData.assignee;
     if (taskData.progress !== undefined) task.progress = taskData.progress;
+    if (taskData.notes !== undefined) task.notes = taskData.notes;
     task.updatedAt = new Date().toISOString();
     data.tasks[idx] = task;
     this._save(data);
@@ -210,7 +212,7 @@ class JsonStorage {
     return true;
   }
 
-  toggleHold(taskId) {
+  toggleHold(taskId, notes) {
     const data = this._load();
     const task = data.tasks.find(t => t.id === taskId);
     if (!task) return null;
@@ -219,15 +221,16 @@ class JsonStorage {
     const wasHeld = task.held === true;
     task.held = !wasHeld;
     task.heldAt = task.held ? now : null;
+    if (notes !== undefined) task.notes = notes;
     task.updatedAt = now;
     
     const action = task.held 
       ? 'Tugas di-hold (dihentikan sementara)' 
       : 'Tugas dibuka kembali (dilanjutkan)';
-    this.addTaskLog(taskId, action);
+    this.addTaskLog(taskId, action, task.notes);
     
     this._save(data);
-    return { held: task.held, heldAt: task.heldAt };
+    return { held: task.held, heldAt: task.heldAt, notes: task.notes };
   }
 
   addTodo(taskId, todoData) {
@@ -323,7 +326,7 @@ class JsonStorage {
     return path.join(path.dirname(this.filePath), 'task-changelog.json');
   }
 
-  addTaskLog(taskId, action) {
+  addTaskLog(taskId, action, notes) {
     const logPath = this._getChangelogPath();
     let logs = [];
     try {
@@ -331,7 +334,9 @@ class JsonStorage {
         logs = JSON.parse(fs.readFileSync(logPath, 'utf-8'));
       }
     } catch (_) { logs = []; }
-    logs.unshift({ taskId, action, actionAt: new Date().toISOString() });
+    const entry = { taskId, action, actionAt: new Date().toISOString() };
+    if (notes !== undefined) entry.notes = notes;
+    logs.unshift(entry);
     fs.writeFileSync(logPath, JSON.stringify(logs, null, 2), 'utf-8');
   }
 
@@ -717,7 +722,7 @@ class JsonStorage {
       developer: momString(data.developer !== undefined ? data.developer : base.developer).trim(),
       pic: momString(data.pic !== undefined ? data.pic : base.pic).trim(),
       dueDate: momString(data.dueDate !== undefined ? data.dueDate : base.dueDate).slice(0, 10),
-      status: ['not_started', 'finish', 'in_progress', 'hold', 'reopen'].includes(status) ? status : 'not_started',
+      status: ['not_started', 'finish', 'in_progress', 'hold', 'reopen', 'passed', 'not_passed'].includes(status) ? status : 'not_started',
       testCases: this._normalizeUatTestCases(
         data.testCases !== undefined ? data.testCases : base.testCases
       ),

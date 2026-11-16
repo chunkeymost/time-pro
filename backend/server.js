@@ -100,11 +100,11 @@ app.get('/api/tasks/:id/evidence-changelog', async (req, res) => {
 
 app.post('/api/tasks', async (req, res) => {
   try {
-    const { name, start, end, cat, assignee, progress } = req.body;
+    const { name, start, end, cat, assignee, progress, notes } = req.body;
     if (!name || !start || !end) {
       return res.status(400).json({ error: 'name, start, and end are required' });
     }
-    const task = await storage.create({ name, start, end, cat, assignee, progress });
+    const task = await storage.create({ name, start, end, cat, assignee, progress, notes });
     res.status(201).json({ task });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -133,6 +133,13 @@ app.put('/api/tasks/:id', async (req, res) => {
       const newName = req.body.assignee || '(kosong)';
       await storage.addTaskLog(id, 'Perubahan Penanggung Jawab dari ' + oldName + ' ke ' + newName);
     }
+    if (req.body.notes !== undefined && String(req.body.notes ?? '') !== String(oldTask.notes ?? '')) {
+      await storage.addTaskLog(
+        id,
+        'Perubahan Catatan Tugas dari "' + (oldTask.notes || '') + '" ke "' + (req.body.notes || '') + '"',
+        req.body.notes
+      );
+    }
 
     res.json({ task });
   } catch (err) {
@@ -154,9 +161,10 @@ app.delete('/api/tasks/:id', async (req, res) => {
 app.put('/api/tasks/:id/hold', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const result = await storage.toggleHold(id);
+    const notes = req.body && req.body.notes !== undefined ? String(req.body.notes).trim() : undefined;
+    const result = await storage.toggleHold(id, notes);
     if (!result) return res.status(404).json({ error: 'Task not found' });
-    res.json({ held: result.held, heldAt: result.heldAt });
+    res.json({ held: result.held, heldAt: result.heldAt, notes: result.notes });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -277,7 +285,7 @@ function requireJsonUatStorage(req, res, next) {
 
 app.use('/api/uat', requireJsonUatStorage);
 
-const UAT_STATUSES = ['not_started', 'finish', 'in_progress', 'hold', 'reopen'];
+const UAT_STATUSES = ['not_started', 'finish', 'in_progress', 'hold', 'reopen', 'passed', 'not_passed'];
 
 function validateUatBody(body, partial) {
   if (!partial || body.title !== undefined) {
