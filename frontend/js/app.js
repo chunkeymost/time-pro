@@ -1,6 +1,24 @@
 (function(){
   "use strict";
 
+  /* ---------------- Authentication bootstrap ---------------- */
+  // Semua request API memakai cookie sesi. Jika sesi berakhir (401),
+  // arahkan pengguna kembali ke halaman login.
+  const nativeFetch = window.fetch.bind(window);
+  let redirectingToLogin = false;
+
+  window.fetch = async function authenticatedFetch(input, init){
+    const response = await nativeFetch(input, init);
+    if(response && response.status === 401){
+      const target = typeof input === 'string' ? input : (input && input.url) || '';
+      if(!redirectingToLogin && target.indexOf('/api/auth/login') === -1){
+        redirectingToLogin = true;
+        window.location.replace('/login.html?expired=1');
+      }
+    }
+    return response;
+  };
+
   /* ---------------- State ---------------- */
   const CATS = {
     desain:        { label:"Desain",        cls:"cat-desain" },
@@ -136,6 +154,12 @@
     dailyTaskChart: document.getElementById('daily-task-chart'),
     dailyTaskLegend: document.getElementById('daily-task-legend'),
     dailyTaskDragHandle: document.getElementById('daily-task-drag-handle'),
+    generalTaskOverlay: document.getElementById('general-task-overlay'),
+    generalTaskCloseBtn: document.getElementById('general-task-close-btn'),
+    generalTaskInput: document.getElementById('general-task-input'),
+    generalTaskAddBtn: document.getElementById('general-task-add-btn'),
+    generalTaskSummary: document.getElementById('general-task-summary'),
+    generalTaskList: document.getElementById('general-task-list'),
     imgPreviewOverlay: document.getElementById('img-preview-overlay'),
     imgPreviewImg: document.getElementById('img-preview-img'),
     reportOverlay: document.getElementById('report-overlay'),
@@ -165,6 +189,8 @@
     profileDropdown: document.getElementById('profile-dropdown'),
     profileTrigger: document.getElementById('profile-trigger'),
     profileMenu: document.getElementById('profile-menu'),
+    profileUsername: document.getElementById('profile-username'),
+    profileRole: document.getElementById('profile-role'),
   };
 
   /* ---------------- API helper ---------------- */
@@ -227,7 +253,7 @@
       renderRestoreLog();
     } catch(e){
       console.error('Gagal memuat data:', e);
-      alert('Gagal memuat data. Pastikan server API berjalan (node server.js).');
+      if(!redirectingToLogin) alert('Gagal memuat data. Pastikan server API berjalan (node server.js).');
     }
     renderLegend();
     renderViewContent(currentView);
@@ -338,6 +364,7 @@
     const heldTasks = tasks.filter(t => t.held === true).length;
     const dailyTotal = dailyTasks.length;
     const dailyDone = dailyTasks.filter(t => t.status === 'done').length;
+    const generalTotal = generalTasks.length;
 
     els.overviewCards.innerHTML = `
       <div class="overview-card">
@@ -378,6 +405,14 @@
           <div class="overview-num">${dailyDone}/${dailyTotal}</div>
           <div class="overview-label">Daily Task ${dateLabel()}</div>
           <div class="overview-sub">${dailyDone} selesai dari ${dailyTotal} tugas</div>
+        </div>
+      </div>
+      <div class="overview-card" id="card-general-task">
+        <div class="overview-icon general"><i class="bi bi-inbox"></i></div>
+        <div class="overview-body">
+          <div class="overview-num">${generalTotal}</div>
+          <div class="overview-label">Task General</div>
+          <div class="overview-sub">${generalTotal > 0 ? generalTotal + ' tugas menunggu digenerate' : 'Belum ada task general'}</div>
         </div>
       </div>
     `;
@@ -771,6 +806,10 @@
 
     // Nav item clicks
     els.navItems.forEach(item => {
+      const labelEl = item.querySelector('span');
+      const label = labelEl ? labelEl.textContent.trim() : '';
+      if(label) item.setAttribute('aria-label', label);
+
       item.addEventListener('click', (e) => {
         e.preventDefault();
         const view = item.dataset.view;
@@ -892,13 +931,41 @@
   }
 
   function handleLogout(){
-    showConfirm('Yakin ingin keluar?', 'Ya, Logout', 'Batal', 'confirm-yes').then(confirmed => {
-      if(confirmed){
-        localStorage.clear();
+    showConfirm('Yakin ingin keluar?', 'Ya, Logout', 'Batal', 'confirm-yes').then(async confirmed => {
+      if(!confirmed) return;
+      try {
+        await fetch('/api/auth/logout', { method:'POST', headers:{ 'Content-Type':'application/json' } });
+      } catch(_){}
+      try{
+        localStorage.removeItem('currentView');
+        localStorage.removeItem('navSidebarHidden');
+        localStorage.removeItem('showFinished');
         sessionStorage.clear();
-        window.location.reload();
-      }
+      }catch(_){}
+      window.location.replace('/login.html?logout=1');
     });
+  }
+
+  function renderSessionUser(user){
+    if(!user) return;
+    if(els.profileUsername) els.profileUsername.textContent = user.username || '—';
+    if(els.profileRole){
+      els.profileRole.textContent = user.role || 'user';
+      els.profileRole.setAttribute('data-role', user.role || 'user');
+    }
+    if(els.profileTrigger){
+      els.profileTrigger.setAttribute('aria-label', 'Menu pengguna: ' + (user.username || ''));
+      els.profileTrigger.title = user.username || '';
+    }
+  }
+
+  async function loadSessionUser(){
+    try{
+      const res = await fetch('/api/auth/me', { headers:{ 'Accept':'application/json' } });
+      if(!res.ok) return;
+      const data = await res.json();
+      renderSessionUser(data.user);
+    }catch(_){}
   }
 
   function setActiveView(view){
@@ -959,20 +1026,29 @@
 
   function applyNavSidebarState(){
     const isDesktopViewport = window.innerWidth > 480;
-    const isHidden = navSidebarHidden && isDesktopViewport;
+    const isCollapsed = navSidebarHidden && isDesktopViewport;
 
     if(els.navSidebar){
-      els.navSidebar.classList.toggle('hidden', isHidden);
+      els.navSidebar.classList.toggle('collapsed', isCollapsed);
     }
+
+    // Tooltip label hanya saat sidebar collapsed (mode ikon saja)
+    els.navItems.forEach(item => {
+      const labelEl = item.querySelector('span');
+      const label = labelEl ? labelEl.textContent.trim() : '';
+      if(!label) return;
+      if(isCollapsed) item.setAttribute('title', label);
+      else item.removeAttribute('title');
+    });
 
     const toggleBtn = els.navSidebarToggle;
     if(toggleBtn){
-      toggleBtn.setAttribute('aria-expanded', String(!isHidden));
-      toggleBtn.setAttribute('aria-label', isHidden ? 'Tampilkan sidebar' : 'Sembunyikan sidebar');
+      toggleBtn.setAttribute('aria-expanded', String(!isCollapsed));
+      toggleBtn.setAttribute('aria-label', isCollapsed ? 'Perluas sidebar' : 'Ciutkan sidebar');
       const icon = els.navSidebarToggleIcon;
       if(icon){
-        icon.classList.toggle('bi-chevron-left', !isHidden);
-        icon.classList.toggle('bi-chevron-right', isHidden);
+        icon.classList.toggle('bi-chevron-left', !isCollapsed);
+        icon.classList.toggle('bi-chevron-right', isCollapsed);
       }
     }
   }
@@ -1702,6 +1778,7 @@
   /* ---------------- Daily Task Panel ---------------- */
   let dailyTasks = [];
   let dailyTaskChart = null;
+  let generalTasks = [];
 
   function updateDateLabels(){
     if(els.dailyTaskTitle) els.dailyTaskTitle.textContent = 'DAILY TASK ' + dateLabel();
@@ -2058,6 +2135,326 @@
     }).join('');
   }
 
+  /* ---------------- General Task Panel ---------------- */
+
+  function openGeneralTaskPanel(){
+    if(!els.generalTaskOverlay) return;
+    els.generalTaskOverlay.classList.add('open');
+    loadGeneralTasks();
+    setTimeout(() => { if(els.generalTaskInput) els.generalTaskInput.focus(); }, 120);
+  }
+
+  function closeGeneralTaskPanel(){
+    if(els.generalTaskOverlay) els.generalTaskOverlay.classList.remove('open');
+  }
+
+  async function loadGeneralTasks(){
+    try {
+      const res = await api.get('/api/general-tasks');
+      generalTasks = res.generalTasks || [];
+    } catch(e) {
+      console.error('Failed to load general tasks:', e);
+      generalTasks = [];
+    }
+    renderGeneralTasks();
+    renderOverviewCards();
+  }
+
+  function clearGeneralPanels(){
+    if(!els.generalTaskList) return;
+    els.generalTaskList.querySelectorAll('.general-task-panel').forEach(panel => {
+      panel.innerHTML = '';
+    });
+  }
+
+  function renderGeneralTasks(){
+    if(!els.generalTaskList) return;
+
+    if(els.generalTaskSummary){
+      els.generalTaskSummary.textContent = generalTasks.length > 0
+        ? generalTasks.length + ' task menunggu digenerate'
+        : '';
+    }
+
+    if(generalTasks.length === 0){
+      els.generalTaskList.innerHTML = `
+        <div class="general-task-empty">
+          <i class="bi bi-inbox"></i>
+          <div>Belum ada task general.</div>
+          <span>Tambahkan tugas di atas, lalu generate ke Tugas Utama atau Sub Task.</span>
+        </div>
+      `;
+      return;
+    }
+
+    els.generalTaskList.innerHTML = generalTasks.map((g, i) => `
+      <div class="general-task-item" data-id="${g.id}">
+        <div class="general-task-main">
+          <div class="general-task-num">${i + 1}</div>
+          <div class="general-task-body">
+            <div class="general-task-text">${escapeHtml(String(g.text || ''))}</div>
+            <div class="general-task-meta"><i class="bi bi-clock"></i> ${g.createdAt ? fmtDateTime(g.createdAt) : '-'}</div>
+          </div>
+          <div class="general-task-actions">
+            <button type="button" class="gt-action generate" title="Generate ke Tugas Utama / Sub Task">
+              <i class="bi bi-lightning-charge"></i><span>Generate</span>
+            </button>
+            <button type="button" class="gt-action edit" title="Edit task"><i class="bi bi-pencil"></i></button>
+            <button type="button" class="gt-action delete" title="Hapus task"><i class="bi bi-trash"></i></button>
+          </div>
+        </div>
+        <div class="general-task-panel"></div>
+      </div>
+    `).join('');
+
+    els.generalTaskList.querySelectorAll('.general-task-item').forEach(itemEl => {
+      const id = parseInt(itemEl.dataset.id, 10);
+      const g = generalTasks.find(t => t.id === id);
+      if(!g) return;
+
+      itemEl.querySelector('.gt-action.generate').addEventListener('click', () => {
+        toggleGeneralConvertPanel(itemEl, g);
+      });
+
+      itemEl.querySelector('.gt-action.edit').addEventListener('click', () => {
+        toggleGeneralEditPanel(itemEl, g);
+      });
+
+      itemEl.querySelector('.gt-action.delete').addEventListener('click', async () => {
+        const confirmed = await showConfirm(
+          'Hapus task general <strong>' + escapeHtml(String(g.text || '')) + '</strong>?',
+          'Ya, Hapus', 'Batal', 'confirm-yes'
+        );
+        if(!confirmed) return;
+        try {
+          await api.del('/api/general-tasks/' + g.id);
+          await loadGeneralTasks();
+          showToast('Task general dihapus');
+        } catch(e) {
+          console.error('Failed to delete general task:', e);
+          showToast('Gagal menghapus task general', 'error');
+        }
+      });
+    });
+  }
+
+  function toggleGeneralEditPanel(itemEl, g){
+    const panel = itemEl.querySelector('.general-task-panel');
+    if(!panel) return;
+    if(panel.querySelector('.gt-edit-panel')){
+      clearGeneralPanels();
+      return;
+    }
+    clearGeneralPanels();
+
+    panel.innerHTML = `
+      <div class="gt-edit-panel">
+        <div class="field">
+          <label>Edit task</label>
+          <input type="text" class="gt-edit-input" autocomplete="off">
+        </div>
+        <div class="gt-form-actions">
+          <button type="button" class="btn btn-ghost gt-edit-cancel">Batal</button>
+          <button type="button" class="btn btn-primary gt-edit-save"><i class="bi bi-check-lg"></i> Simpan</button>
+        </div>
+      </div>
+    `;
+
+    const input = panel.querySelector('.gt-edit-input');
+    input.value = g.text || '';
+    input.focus();
+    input.select();
+
+    const save = async () => {
+      const text = input.value.trim();
+      if(!text){ showToast('Teks task tidak boleh kosong', 'error'); return; }
+      try {
+        await api.put('/api/general-tasks/' + g.id, { text });
+        clearGeneralPanels();
+        await loadGeneralTasks();
+        showToast('Task general diperbarui');
+      } catch(e) {
+        console.error('Failed to update general task:', e);
+        showToast('Gagal memperbarui task general', 'error');
+      }
+    };
+
+    panel.querySelector('.gt-edit-cancel').addEventListener('click', clearGeneralPanels);
+    panel.querySelector('.gt-edit-save').addEventListener('click', save);
+    input.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter'){ e.preventDefault(); save(); }
+      if(e.key === 'Escape'){ e.stopPropagation(); clearGeneralPanels(); }
+    });
+  }
+
+  function toggleGeneralConvertPanel(itemEl, g){
+    const panel = itemEl.querySelector('.general-task-panel');
+    if(!panel) return;
+    if(panel.querySelector('.gt-convert')){
+      clearGeneralPanels();
+      return;
+    }
+    clearGeneralPanels();
+
+    panel.innerHTML = `
+      <div class="gt-convert">
+        <div class="gt-convert-targets">
+          <button type="button" class="gt-target-btn active" data-target="main">
+            <i class="bi bi-clipboard-check"></i> Tugas Utama
+          </button>
+          <button type="button" class="gt-target-btn" data-target="subtask">
+            <i class="bi bi-list-check"></i> Sub Task
+          </button>
+        </div>
+        <div class="gt-convert-form"></div>
+      </div>
+    `;
+
+    const form = panel.querySelector('.gt-convert-form');
+    let target = 'main';
+
+    function renderForm(){
+      if(target === 'main'){
+        form.innerHTML = `
+          <div class="row-2">
+            <div class="field">
+              <label>Mulai</label>
+              <input type="date" class="gt-start" value="${fmt(today())}">
+            </div>
+            <div class="field">
+              <label>Selesai</label>
+              <input type="date" class="gt-end" value="${fmt(addDays(today(), 7))}">
+            </div>
+          </div>
+          <div class="field">
+            <label>Kategori</label>
+            <select class="gt-cat">
+              ${Object.entries(CATS).map(([key, c]) =>
+                `<option value="${key}"${key === 'lainnya' ? ' selected' : ''}>${escapeHtml(c.label)}</option>`
+              ).join('')}
+            </select>
+          </div>
+          <div class="field">
+            <label>PIC (opsional)</label>
+            <input type="text" class="gt-assignee" placeholder="cth. Sari">
+          </div>
+          <div class="gt-form-actions">
+            <button type="button" class="btn btn-ghost gt-cancel">Batal</button>
+            <button type="button" class="btn btn-primary gt-submit">
+              <i class="bi bi-lightning-charge"></i> Buat Tugas Utama
+            </button>
+          </div>
+        `;
+        form.querySelector('.gt-cancel').addEventListener('click', clearGeneralPanels);
+        form.querySelector('.gt-submit').addEventListener('click', async function(){
+          const start = form.querySelector('.gt-start').value;
+          const end = form.querySelector('.gt-end').value;
+          if(!start || !end){ showToast('Tanggal mulai dan selesai wajib diisi', 'error'); return; }
+          if(end < start){ showToast('Tanggal selesai harus setelah tanggal mulai', 'error'); return; }
+          await submitGeneralConversion(g, {
+            target: 'main',
+            start,
+            end,
+            cat: form.querySelector('.gt-cat').value,
+            assignee: form.querySelector('.gt-assignee').value.trim(),
+          }, this);
+        });
+        return;
+      }
+
+      if(tasks.length === 0){
+        form.innerHTML = `
+          <div class="gt-empty"><i class="bi bi-info-circle"></i> Belum ada Tugas Utama. Buat Tugas Utama terlebih dahulu.</div>
+          <div class="gt-form-actions">
+            <button type="button" class="btn btn-ghost gt-cancel">Tutup</button>
+          </div>
+        `;
+        form.querySelector('.gt-cancel').addEventListener('click', clearGeneralPanels);
+        return;
+      }
+
+      const options = tasks.slice().sort((a, b) => a.start - b.start).map(t =>
+        `<option value="${t.id}">${escapeHtml(t.name)} — ${escapeHtml(CATS[t.cat]?.label || t.cat || '')}</option>`
+      ).join('');
+      form.innerHTML = `
+        <div class="field">
+          <label>Tugas Utama tujuan</label>
+          <select class="gt-task">${options}</select>
+        </div>
+        <p class="gt-hint">Sub task akan ditambahkan ke To Do List tugas terpilih.</p>
+        <div class="gt-form-actions">
+          <button type="button" class="btn btn-ghost gt-cancel">Batal</button>
+          <button type="button" class="btn btn-primary gt-submit">
+            <i class="bi bi-plus-lg"></i> Buat Sub Task
+          </button>
+        </div>
+      `;
+      form.querySelector('.gt-cancel').addEventListener('click', clearGeneralPanels);
+      form.querySelector('.gt-submit').addEventListener('click', async function(){
+        const taskId = parseInt(form.querySelector('.gt-task').value, 10);
+        if(!taskId){ showToast('Pilih Tugas Utama tujuan', 'error'); return; }
+        await submitGeneralConversion(g, { target: 'subtask', taskId }, this);
+      });
+    }
+
+    panel.querySelectorAll('.gt-target-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        target = btn.dataset.target;
+        panel.querySelectorAll('.gt-target-btn').forEach(b => b.classList.toggle('active', b === btn));
+        renderForm();
+      });
+    });
+
+    renderForm();
+  }
+
+  async function submitGeneralConversion(g, payload, btn){
+    if(btn){
+      btn.disabled = true;
+      btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Memproses...';
+    }
+    try {
+      await api.post('/api/general-tasks/' + g.id + '/convert', payload);
+      clearGeneralPanels();
+      await Promise.all([loadTasks(), loadGeneralTasks()]);
+      renderAll(false);
+      showToast(payload.target === 'main'
+        ? 'Task general digenerate menjadi Tugas Utama'
+        : 'Task general digenerate menjadi Sub Task');
+    } catch(e) {
+      console.error('Failed to convert general task:', e);
+      showToast('Gagal generate task general', 'error');
+      if(btn){
+        btn.disabled = false;
+        btn.innerHTML = payload.target === 'main'
+          ? '<i class="bi bi-lightning-charge"></i> Buat Tugas Utama'
+          : '<i class="bi bi-plus-lg"></i> Buat Sub Task';
+      }
+    }
+  }
+
+  async function addGeneralTask(){
+    if(!els.generalTaskInput) return;
+    const text = els.generalTaskInput.value.trim();
+    if(!text){
+      els.generalTaskInput.focus();
+      return;
+    }
+    if(els.generalTaskAddBtn) els.generalTaskAddBtn.disabled = true;
+    try {
+      await api.post('/api/general-tasks', { text });
+      els.generalTaskInput.value = '';
+      await loadGeneralTasks();
+      showToast('Task general ditambahkan');
+    } catch(e) {
+      console.error('Failed to add general task:', e);
+      showToast('Gagal menambahkan task general', 'error');
+    } finally {
+      if(els.generalTaskAddBtn) els.generalTaskAddBtn.disabled = false;
+      els.generalTaskInput.focus();
+    }
+  }
+
   function renderEvidences(){
     els.evidenceBody.innerHTML = '';
     const task = tasks.find(t => t.id === evidenceTaskId);
@@ -2381,12 +2778,24 @@
 
   els.dailyTaskCloseBtn.addEventListener('click', closeDailyTaskPanel);
 
+  /* ---------------- General Task Panel Events ---------------- */
+  els.generalTaskOverlay?.addEventListener('click', (e)=>{
+    if(e.target === els.generalTaskOverlay) closeGeneralTaskPanel();
+  });
+
+  els.generalTaskCloseBtn?.addEventListener('click', closeGeneralTaskPanel);
+  els.generalTaskAddBtn?.addEventListener('click', addGeneralTask);
+  els.generalTaskInput?.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter'){ e.preventDefault(); addGeneralTask(); }
+  });
+
   document.addEventListener('keydown', (e)=>{
     if(e.key==='Escape' && els.confirmOverlay.classList.contains('open')){ closeConfirm(); return; }
     if(e.key==='Escape' && els.overlay.classList.contains('open')) closeModal();
     if(e.key==='Escape' && els.notifOverlay.classList.contains('open')) els.notifOverlay.classList.remove('open');
     if(e.key==='Escape' && els.evidenceOverlay.classList.contains('open')) closeEvidencePanel();
     if(e.key==='Escape' && els.dailyTaskOverlay.classList.contains('open')) closeDailyTaskPanel();
+    if(e.key==='Escape' && els.generalTaskOverlay?.classList.contains('open')) closeGeneralTaskPanel();
     if(e.key==='Escape' && els.imgPreviewOverlay.classList.contains('open')) closeImagePreview();
     if(e.key==='Escape' && els.navSidebar.classList.contains('open')) closeMobileNav();
   });
@@ -4612,7 +5021,7 @@
     const savedView = localStorage.getItem('currentView');
     const validViews = ['dashboard', 'projects', 'mom', 'qa', 'uat-process'];
     setActiveView(savedView && validViews.includes(savedView) ? savedView : 'dashboard');
-    await Promise.all([loadTasks(), loadDailyTasks(), loadMomMeetings(), loadUats()]);
+    await Promise.all([loadTasks(), loadDailyTasks(), loadGeneralTasks(), loadMomMeetings(), loadUats(), loadSessionUser()]);
   })();
 
   // Update date labels when the day rolls over (checked every 30s)
@@ -4626,11 +5035,16 @@
     }
   }, 30000);
 
-  // Daily Task card click handler (delegated)
+  // Daily Task & General Task card click handlers (delegated)
   els.overviewCards.addEventListener('click', (e) => {
-    const card = e.target.closest('#card-daily-task');
-    if (card) {
+    const dailyCard = e.target.closest('#card-daily-task');
+    if (dailyCard) {
       openDailyTaskPanel();
+      return;
+    }
+    const generalCard = e.target.closest('#card-general-task');
+    if (generalCard) {
+      openGeneralTaskPanel();
     }
   });
 

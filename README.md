@@ -11,6 +11,9 @@ npm install
 # Setup environment variables
 cd backend && cp .env.example .env   # Edit .env sesuai kebutuhan
 
+# Buat akun login pertama (wajib sebelum mengakses aplikasi)
+cd backend && SUPERADMIN_PASSWORD='password-anda' npm run auth:create -- superadmin --role superadmin
+
 # Mode JSON (default, tanpa MySQL)
 cd backend && npm start
 
@@ -41,6 +44,37 @@ Semua konfigurasi diatur via file `.env` (gunakan `.env.example` sebagai templat
 | `MYSQL_PASSWORD` | — | MySQL password |
 | `MYSQL_DATABASE` | `db_timepro` | MySQL database name |
 | `DATA_PATH` | `backend/data/tasks.json` | Path file JSON storage |
+| `AUTH_SECRET` | *auto* | Kunci HMAC untuk tanda tangan security token sesi |
+| `AUTH_ENCRYPTION_KEY` | *auto* | Kunci enkripsi AES-256-GCM untuk `data/auth.json` |
+| `AUTH_TOKEN_TTL` | `8h` | Umur sesi login (format `30m`, `8h`, `30d`) |
+| `AUTH_REMEMBER_TTL` | `30d` | Umur sesi saat memilih "Ingat saya" |
+| `AUTH_COOKIE_SECURE` | `false` | Set `true` jika aplikasi diakses via HTTPS |
+| `AUTH_LOGIN_MAX_ATTEMPTS` | `5` | Jumlah gagal login sebelum diblokir sementara |
+| `AUTH_LOGIN_WINDOW` / `AUTH_LOGIN_BLOCK` | `15m` / `15m` | Jendela hitung & durasi blokir login |
+| `ALLOWED_ORIGIN` | — | Origin tambahan yang diizinkan (pisahkan koma) |
+
+> Jika `AUTH_SECRET` / `AUTH_ENCRYPTION_KEY` kosong, server membuat secret otomatis di `backend/data/.auth-secrets.json` (mode 0600). Untuk produksi, isi nilainya di `.env` / secret manager.
+
+## Login & Akun
+
+Aplikasi dilindungi halaman login (`/login.html`).
+
+- **Akun pertama** dibuat via CLI, password dibaca dari env atau prompt (tidak disimpan di source):
+  ```bash
+  cd backend
+  SUPERADMIN_PASSWORD='...' npm run auth:create -- superadmin --role superadmin
+  ```
+- **Menambah akun lain** (belum ada UI register):
+  ```bash
+  cd backend && npm run auth:create -- <username> --role admin
+  ```
+- **Keamanan kredensial**:
+  - `backend/data/auth.json` menyimpan akun dalam bentuk **terenkripsi AES-256-GCM per record** — username & password hash tidak terbaca tanpa `AUTH_ENCRYPTION_KEY`.
+  - Password di dalam record tetap di-hash **scrypt** (salt acak per akun), tidak pernah disimpan plaintext dan tidak pernah dikembalikan API.
+  - File dibuat dengan permission `0600` dan **tidak** ikut backup/restore.
+- **Security token**: token sesi ditandatangani HMAC-SHA256, dikirim lewat cookie `HttpOnly` + `SameSite=Strict` (+ `Secure` di produksi). Semua endpoint `/api/*` dan `/uploads/*` menolak request tanpa sesi valid.
+- **Rate limit**: 5 percobaan gagal per IP+username → blokir 15 menit (`429` + `Retry-After`).
+- Logout tersedia di menu profile (pojok kanan atas) dan langsung mencabut cookie sesi.
 
 ## Target Purpose
 
@@ -97,6 +131,9 @@ Jalan otomatis saat `STORAGE=mysql` — `server.js` menjalankan `migrate()` pada
 
 | Method | Endpoint | Deskripsi |
 |--------|----------|-----------|
+| `POST` | `/api/auth/login` | Login (`username`, `password`, `remember`) → set cookie sesi |
+| `POST` | `/api/auth/logout` | Logout & hapus cookie sesi |
+| `GET` | `/api/auth/me` | Info user yang sedang login |
 | `GET` | `/api/tasks` | Ambil semua data |
 | `GET` | `/api/tasks/:id` | Ambil detail task |
 | `POST` | `/api/tasks` | Buat task baru |
@@ -167,6 +204,8 @@ Lihat `know-me/PLAN.md` untuk detail rencana implementasi.
 - `MYSQL_URL` otomatis diparsing oleh `config.js` — tidak perlu set `MYSQL_HOST` dll secara terpisah
 - Seed otomatis: jika ada kategori baru di JSON yang belum ada di DB, akan dibuat otomatis
 - Semua konfigurasi sensitif (password, credentials) diatur via `.env` — tidak di-commit ke git
+- Akun login tersimpan terenkripsi di `backend/data/auth.json` (tidak di-commit) — lihat bagian **Login & Akun**
+- Halaman login: `frontend/login.html`; halaman aplikasi & `/api/*` tidak dapat diakses tanpa sesi valid
 - Lihat `know-me/PLAN.md` untuk migration path lengkap
 - Lihat `know-me/BASE_DESIGN.md` untuk panduan design system dan konsistensi UI
 - Judul proyek bisa diedit langsung dengan mengklik teks judul di header — perubahan otomatis tersimpan ke server

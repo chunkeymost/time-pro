@@ -17,6 +17,9 @@
 
   <aside class="nav-sidebar" id="nav-sidebar">
     <div class="nav-brand">
+      <span class="nav-brand-icon" title="Action Management">
+        <i class="bi bi-kanban-fill" aria-hidden="true"></i>
+      </span>
       <span class="nav-title">Action<span class="nav-title-accent"> Management</span></span>
       <span class="nav-subtitle">System Analyst & Associate PM</span>
     </div>
@@ -60,6 +63,10 @@
             <i class="bi bi-person-circle"></i>
           </button>
           <div class="profile-menu" id="profile-menu" role="menu" hidden>
+            <div class="profile-menu-header">
+              <span class="profile-menu-name" id="profile-username">Memuat…</span>
+              <span class="profile-menu-role" id="profile-role" data-role="user">user</span>
+            </div>
             <button class="profile-menu-item" data-action="profile" role="menuitem">
               <i class="bi bi-person"></i>
               <span>Profile</span>
@@ -854,6 +861,27 @@
           <div class="chart-legend" id="daily-task-legend"></div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- General Task sidepeek -->
+<div class="overlay" id="general-task-overlay">
+  <div class="modal general-task-modal">
+    <div class="modal-head">
+      <h2><i class="bi bi-inbox"></i> TASK GENERAL</h2>
+      <button class="modal-close" id="general-task-close-btn">&times;</button>
+    </div>
+    <div class="modal-sub">Catat tugas cepat tanpa due date dan PIC. Generate ke Tugas Utama atau Sub Task kapan saja.</div>
+
+    <div class="general-task-add">
+      <input type="text" id="general-task-input" placeholder="Tulis tugas general..." autocomplete="off">
+      <button class="btn btn-primary" id="general-task-add-btn"><i class="bi bi-plus-lg"></i> Tambah</button>
+    </div>
+
+    <div class="general-task-summary" id="general-task-summary"></div>
+    <div class="general-task-list" id="general-task-list">
+      <div class="general-task-empty">Belum ada task general.</div>
     </div>
   </div>
 </div>

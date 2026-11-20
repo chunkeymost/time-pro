@@ -560,6 +560,77 @@ class JsonStorage {
     return this._loadDailyHistory();
   }
 
+  /* ---------- General Tasks ---------- */
+  _getGeneralTasksPath() {
+    return path.join(path.dirname(this.filePath), 'general-tasks.json');
+  }
+
+  _loadGeneralTasks() {
+    try {
+      const p = this._getGeneralTasksPath();
+      if (!fs.existsSync(p)) {
+        const seed = { generalTasks: [], nextId: 1 };
+        fs.writeFileSync(p, JSON.stringify(seed, null, 2), 'utf-8');
+        return seed;
+      }
+      const raw = fs.readFileSync(p, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed.generalTasks)) parsed.generalTasks = [];
+      if (!parsed.nextId) {
+        parsed.nextId = (parsed.generalTasks.reduce((max, t) => Math.max(max, t.id || 0), 0)) + 1;
+      }
+      return parsed;
+    } catch (err) {
+      console.error('Failed to load general tasks:', err.message);
+      const seed = { generalTasks: [], nextId: 1 };
+      fs.writeFileSync(this._getGeneralTasksPath(), JSON.stringify(seed, null, 2), 'utf-8');
+      return seed;
+    }
+  }
+
+  _saveGeneralTasks(data) {
+    fs.writeFileSync(this._getGeneralTasksPath(), JSON.stringify(data, null, 2), 'utf-8');
+  }
+
+  getGeneralTasks() {
+    const data = this._loadGeneralTasks();
+    return data.generalTasks || [];
+  }
+
+  createGeneralTask(gtData) {
+    const data = this._loadGeneralTasks();
+    const gt = {
+      id: data.nextId++,
+      text: gtData.text || '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    data.generalTasks.push(gt);
+    this._saveGeneralTasks(data);
+    return gt;
+  }
+
+  updateGeneralTask(id, gtData) {
+    const data = this._loadGeneralTasks();
+    const idx = data.generalTasks.findIndex(t => t.id === id);
+    if (idx === -1) return null;
+    const gt = data.generalTasks[idx];
+    if (gtData.text !== undefined) gt.text = gtData.text;
+    gt.updatedAt = new Date().toISOString();
+    data.generalTasks[idx] = gt;
+    this._saveGeneralTasks(data);
+    return gt;
+  }
+
+  deleteGeneralTask(id) {
+    const data = this._loadGeneralTasks();
+    const idx = data.generalTasks.findIndex(t => t.id === id);
+    if (idx === -1) return false;
+    data.generalTasks.splice(idx, 1);
+    this._saveGeneralTasks(data);
+    return true;
+  }
+
   /* ---------- Minutes of Meeting ---------- */
   _getMomPath() {
     return path.join(path.dirname(this.filePath), 'mom.json');

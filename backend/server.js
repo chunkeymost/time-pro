@@ -7,15 +7,157 @@ const multer = require('multer');
 const JsonStorage = require('./src/storage/JsonStorage');
 const MysqlStorage = require('./src/storage/MysqlStorage');
 const config = require('./src/config');
+const { AuthStore } = require('./src/auth/AuthStore');
+const {
+  signToken,
+  setSessionCookie,
+  clearSessionCookie,
+  securityHeaders,
+  createAuthGuards,
+} = require('./src/auth/session');
+const { createLoginRateLimiter } = require('./src/auth/rateLimit');
 
 const app = express();
+app.disable('x-powered-by');
 
 const storage = process.env.STORAGE === 'mysql'
   ? new MysqlStorage(config.mysql)
   : new JsonStorage(config.dataPath);
 
-app.use(cors());
-app.use(express.json());
+const authStore = new AuthStore({
+  filePath: config.auth.filePath,
+  encryptionKey: config.auth.encryptionKey,
+});
+
+const authGuards = createAuthGuards({ authStore, authConfig: config.auth });
+
+const loginLimiter = createLoginRateLimiter({
+  maxAttempts: config.auth.login.maxAttempts,
+  windowMs: config.auth.login.windowMs,
+  blockMs: config.auth.login.blockMs,
+});
+
+/* ---------- Global Middleware ---------- */
+
+app.use(securityHeaders);
+
+app.use(cors({
+  credentials: true,
+  origin(origin, callback) {
+    // Request tanpa Origin (curl, same-origin GET) selalu diizinkan.
+    if (!origin) return callback(null, true);
+    if (config.auth.allowedOrigins.length > 0) {
+      return callback(null, config.auth.allowedOrigins.indexOf(origin) !== -1);
+    }
+    // Default: hanya origin lokal (development).
+    const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(origin);
+    return callback(null, isLocal);
+  },
+}));
+
+app.use(express.json({ limit: '256kb' }));
+app.use(authGuards.requireSameOrigin);
+
+/* ---------- Authentication API ---------- */
+
+const LOGIN_MIN_DURATION_MS = 350;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+app.post('/api/auth/login', async (req, res, next) => {
+  const startedAt = Date.now();
+  const body = req.body || {};
+  const username = typeof body.username === 'string' ? body.username.trim() : '';
+  const password = typeof body.password === 'string' ? body.password : '';
+
+  if (!username || !password) {
+    return res.status(400).json({
+      error: 'Username dan password wajib diisi.',
+      code: 'MISSING_CREDENTIALS',
+    });
+  }
+
+  const limiterKey = (req.ip || 'unknown') + '|' + username.toLowerCase();
+  const limit = loginLimiter.check(limiterKey);
+  if (!limit.allowed) {
+    res.setHeader('Retry-After', String(limit.retryAfterSeconds));
+    return res.status(429).json({
+      error:
+        'Terlalu banyak percobaan login. Coba lagi dalam ' +
+        Math.max(1, Math.ceil(limit.retryAfterSeconds / 60)) +
+        ' menit.',
+      code: 'TOO_MANY_ATTEMPTS',
+      retryAfterSeconds: limit.retryAfterSeconds,
+    });
+  }
+
+  try {
+    const user = await authStore.verifyCredentials(username, password);
+
+    // Samakan durasi respons agar keberadaan username tidak bisa ditebak.
+    const elapsed = Date.now() - startedAt;
+    if (elapsed < LOGIN_MIN_DURATION_MS) await sleep(LOGIN_MIN_DURATION_MS - elapsed);
+
+    if (!user) {
+      loginLimiter.fail(limiterKey);
+      return res.status(401).json({
+        error: 'Username atau password salah.',
+        code: 'INVALID_CREDENTIALS',
+      });
+    }
+
+    loginLimiter.reset(limiterKey);
+
+    const remember = body.remember === true;
+    const ttl = remember ? config.auth.rememberTtlSeconds : config.auth.tokenTtlSeconds;
+    const token = signToken(
+      { sub: user.id, un: user.username, role: user.role, ver: user.tokenVersion },
+      config.auth.secret,
+      ttl
+    );
+
+    setSessionCookie(res, token, {
+      name: config.auth.cookieName,
+      maxAge: ttl,
+      secure: config.auth.cookieSecure,
+    });
+
+    return res.json({
+      user: { username: user.username, role: user.role },
+      expiresIn: ttl,
+    });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  clearSessionCookie(res, {
+    name: config.auth.cookieName,
+    secure: config.auth.cookieSecure,
+  });
+  res.json({ success: true });
+});
+
+app.get('/api/auth/me', async (req, res, next) => {
+  try {
+    const user = await authGuards.resolveUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Belum login.', code: 'UNAUTHENTICATED' });
+    }
+    res.json({ user: { username: user.username, role: user.role } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* ---------- Page Guard & Static Files ---------- */
+
+app.get('/login', (req, res) => res.redirect(302, '/login.html'));
+
+app.use(authGuards.pageGuard);
 
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
@@ -43,7 +185,11 @@ const upload = multer({
   },
 });
 
-app.use('/uploads', express.static(uploadDir));
+app.use('/uploads', authGuards.requireAuth, express.static(uploadDir));
+
+/* ---------- Protect remaining API routes ---------- */
+
+app.use('/api', authGuards.requireAuth);
 
 /* ---------- Tasks ---------- */
 
@@ -997,6 +1143,135 @@ app.delete('/api/daily-tasks/:id', async (req, res) => {
   }
 });
 
+/* ---------- General Tasks ---------- */
+
+// Task General sementara hanya didukung pada penyimpanan JSON,
+// mengikuti pola yang sama dengan Minutes of Meeting.
+function requireJsonGeneralStorage(req, res, next) {
+  if (typeof storage.getGeneralTasks !== 'function') {
+    return res.status(501).json({
+      error: 'Task General sementara hanya tersedia pada penyimpanan JSON.',
+    });
+  }
+  next();
+}
+
+app.use('/api/general-tasks', requireJsonGeneralStorage);
+
+app.get('/api/general-tasks', async (req, res) => {
+  try {
+    const generalTasks = await storage.getGeneralTasks();
+    res.json({ generalTasks });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/general-tasks', async (req, res) => {
+  try {
+    const text = String((req.body && req.body.text) || '').trim();
+    if (!text) return res.status(400).json({ error: 'text is required' });
+    const generalTask = await storage.createGeneralTask({ text });
+    res.status(201).json({ generalTask });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/general-tasks/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const text = String((req.body && req.body.text) || '').trim();
+    if (!text) return res.status(400).json({ error: 'text is required' });
+    const generalTask = await storage.updateGeneralTask(id, { text });
+    if (!generalTask) return res.status(404).json({ error: 'General task not found' });
+    res.json({ generalTask });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/general-tasks/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const ok = await storage.deleteGeneralTask(id);
+    if (!ok) return res.status(404).json({ error: 'General task not found' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/general-tasks/:id/convert', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const generalTasks = await storage.getGeneralTasks();
+    const generalTask = generalTasks.find(t => t.id === id);
+    if (!generalTask) return res.status(404).json({ error: 'General task not found' });
+
+    const body = req.body || {};
+
+    if (body.target === 'main') {
+      const start = String(body.start || '');
+      const end = String(body.end || '');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) {
+        return res.status(400).json({ error: 'start dan end wajib diisi dengan format YYYY-MM-DD' });
+      }
+      if (end < start) {
+        return res.status(400).json({ error: 'Tanggal selesai harus setelah tanggal mulai' });
+      }
+
+      const cat = body.cat || 'lainnya';
+      const assignee = String(body.assignee || '').trim();
+      const task = await storage.create({
+        name: generalTask.text,
+        start,
+        end,
+        cat,
+        assignee,
+        progress: 0,
+        notes: '',
+      });
+      await storage.addTaskLog(task.id, 'Dibuat dari Task General: "' + generalTask.text + '"');
+      await storage.deleteGeneralTask(id);
+
+      return res.status(201).json({ success: true, targetType: 'main', task });
+    }
+
+    if (body.target === 'subtask') {
+      const taskId = parseInt(body.taskId, 10);
+      if (!Number.isFinite(taskId)) {
+        return res.status(400).json({ error: 'taskId wajib diisi' });
+      }
+      const parent = await storage.getById(taskId);
+      if (!parent) return res.status(404).json({ error: 'Task not found' });
+
+      const todo = await storage.addTodo(taskId, { text: generalTask.text, due: null });
+      if (!todo) return res.status(404).json({ error: 'Task not found' });
+      await storage.addTaskLog(taskId, 'Menambahkan Sub Task dari Task General: "' + generalTask.text + '"');
+
+      const updated = await storage.getById(taskId);
+      const todos = (updated && updated.todos) || [];
+      if (todos.length > 0) {
+        const done = todos.filter(td => td.done).length;
+        await storage.update(taskId, { progress: Math.round((done / todos.length) * 100) });
+      }
+      await storage.deleteGeneralTask(id);
+
+      return res.status(201).json({
+        success: true,
+        targetType: 'subtask',
+        task: await storage.getById(taskId),
+        todo,
+      });
+    }
+
+    return res.status(400).json({ error: 'target must be "main" or "subtask"' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ---------- Metadata ---------- */
 
 app.get('/api/metadata', async (req, res) => {
@@ -1027,17 +1302,41 @@ app.post('/api/sync/commit', (req, res) => {
   res.json({ message: 'Sync akan tersedia di Phase 2 setelah integrasi MySQL.' });
 });
 
+/* ---------- Error handler ---------- */
+
+app.use((err, req, res, next) => {
+  console.error('[server]', err.message);
+  if (res.headersSent) return next(err);
+  const status = err.status && Number.isFinite(err.status) ? err.status : 500;
+  res.status(status).json({ error: err.message || 'Internal server error' });
+});
+
 /* ---------- Start ---------- */
 
 const PORT = config.port;
-app.listen(PORT, () => {
-  console.log(`Time Pro API running at http://localhost:${PORT}`);
 
-  // Daily task day-rollover: snapshot closing day into history, reset active list
-  if (typeof storage.ensureDailyRollover === 'function') {
-    try { storage.ensureDailyRollover(); } catch (err) { console.error('Daily rollover (start) failed:', err.message); }
-    setInterval(() => {
-      try { storage.ensureDailyRollover(); } catch (err) { console.error('Daily rollover (interval) failed:', err.message); }
-    }, 60000);
+async function startServer() {
+  await authStore.init();
+  const accountCount = await authStore.count();
+  console.log(`[auth] ${accountCount} akun terdaftar di ${config.auth.filePath}`);
+  if (accountCount === 0) {
+    console.warn('[auth] Belum ada akun. Buat akun dengan: npm run auth:create -- <username> --role superadmin');
   }
+
+  app.listen(PORT, () => {
+    console.log(`Time Pro API running at http://localhost:${PORT}`);
+
+    // Daily task day-rollover: snapshot closing day into history, reset active list
+    if (typeof storage.ensureDailyRollover === 'function') {
+      try { storage.ensureDailyRollover(); } catch (err) { console.error('Daily rollover (start) failed:', err.message); }
+      setInterval(() => {
+        try { storage.ensureDailyRollover(); } catch (err) { console.error('Daily rollover (interval) failed:', err.message); }
+      }, 60000);
+    }
+  });
+}
+
+startServer().catch((err) => {
+  console.error('[auth] Gagal inisialisasi autentikasi:', err.message);
+  process.exit(1);
 });

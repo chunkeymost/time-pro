@@ -1,2 +1,3 @@
-◇ injected env (8) from .env // tip: ⌘ override existing { override: true }
+◇ injected env (13) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+[auth] 1 akun terdaftar di /Users/goodevaninja_mac1/Documents/Google Drive/Development/time-pro/backend/data/auth.json
 Time Pro API running at http://localhost:3000
