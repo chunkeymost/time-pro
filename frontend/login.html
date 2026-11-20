@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Masuk | Time Pro</title>
+<link rel="icon" type="image/svg+xml" href="assets/kanban-fill.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/login.css">
+<script>
+  (function () {
+    try {
+      var saved = localStorage.getItem('theme');
+      if (saved) {
+        document.documentElement.setAttribute('data-theme', saved);
+      } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    } catch (_) {}
+  })();
+</script>
+</head>
+<body class="auth-body">
+
+<button class="auth-theme-toggle" id="auth-theme-toggle" type="button" aria-label="Ganti tema">
+  <i class="bi bi-moon" id="auth-theme-icon"></i>
+</button>
+
+<main class="auth-shell">
+  <section class="auth-brand" aria-label="Time Pro">
+    <div class="auth-brand-inner">
+      <span class="auth-brand-badge">
+        <i class="bi bi-kanban-fill"></i>
+      </span>
+      <h1 class="auth-brand-title">Action<span> Management</span></h1>
+      <p class="auth-brand-sub">System Analyst &amp; Associate PM</p>
+
+      <ul class="auth-brand-points">
+        <li><i class="bi bi-diagram-3"></i> Timeline &amp; Gantt proyek dalam satu layar</li>
+        <li><i class="bi bi-clipboard-check"></i> MoM, UAT, dan daily task terpusat</li>
+        <li><i class="bi bi-shield-lock"></i> Akses terproteksi token &amp; enkripsi kredensial</li>
+      </ul>
+
+      <span class="auth-brand-foot">Time Pro · Lini Waktu Proyek</span>
+    </div>
+    <div class="auth-brand-grid" aria-hidden="true"></div>
+  </section>
+
+  <section class="auth-panel">
+    <form class="auth-card" id="login-form" novalidate>
+      <header class="auth-card-head">
+        <span class="auth-eyebrow">Autentikasi</span>
+        <h2 class="auth-title">Masuk ke akun Anda</h2>
+        <p class="auth-desc">Gunakan kredensial yang diberikan superadmin.</p>
+      </header>
+
+      <div class="auth-banner" id="auth-banner" role="status" aria-live="polite" hidden></div>
+
+      <div class="auth-field">
+        <label for="login-username">Username</label>
+        <div class="auth-input">
+          <i class="bi bi-person" aria-hidden="true"></i>
+          <input
+            id="login-username"
+            name="username"
+            type="text"
+            autocomplete="username"
+            spellcheck="false"
+            autocapitalize="none"
+            maxlength="32"
+            required
+            autofocus
+          >
+        </div>
+      </div>
+
+      <div class="auth-field">
+        <label for="login-password">Password</label>
+        <div class="auth-input">
+          <i class="bi bi-lock" aria-hidden="true"></i>
+          <input
+            id="login-password"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            maxlength="200"
+            required
+          >
+          <button
+            class="auth-eye"
+            id="toggle-password"
+            type="button"
+            aria-label="Tampilkan password"
+            aria-pressed="false"
+          >
+            <i class="bi bi-eye" id="toggle-password-icon"></i>
+          </button>
+        </div>
+        <p class="auth-caps" id="caps-warning" hidden><i class="bi bi-exclamation-circle"></i> Caps Lock aktif</p>
+      </div>
+
+      <label class="auth-remember">
+        <input type="checkbox" id="remember-me">
+        <span>Ingat saya di perangkat ini (30 hari)</span>
+      </label>
+
+      <button class="auth-submit" id="login-submit" type="submit">
+        <span class="auth-submit-label">Masuk</span>
+        <i class="bi bi-arrow-right auth-submit-icon" aria-hidden="true"></i>
+        <span class="auth-spinner" aria-hidden="true"></span>
+      </button>
+
+      <p class="auth-hint">
+        Lupa password? Hubungi <strong>superadmin</strong> untuk reset kredensial.
+      </p>
+    </form>
+
+    <footer class="auth-footer">
+      <span>&copy; <span id="auth-year">2026</span> Time Pro</span>
+      <span class="auth-footer-dot" aria-hidden="true"></span>
+      <span>Sesi aman &amp; terenkripsi</span>
+    </footer>
+  </section>
+</main>
+
+<script src="js/login.js"></script>
+</body>
+</html>
